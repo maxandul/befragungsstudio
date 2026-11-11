@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="de-CH"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{p.name}} · {{unit or 'Gesamtbericht'}}</title>
+<style>
+body{font:17px/1.6 Arial,sans-serif;color:#222;margin:0;border-top:10px solid #0070b4;background:#fff}
+main{max-width:1080px;margin:40px auto;padding:0 24px}h1,h2{line-height:1.2}h1{font-size:36px}
+small{color:#555}table{border-collapse:collapse;width:100%;margin:20px 0}th,td{text-align:left;padding:10px;border-bottom:1px solid #ddd}
+th{background:#edf5fa}article{margin:40px 0;border-top:1px solid #ccc;padding-top:24px}a{color:#00407c}
+button,select{font:15px Arial,sans-serif;padding:10px 14px;border:1px solid #9cabb5;border-radius:4px;background:#fff;color:#00407c;margin:5px;cursor:pointer}
+button:hover{background:#edf5fa}button:disabled{opacity:.5;cursor:wait}.primary{background:#00407c;color:white}.primary:hover{background:#0070b4}
+.hint{background:#f0f5f8;padding:16px}.chart-container{position:relative;height:520px;margin:24px 0}.chart-container canvas{max-width:100%}
+.status{color:#526b7c;font-size:14px}.table-wrap{overflow:auto}noscript{display:block;background:#fff0db;padding:16px}
+:focus-visible{outline:3px solid #009ee0;outline-offset:2px}
+@media(max-width:650px){main{padding:0 16px}h1{font-size:28px}.chart-container{height:600px}th,td{padding:8px;font-size:13px}}
+@media print{.downloads{display:none}.chart-container{height:420px}article{break-inside:avoid}}
+</style></head>
+<body data-auto-zip="{{'true' if auto_zip else 'false'}}"><main>
+<small>BEFRAGUNGSSTUDIO · AUSWERTUNG</small><h1>{{p.name}}</h1><h2>{{unit or 'Gesamtbefragung'}}</h2><p>{{selected|join(' · ')}}</p>
+<div class="hint">Ausgewählte Einheit: {{dimension or 'Gesamt'}} {{unit}}. Mindestfallzahl: {{minimum}}.
+{{hidden}} Ergebnisse unter Mindestfallzahl ausgeblendet. Freitexte sind nicht enthalten.</div>
+<div class="downloads"><button id="all-charts" class="primary" type="button">Alle Charts als PNG-ZIP herunterladen</button><p id="export-status" class="status" role="status">Charts werden geladen …</p></div>
+<noscript>Für interaktive Charts und PNG-Downloads aktivieren Sie JavaScript. Die Ergebnistabellen bleiben lesbar.</noscript>
+<h2>Teilnahme und Rücklauf</h2><div class="table-wrap"><table><tr><th>Welle</th><th>Feedbacks</th><th>Eingeladen</th><th>Rücklauf</th></tr>
+{% for r in rates %}<tr><td>{{r.wave}}</td><td>{{r.n}}</td><td>{{r.total if r.total is not none else 'Nicht hinterlegt'}}</td><td>{{'%.1f %%'|format(r.rate) if r.rate is not none else '–'}}{% if r.warning %} · Grundmenge prüfen{% endif %}</td></tr>{% endfor %}</table></div>
+<nav aria-label="Berichtsinhalt"><h2>Inhalt</h2>{% for card in cards %}<p><a href="#q{{loop.index}}">{{card.label}}</a></p>{% endfor %}</nav>
+{% for card in cards %}{% set card_index=loop.index0 %}<article id="q{{loop.index}}"><small>{{card.theme}}</small><h2>{{card.label}}</h2>
+{% if card.rows[0].type=='scale' %}<div class="downloads"><label for="metric-{{card_index}}">Darstellung</label><select id="metric-{{card_index}}"><option value="mean">Mittelwert</option><option value="top2">Zustimmungsanteil</option></select></div>{% endif %}
+<div class="chart-container"><canvas id="chart-{{card_index}}" role="img" aria-label="{{card.label}}. Werte in der folgenden Tabelle."></canvas></div>
+<div class="downloads">PNG herunterladen:
+{% for layout,label in [('wide','Ganze Folie · 1920 × 1080'),('half','Halbfolie · 960 × 1080'),('compact','Kompakt · 1200 × 900')] %}<button type="button" data-png="{{layout}}" data-index="{{card_index}}">{{label}}</button>{% endfor %}</div>
+<div class="table-wrap"><table><tr><th>Welle</th><th>Gültig</th><th>Mittelwert</th><th>Zustimmung</th><th>Fehlend / ungeklärt</th></tr>
+{% for r in card.rows %}<tr><td>{{r.wave}}</td><td>{{r.n}}</td><td>{{'%.2f'|format(r.mean) if r.mean is not none else '–'}}</td><td>{{'%.1f %%'|format(r.top2) if r.top2 is not none else '–'}}</td><td>{{r.missing}} / {{r.invalid}}</td></tr>{% endfor %}</table></div></article>{% endfor %}
+<details><summary>Berechnung und Datenbasis</summary><p>Mittelwerte und Zustimmungsanteile beziehen sich auf gültige Antworten je Frage. Die Zustimmungsgrenze ist je Frage konfiguriert, bei einer Skala von 1 bis 5 standardmässig 4. Fehlende und nicht zugeordnete Antworten sind ausgeschlossen. Auswahlcharts zeigen die letzte ausgewählte Welle in der Reihenfolge der Antwortdaten. Mehrfachnennungen können mehr als 100 % ergeben. Zeitvergleiche setzen fachlich vergleichbare Fragen und Einheiten voraus.</p><p>Rücklauf = unterschiedliche Feedbacks je Welle / hinterlegte eingeladene Personen. Die Grundmengen müssen dieselbe Einheit und Abgrenzung wie die Ergebnisse betreffen.</p></details>
+</main>
+<script id="chart-data" type="application/json">{{chart_payload|tojson}}</script>
+<script>{{chart_library|safe}}</script>
+<script>{{chart_renderer|safe}}</script>
+</body></html>
