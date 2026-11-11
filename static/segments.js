@@ -3,6 +3,22 @@
   const byId=id=>document.getElementById(id);
   const wave=byId('segment-wave'), source=byId('mapping-source');
   const dimension=byId('alias-dimension'), original=byId('alias-source'), target=byId('alias-target');
+  const mappingDimension=byId('mapping-dimension');
+  const rules=JSON.parse(byId('mapping-rules').textContent);
+  const dimensionValue=()=>dimension.value==='__custom__'?byId('alias-custom').value.trim():dimension.value;
+  function customFields(){
+    for(const prefix of ['mapping','alias']){
+      const custom=byId(prefix+'-dimension').value==='__custom__';
+      byId(prefix+'-custom-wrap').hidden=!custom;
+      byId(prefix+'-custom').required=custom;
+    }
+  }
+  function chooseSavedSource(){
+    const dim=mappingDimension.value==='__custom__'?byId('mapping-custom').value.trim():mappingDimension.value;
+    const match=rules.find(r=>r.dimension===dim && r.wave===wave.value)
+      ||rules.find(r=>r.dimension===dim && r.wave==='*');
+    source.value=match?match.source:'';
+  }
   let data=null, requestNumber=0, timer;
   function cell(row,value){const td=document.createElement('td');td.textContent=value;row.appendChild(td);return td;}
   function messageRow(body,text,columns){body.replaceChildren();const tr=document.createElement('tr');cell(tr,text).colSpan=columns;body.appendChild(tr);}
@@ -38,7 +54,7 @@
     if(unique.has(selected))original.value=selected;
     const names=new Set(data.effective.flatMap(row=>[row.source,row.current]));
     byId('existing-values').replaceChildren(...[...names].map(value=>new Option(value,value)));
-    byId('alias-summary').textContent=dimension.value
+    byId('alias-summary').textContent=dimensionValue()
       ? `${data.mapped} von ${data.total} Teilnahmen dem Merkmal zugeordnet · ${data.unmapped} ohne Zuordnung · ${data.mapping_conflicts} mit widersprüchlichen Werten.`
       : 'Bitte ein Merkmal wählen.';
     const aliases=byId('alias-preview');aliases.replaceChildren();
@@ -51,7 +67,7 @@
   async function refresh(){
     const mine=++requestNumber;
     const url=new URL(location.href);url.pathname=url.pathname.replace(/\/$/,'')+'/preview';
-    url.search=new URLSearchParams({wave:wave.value,source:source.value,dimension:dimension.value,original:original.value,target:target.value});
+    url.search=new URLSearchParams({wave:wave.value,source:source.value,dimension:dimensionValue(),original:original.value,target:target.value});
     document.querySelectorAll('input[type=hidden][name=wave]').forEach(input=>input.value=wave.value);
     byId('preview-error').hidden=true;
     try{
@@ -64,10 +80,22 @@
   }
   const later=()=>{clearTimeout(timer);timer=setTimeout(refresh,300);};
   byId('scope-form').addEventListener('submit',event=>{event.preventDefault();refresh();});
-  wave.addEventListener('change',()=>{original.value='';target.value='';refresh();});
+  wave.addEventListener('change',()=>{original.value='';target.value='';chooseSavedSource();refresh();});
   source.addEventListener('change',refresh);
-  byId('mapping-dimension').addEventListener('input',event=>{dimension.value=event.target.value;later();});
-  dimension.addEventListener('input',later);original.addEventListener('change',refresh);target.addEventListener('input',later);
+  mappingDimension.addEventListener('change',()=>{
+    dimension.value=mappingDimension.value;
+    byId('alias-custom').value=byId('mapping-custom').value;
+    original.value='';target.value='';customFields();chooseSavedSource();refresh();
+  });
+  byId('mapping-custom').addEventListener('input',()=>{
+    dimension.value='__custom__';byId('alias-custom').value=byId('mapping-custom').value;
+    customFields();later();
+  });
+  dimension.addEventListener('change',()=>{original.value='';target.value='';customFields();refresh();});
+  byId('alias-custom').addEventListener('input',later);
+  original.addEventListener('change',refresh);target.addEventListener('input',later);
   byId('column-search').addEventListener('input',renderColumns);byId('all-columns').addEventListener('change',renderColumns);
+  customFields();
+  if(!source.value)chooseSavedSource();
   refresh();
 })();

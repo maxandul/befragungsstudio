@@ -1,4 +1,4 @@
-# Befragungsstudio 0.1.6
+# Befragungsstudio 0.1.7
 
 Erste lokale Umsetzung für Befragungsdaten. Charts mit lokal mitgeliefertem Chart.js 4.4.8; Matplotlib wird nicht benötigt. Python 3.11 oder neuer mit Python
 Launcher unter Windows. Alle Oberflächendateien werden mitgeliefert.
@@ -213,3 +213,14 @@ der Teilnahmen sein; die Vorschau weist solche Konflikte ausdrücklich aus.
 Namensregeln vergleichen jeweils den ursprünglichen Merkmalswert. Eine speziellere
 Regel überschreibt eine allgemeine Regel; Umbenennungen werden nicht als Kette
 aufeinander angewendet.
+
+## Merkmalauswahl ab 0.1.7
+
+Merkmale werden über ein vollständiges Dropdown ausgewählt. Amt, Bereich,
+Abteilung, RAV Gruppe, RAV und Team sind immer sichtbar. Gespeicherte eigene
+Merkmale ergänzen die Liste; gleiche Namen erscheinen nur einmal, auch wenn sie
+für mehrere Erhebungen zugeordnet sind. Über «Eigenes Merkmal …» wird ein eigener
+Name erfasst, der nach dem Speichern ebenfalls in der Liste erscheint.
+Beim Wechsel von Merkmal oder Erhebung wird die bereits gespeicherte Quellspalte
+für diese Kombination angezeigt. Fehlt eine Regel, bleibt die Quellspalte leer,
+damit nicht versehentlich die zuvor ausgewählte Spalte zugeordnet wird.

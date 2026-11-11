@@ -350,7 +350,9 @@ def create_app(instance=None):
             if request.method == 'POST':
                 f=request.form
                 dim=f['dimension'].strip()
-                if not dim:
+                if dim=='__custom__':
+                    dim=f.get('custom_dimension','').strip()
+                if not dim or dim=='__custom__':
                     raise ValueError('Bitte eine Merkmalsbezeichnung angeben.')
                 if f['action']=='mapping':
                     c.execute('INSERT INTO mappings(project,wave,dimension,source) VALUES(?,?,?,?) ON CONFLICT(project,wave,dimension) DO UPDATE SET source=excluded.source',
@@ -364,9 +366,13 @@ def create_app(instance=None):
             mappings=c.execute('SELECT * FROM mappings WHERE project=?',(pid,)).fetchall()
             aliases=c.execute('SELECT * FROM aliases WHERE project=?',(pid,)).fetchall()
         scope=request.args.get('wave') or (ctx['waves'][0] if ctx['waves'] else '*')
+        selected_dimension=request.args.get('dimension','Bereich')
+        dimension_options=list(dict.fromkeys([*DIMENSIONS,*[r['dimension'] for r in mappings],
+                                              *[r['dimension'] for r in aliases],selected_dimension]))
         return render_template('segments.html', **ctx, mappings=mappings,aliases=aliases,tab='segments',
                                scope=scope,selected_source=request.args.get('source',''),
-                               selected_dimension=request.args.get('dimension','Bereich'))
+                               selected_dimension=selected_dimension,dimension_options=dimension_options,
+                               mapping_rules=[dict(r) for r in mappings])
 
     @app.get('/p/<int:pid>/segments/preview')
     def preview_segments(pid):

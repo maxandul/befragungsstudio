@@ -14,6 +14,40 @@ from core import read_table,normalize,aggregate,parse_rules,segment_preview
 
 
 class StudioTests(unittest.TestCase):
+    def test_segment_dimensions_are_complete_unique_and_extensible(self):
+        from html.parser import HTMLParser
+        class Selects(HTMLParser):
+            def __init__(self):
+                super().__init__();self.current=None;self.options={}
+            def handle_starttag(self,tag,attrs):
+                a=dict(attrs)
+                if tag=='select':
+                    self.current=a.get('id');self.options[self.current]=[]
+                if tag=='option' and self.current:
+                    self.options[self.current].append(a.get('value',''))
+            def handle_endtag(self,tag):
+                if tag=='select':self.current=None
+        self.question_setup()
+        for wave in ['*','Juni']:
+            r=self.post('/p/1/segments',dict(action='mapping',wave=wave,dimension='Bereich',source='Question title'))
+            self.assertEqual(r.status_code,302)
+        r=self.post('/p/1/segments',dict(action='mapping',wave='*',dimension='__custom__',
+                    custom_dimension='Dienstjahresgruppe',source='Question title'))
+        self.assertEqual(r.status_code,302)
+        page=self.client.get(r.location)
+        parser=Selects();parser.feed(page.data.decode())
+        for name in ['mapping-dimension','alias-dimension']:
+            values=parser.options[name]
+            self.assertEqual(values.count('Bereich'),1)
+            self.assertEqual(len(values),len(set(values)))
+            for value in ['Amt','Bereich','Abteilung','RAV Gruppe','RAV','Team','Dienstjahresgruppe','__custom__']:
+                self.assertIn(value,values)
+        self.assertNotIn(b'list="dims"',page.data)
+        with sqlite3.connect(Path(self.temp.name)/'studio.sqlite3') as c:
+            self.assertEqual(c.execute('SELECT COUNT(*) FROM mappings WHERE dimension=?',('__custom__',)).fetchone()[0],0)
+        bad=self.post('/p/1/segments',dict(action='mapping',wave='*',dimension='__custom__',custom_dimension='',source='Question title'))
+        self.assertEqual(bad.status_code,400)
+
     def test_segment_preview_counts_participations_and_applies_rules(self):
         first=dict(wave='2024',feedback='a',raw={'HS2':'Stab','Bereich':''})
         records=[first,dict(first),dict(wave='2024',feedback='b',raw={'HS2':'AI','Bereich':''}),
