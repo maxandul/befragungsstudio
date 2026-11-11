@@ -119,10 +119,69 @@ def mapped_dimensions(record, mappings, aliases):
         value = str(record['raw'].get(mapping['source'], '')).strip()
         if value:
             dims[mapping['dimension']] = value
+    # Namensregeln beziehen sich auf den ursprünglichen Merkmalswert, nicht auf
+    # das Ergebnis einer vorherigen Umbenennung. So kann eine Wellenregel eine
+    # allgemeine Namensregel zuverlässig überschreiben.
+    original_dims=dict(dims)
     for a in aliases:
-        if a['wave'] in ('*', record['wave']) and dims.get(a['dimension']) == a['source']:
+        if a['wave'] in ('*', record['wave']) and original_dims.get(a['dimension']) == a['source']:
             dims[a['dimension']] = a['target']
     return dims
+
+
+def segment_preview(records, mappings=(), aliases=(), wave='*', source='', dimension='',
+                    original='', target=''):
+    """Teilnahmen statt Antwortzeilen zählen; widersprüchliche Werte sichtbar machen."""
+    records=[r for r in records if wave=='*' or r['wave']==wave]
+    proposed=[dict(a) for a in aliases]
+    if dimension and original and target:
+        existing=next((a for a in proposed if a['wave']==wave and a['dimension']==dimension and a['source']==original),None)
+        if existing is not None:
+            existing['target']=target
+        else:
+            proposed.append(dict(wave=wave,dimension=dimension,source=original,target=target))
+        proposed.sort(key=lambda a:a['wave']!='*')
+    people={(r['wave'],r['feedback']) for r in records}
+    column_people=defaultdict(set)
+    column_values=defaultdict(set)
+    source_values=defaultdict(set)
+    source_people=defaultdict(set)
+    pairs=defaultdict(set)
+    dim_people=defaultdict(set)
+    for r in records:
+        person=(r['wave'],r['feedback'])
+        for col,value in r['raw'].items():
+            value=str(value).strip()
+            if value:
+                column_people[col].add(person)
+                column_values[col].add(value)
+        value=str(r['raw'].get(source,'')).strip()
+        if value:
+            source_values[value].add(person)
+            source_people[person].add(value)
+        if dimension:
+            raw=mapped_dimensions(r,mappings,[]).get(dimension,'')
+            current=mapped_dimensions(r,mappings,aliases).get(dimension,'')
+            if raw:
+                after=mapped_dimensions(r,mappings,proposed).get(dimension,'')
+                pairs[(raw,current,after)].add(person)
+                dim_people[person].add(raw)
+    columns=[]
+    for col in sorted(column_people):
+        examples=sorted(column_values[col])
+        columns.append(dict(name=col,filled=len(column_people[col]),distinct=len(examples),
+                            examples=[v[:100] for v in examples[:5]]))
+    values=[dict(value=v,n=len(ids)) for v,ids in sorted(source_values.items())]
+    effective=[dict(source=a,current=b,after=c,n=len(ids)) for (a,b,c),ids in sorted(pairs.items())]
+    target_people=defaultdict(set)
+    for (_,_,after),ids in pairs.items():
+        target_people[after].update(ids)
+    return dict(total=len(people),columns=columns,values=values,
+                filled=len(source_people),empty=len(people)-len(source_people),
+                conflicts=sum(len(v)>1 for v in source_people.values()),
+                mapped=len(dim_people),unmapped=len(people)-len(dim_people),
+                mapping_conflicts=sum(len(v)>1 for v in dim_people.values()),effective=effective,
+                resulting=[dict(value=v,n=len(ids)) for v,ids in sorted(target_people.items())])
 
 
 def number(value):

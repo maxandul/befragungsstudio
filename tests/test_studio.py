@@ -10,10 +10,47 @@ import sqlite3
 from unittest.mock import patch, MagicMock
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from app import create_app
-from core import read_table,normalize,aggregate,parse_rules
+from core import read_table,normalize,aggregate,parse_rules,segment_preview
 
 
 class StudioTests(unittest.TestCase):
+    def test_segment_preview_counts_participations_and_applies_rules(self):
+        first=dict(wave='2024',feedback='a',raw={'HS2':'Stab','Bereich':''})
+        records=[first,dict(first),dict(wave='2024',feedback='b',raw={'HS2':'AI','Bereich':''}),
+                 dict(wave='2026',feedback='a',raw={'HS2':'','Bereich':'AWI Stab'})]
+        mappings=[dict(wave='*',dimension='Bereich',source='Bereich'),dict(wave='2024',dimension='Bereich',source='HS2')]
+        aliases=[dict(wave='*',dimension='Bereich',source='Stab',target='AWI Stab')]
+        preview=segment_preview(records,mappings,aliases,wave='2024',source='HS2',dimension='Bereich',original='Stab',target='Neuer Stab')
+        self.assertEqual(preview['total'],2)
+        self.assertEqual(preview['filled'],2)
+        self.assertEqual(preview['values'],[dict(value='AI',n=1),dict(value='Stab',n=1)])
+        self.assertIn(dict(source='Stab',current='AWI Stab',after='Neuer Stab',n=1),preview['effective'])
+        self.assertEqual(aliases[0]['target'],'AWI Stab')
+        preview=segment_preview(records,mappings,aliases,wave='2026',source='HS2',dimension='Bereich')
+        self.assertEqual(preview['total'],1)
+        self.assertEqual(preview['empty'],1)
+        self.assertEqual(preview['mapped'],1)
+        self.assertNotIn('HS2',[c['name'] for c in preview['columns']])
+        preview=segment_preview(records,mappings,aliases)
+        self.assertEqual(preview['total'],3)
+
+    def test_segment_preview_conflicts_and_endpoint_is_readonly(self):
+        records=[dict(wave='W',feedback='a',raw={'Bereich':'A'}),dict(wave='W',feedback='a',raw={'Bereich':'B'})]
+        preview=segment_preview(records,source='Bereich')
+        self.assertEqual(preview['filled'],1)
+        self.assertEqual(preview['conflicts'],1)
+        self.question_setup()
+        self.post('/p/1/segments',dict(action='mapping',wave='*',dimension='Bereich',source='Question title'))
+        r=self.client.get('/p/1/segments/preview?wave=Juni&source=Question+title&dimension=Bereich&original=Frage+alt&target=Gemeinsam')
+        self.assertEqual(r.status_code,200)
+        self.assertEqual(r.json['total'],2)
+        self.assertIn(dict(source='Frage alt',current='Frage alt',after='Gemeinsam',n=1),r.json['effective'])
+        with sqlite3.connect(Path(self.temp.name)/'studio.sqlite3') as c:
+            self.assertEqual(c.execute('SELECT COUNT(*) FROM aliases').fetchone()[0],0)
+        r=self.client.get('/p/1/segments?wave=Juni')
+        self.assertIn(b'id="candidate-columns"',r.data)
+        self.assertIn(b'segments.js',r.data)
+
     @unittest.skipUnless(shutil.which('node'), 'Optionaler Entwicklungstest benötigt Node.js')
     def test_question_save_url_and_csrf_retry(self):
         subprocess.run(['node',str(Path(__file__).with_name('check_question_save.cjs'))],check=True,capture_output=True)

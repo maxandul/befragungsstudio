@@ -1,4 +1,4 @@
-# Befragungsstudio 0.1.5
+# Befragungsstudio 0.1.6
 
 Erste lokale Umsetzung für Befragungsdaten. Charts mit lokal mitgeliefertem Chart.js 4.4.8; Matplotlib wird nicht benötigt. Python 3.11 oder neuer mit Python
 Launcher unter Windows. Alle Oberflächendateien werden mitgeliefert.
@@ -190,3 +190,26 @@ instance/app.log. Formularwerte werden dabei nicht gezielt protokolliert.
 Update: App beenden, Programmdateien ersetzen, .venv und instance beibehalten,
 START.bat ausführen und die Browserseite neu laden. Keine neuen Pakete nötig.
 Noch nicht gespeicherte Änderungen vor dem Neuladen separat sichern.
+
+## Datenvorschau für Segmentierungen ab 0.1.6
+
+Unter Segmentierung zuerst eine Erhebung auswählen. Typische Organisations- und
+Segmentspalten werden mit Anzahl befüllter Teilnahmen, verschiedenen Werten und
+Beispielen angezeigt. Mit «Auch andere Datenfelder anzeigen» werden weitere
+befüllte Spalten sichtbar. Eine Suche kann Spaltennamen und Beispielwerte filtern.
+Nach Auswahl einer Spalte zeigt die Vorschau alle Werte samt Teilnahmezahlen,
+fehlende Angaben und widersprüchliche Werte innerhalb einer Teilnahme.
+
+Nach Speichern der Spaltenzuordnung können vorhandene Werte für eine Namensregel
+ausgewählt werden. Die Vorschau zeigt Originalwert, aktuellen Berichtsnamen und
+Berichtsnamen nach der vorgeschlagenen Änderung, zusätzlich die resultierende
+Verteilung. Die Vorschau verwendet dieselben Prioritäten wie die Auswertung und
+speichert selbst keine Regeln. Die gewählte Erhebung gilt für beide Formulare.
+Alle Erhebungen gemeinsam zählen Teilnahmen über ihre Kombination aus Welle und
+Feedback-ID. Antwortzeilen werden nicht mehrfach als Teilnahmen gezählt.
+Bei widersprüchlichen Werten kann die Summe über die Werte grösser als die Zahl
+der Teilnahmen sein; die Vorschau weist solche Konflikte ausdrücklich aus.
+
+Namensregeln vergleichen jeweils den ursprünglichen Merkmalswert. Eine speziellere
+Regel überschreibt eine allgemeine Regel; Umbenennungen werden nicht als Kette
+aufeinander angewendet.

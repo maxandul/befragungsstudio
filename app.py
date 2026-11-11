@@ -359,10 +359,34 @@ def create_app(instance=None):
                     c.execute('INSERT INTO aliases(project,wave,dimension,source,target) VALUES(?,?,?,?,?) ON CONFLICT(project,wave,dimension,source) DO UPDATE SET target=excluded.target',
                               (pid,f['wave'],dim,f['source'],f['target']))
                 flash('Zuordnung gespeichert.')
-                return redirect(url_for('segments',pid=pid))
+                return redirect(url_for('segments',pid=pid,wave=f['wave'],dimension=dim,
+                                        source=f['source'] if f['action']=='mapping' else ''))
             mappings=c.execute('SELECT * FROM mappings WHERE project=?',(pid,)).fetchall()
             aliases=c.execute('SELECT * FROM aliases WHERE project=?',(pid,)).fetchall()
-        return render_template('segments.html', **ctx, mappings=mappings,aliases=aliases,tab='segments')
+        scope=request.args.get('wave') or (ctx['waves'][0] if ctx['waves'] else '*')
+        return render_template('segments.html', **ctx, mappings=mappings,aliases=aliases,tab='segments',
+                               scope=scope,selected_source=request.args.get('source',''),
+                               selected_dimension=request.args.get('dimension','Bereich'))
+
+    @app.get('/p/<int:pid>/segments/preview')
+    def preview_segments(pid):
+        project(pid)
+        from core import segment_preview
+        scope=request.args.get('wave','*')
+        with db() as c:
+            query='SELECT wave,feedback,raw FROM answers WHERE project=?'
+            args=[pid]
+            if scope!='*':
+                query+=' AND wave=?'
+                args.append(scope)
+            records=[]
+            for row in c.execute(query,args):
+                records.append(dict(wave=row['wave'],feedback=row['feedback'],raw=json.loads(row['raw'])))
+            mappings=[dict(r) for r in c.execute("SELECT * FROM mappings WHERE project=? ORDER BY (wave != '*'),id",(pid,))]
+            aliases=[dict(r) for r in c.execute("SELECT * FROM aliases WHERE project=? ORDER BY (wave != '*'),id",(pid,))]
+        return jsonify(segment_preview(records,mappings,aliases,wave=scope,
+                       source=request.args.get('source',''),dimension=request.args.get('dimension',''),
+                       original=request.args.get('original',''),target=request.args.get('target','')))
 
     @app.post('/p/<int:pid>/rule/delete')
     def delete_rule(pid):

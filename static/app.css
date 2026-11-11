@@ -2,3 +2,5 @@
 
 [hidden]{display:none!important}
 .question-toolbar{position:sticky;top:0;z-index:5;background:#fff;border:1px solid var(--line);border-top:4px solid var(--blue);padding:12px 20px;border-radius:6px;box-shadow:0 4px 16px #18394f12}.question-toolbar label{margin:0}.question-toolbar p{margin:6px 0}.question-toolbar details{margin-top:6px}.question-select{display:inline-flex;align-items:center;margin:0 8px 0 0}.question-select input{width:18px;height:18px;min-height:0;margin:0}.question-card>div,.question-card>details,.question-card>label{margin-top:20px}.question-card details{padding:10px 0}.source-question{padding:12px 18px;margin-top:12px;border-left:3px solid #c3d8e7;background:#f7f9fb}.save-error{color:#a72815!important}
+
+.preview-change{background:#edf5fa;font-weight:700}
