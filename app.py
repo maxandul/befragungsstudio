@@ -472,13 +472,29 @@ def create_app(instance=None):
         rows,participation,grounds=results(pid,dimension,unit)
         with db() as c:
             dated={r[0]:r[1] for r in c.execute('SELECT wave,MIN(NULLIF(date,\'\')) FROM answers WHERE project=? GROUP BY wave',(pid,))}
-        available=sorted(participation,key=lambda w:(dated.get(w) or '9999',w))
-        selected=request.args.getlist('wave') or available
+        available=sorted(dated,key=lambda w:(dated.get(w) or '9999',w))
+        focus_wave=request.args.get('focus_wave','').strip()
+        if focus_wave and focus_wave not in available:
+            raise ValueError('Die ausgewählte Bezugswelle ist nicht vorhanden.')
+        if focus_wave:
+            # Die Bezugswelle bestimmt den Fragenumfang unabhängig von Segment und Fallzahl.
+            # Globale und wellenspezifische Ausschlüsse gelten auch für die Fragenauswahl.
+            with db() as c:
+                eligible={r[0] for r in c.execute('''SELECT DISTINCT q.canonical
+                    FROM answers a JOIN questions q ON q.project=a.project AND q.source=a.source
+                    LEFT JOIN question_exclusions e ON e.project=a.project AND e.source=a.source AND e.wave=a.wave
+                    WHERE a.project=? AND a.wave=? AND q.include=1 AND e.source IS NULL''',(pid,focus_wave))}
+            selected=available[:available.index(focus_wave)+1]
+            rows=[r for r in rows if r['canonical'] in eligible]
+        else:
+            selected=request.args.getlist('wave') or available
+            if any(w not in available for w in selected):
+                raise ValueError('Eine ausgewählte Welle ist nicht vorhanden.')
         rows=[r for r in rows if r['wave'] in selected]
         minimum=max(1,int(request.args.get('min_n',p['min_n'])))
         rates=[]
         for wave in available:
-            n=participation[wave]
+            n=participation.get(wave,0)
             if wave not in selected:
                 continue
             matches=[g for g in grounds if g['wave']==wave and g['dimension']==dimension and g['unit']==unit]
@@ -498,7 +514,7 @@ def create_app(instance=None):
         for group in grouped.values():
             group.sort(key=lambda row:available.index(row['wave']))
         return dict(p=p,grouped=grouped,rates=rates,minimum=minimum,hidden=hidden,
-                    dimension=dimension,unit=unit,selected=selected,available=available)
+                    dimension=dimension,unit=unit,selected=selected,available=available,focus_wave=focus_wave)
 
     @app.route('/p/<int:pid>/results')
     def view_results(pid):
@@ -511,7 +527,8 @@ def create_app(instance=None):
                for rows in ctx['grouped'].values()]
         chart_library=(ROOT/'static/vendor/chart.umd.js').read_text(encoding='utf-8')
         chart_renderer=(ROOT/'static/report-charts.js').read_text(encoding='utf-8')
-        payload=dict(project=ctx['p']['name'],unit=ctx['unit'] or 'Gesamtbefragung',cards=cards)
+        payload=dict(project=ctx['p']['name'],unit=ctx['unit'] or 'Gesamtbefragung',
+                     focus_wave=ctx['focus_wave'],cards=cards)
         html=render_template('report.html',**ctx,cards=cards,chart_library=chart_library,
                              chart_renderer=chart_renderer,chart_payload=payload,
                              auto_zip=request.args.get('zip')=='1')

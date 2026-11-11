@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="de-CH"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{{p.name}} · {{unit or 'Gesamtbericht'}}</title>
+<title>{{p.name}} · {{unit or 'Gesamtbericht'}}{% if focus_wave %} · Bezugswelle {{focus_wave}}{% endif %}</title>
 <style>
 body{font:17px/1.6 Arial,sans-serif;color:#222;margin:0;border-top:10px solid #0070b4;background:#fff}
 main{max-width:1080px;margin:40px auto;padding:0 24px}h1,h2{line-height:1.2}h1{font-size:36px}
@@ -15,7 +15,7 @@ button:hover{background:#edf5fa}button:disabled{opacity:.5;cursor:wait}.primary{
 @media print{.downloads{display:none}.chart-container{height:420px}article{break-inside:avoid}}
 </style></head>
 <body data-auto-zip="{{'true' if auto_zip else 'false'}}"><main>
-<small>BEFRAGUNGSSTUDIO · AUSWERTUNG</small><h1>{{p.name}}</h1><h2>{{unit or 'Gesamtbefragung'}}</h2><p>{{selected|join(' · ')}}</p>
+<small>BEFRAGUNGSSTUDIO · AUSWERTUNG</small><h1>{{p.name}}</h1><h2>{{unit or 'Gesamtbefragung'}}</h2>{% if focus_wave %}<p><strong>Bericht zur Welle {{focus_wave}}</strong> · Fragen dieser Welle mit historischen Verläufen bis zu dieser Welle.</p>{% else %}<p>Gesamtauswertung</p>{% endif %}<p>Vergleichswellen: {{selected|join(' · ')}}</p>
 <div class="hint">Ausgewählte Einheit: {{dimension or 'Gesamt'}} {{unit}}. Mindestfallzahl: {{minimum}}.
 {{hidden}} Ergebnisse unter Mindestfallzahl ausgeblendet. Freitexte sind nicht enthalten.</div>
 <div class="downloads"><button id="all-charts" class="primary" type="button">Alle Charts als PNG-ZIP herunterladen</button><p id="export-status" class="status" role="status">Charts werden geladen …</p></div>

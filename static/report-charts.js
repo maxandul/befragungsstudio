@@ -50,7 +50,7 @@
         layout: {padding: {top: 12, left: 12, right: exporting ? 115 : 85, bottom: 10}},
         plugins: {
           legend: {display: false},
-          title: {display: true, text: [payload.project + ' · ' + payload.unit,
+          title: {display: true, text: [payload.project + ' · ' + payload.unit + (payload.focus_wave ? ' · Bezugswelle ' + payload.focus_wave : ''),
             ...wrap(card.label, small ? 43 : (exporting ? 82 : 75))], color: '#172c3b',
             font: {family: 'Arial', size: exporting ? (small ? 27 : 32) : 19, weight: 'bold'}, padding: {bottom: exporting ? 30 : 20}},
           subtitle: {display: true, text: scale ? (top ? 'Zustimmungsanteil · gültige Antworten' : `Mittelwert · Skala ${latest.minimum}–${latest.maximum}`)
