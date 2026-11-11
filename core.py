@@ -192,7 +192,8 @@ def number(value):
         return None
 
 
-def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit=''):
+def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit='', exclusions=()):
+    exclusions=set(exclusions)
     by_question = defaultdict(dict)
     participation = defaultdict(set)
     dim_cache = {}
@@ -207,7 +208,7 @@ def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit=''
             continue
         participation[r['wave']].add(r['feedback'])
         q = questions[r['source']]
-        if not q.get('include', 1):
+        if not q.get('include', 1) or (r['source'],r['wave']) in exclusions:
             continue
         key = (r['wave'], q['canonical'])
         if r['feedback'] in by_question[key]:

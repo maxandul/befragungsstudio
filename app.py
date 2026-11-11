@@ -55,6 +55,8 @@ def create_app(instance=None):
         CREATE TABLE IF NOT EXISTS imports(id INTEGER PRIMARY KEY,project INTEGER,filename TEXT,
           hash TEXT,rows INTEGER,created TEXT DEFAULT CURRENT_TIMESTAMP);
         CREATE TABLE IF NOT EXISTS organisation(code TEXT PRIMARY KEY,attributes TEXT);
+        CREATE TABLE IF NOT EXISTS question_exclusions(project INTEGER,source TEXT,wave TEXT,reason TEXT,
+          PRIMARY KEY(project,source,wave));
         CREATE TABLE IF NOT EXISTS question_settings(project INTEGER PRIMARY KEY,missing TEXT NOT NULL);
         ''')
         if 'missing_override' not in [r[1] for r in c.execute('PRAGMA table_info(questions)')]:
@@ -91,7 +93,8 @@ def create_app(instance=None):
             mappings = [dict(r) for r in c.execute("SELECT * FROM mappings WHERE project=? ORDER BY (wave != '*'),id", (pid,))]
             aliases = [dict(r) for r in c.execute("SELECT * FROM aliases WHERE project=? ORDER BY (wave != '*'),id", (pid,))]
             grounds = [dict(r) for r in c.execute('SELECT * FROM grounds WHERE project=?', (pid,))]
-        rows, participation = aggregate(records, qs, mappings, aliases, dimension, unit)
+            exclusions={(r['source'],r['wave']) for r in c.execute('SELECT source,wave FROM question_exclusions WHERE project=?',(pid,))}
+        rows, participation = aggregate(records, qs, mappings, aliases, dimension, unit, exclusions)
         return rows, participation, grounds
 
     @app.before_request
@@ -311,6 +314,19 @@ def create_app(instance=None):
                     pending=[{**q,'old_key':q['canonical']} for q in pending]
                 if split_source and split_source not in {q['source'] for q in qs}:
                     raise ValueError('Die zu trennende Quellfrage wurde nicht gefunden.')
+                if f.get('wave_settings_present')=='yes':
+                    valid_pairs={(r['source'],r['wave']) for r in c.execute('SELECT DISTINCT source,wave FROM answers WHERE project=?',(pid,))}
+                    excluded=set()
+                    for encoded in f.getlist('excluded_wave'):
+                        pair=tuple(json.loads(encoded))
+                        if pair not in valid_pairs:
+                            raise ValueError('Unbekannte Frage oder Welle beim Ausschluss.')
+                        excluded.add(pair)
+                    for source,wave in valid_pairs:
+                        if (source,wave) in excluded:
+                            c.execute('INSERT OR IGNORE INTO question_exclusions VALUES(?,?,?,?)',(pid,source,wave,'Manuell ausgeschlossen'))
+                        else:
+                            c.execute('DELETE FROM question_exclusions WHERE project=? AND source=? AND wave=?',(pid,source,wave))
                 for q in pending:
                     c.execute("""UPDATE questions SET canonical=?,label=?,type=?,theme=?,minimum=?,maximum=?,
                       top_from=?,missing=?,options=?,include=?,missing_override=? WHERE project=? AND canonical=?""",
@@ -328,6 +344,12 @@ def create_app(instance=None):
             wave_sources={}
             for r in c.execute('SELECT source,wave,COUNT(DISTINCT feedback) n FROM answers WHERE project=? GROUP BY source,wave ORDER BY wave',(pid,)):
                 wave_sources.setdefault(r['source'],[]).append(dict(r))
+            exclusions={(r['source'],r['wave']):r['reason'] for r in c.execute('SELECT * FROM question_exclusions WHERE project=?',(pid,))}
+            for source, waves in wave_sources.items():
+                for w in waves:
+                    w['excluded']=(source,w['wave']) in exclusions
+                    w['reason']=exclusions.get((source,w['wave']),'')
+                    w['value']=json.dumps([source,w['wave']])
             originals={}
             for r in c.execute('SELECT source,raw FROM answers WHERE project=?',(pid,)):
                 raw=json.loads(r['raw'])

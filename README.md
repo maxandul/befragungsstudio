@@ -1,4 +1,4 @@
-# Befragungsstudio 0.1.7
+# Befragungsstudio 0.1.8
 
 Erste lokale Umsetzung für Befragungsdaten. Charts mit lokal mitgeliefertem Chart.js 4.4.8; Matplotlib wird nicht benötigt. Python 3.11 oder neuer mit Python
 Launcher unter Windows. Alle Oberflächendateien werden mitgeliefert.
@@ -224,3 +224,26 @@ Name erfasst, der nach dem Speichern ebenfalls in der Liste erscheint.
 Beim Wechsel von Merkmal oder Erhebung wird die bereits gespeicherte Quellspalte
 für diese Kombination angezeigt. Fehlt eine Regel, bleibt die Quellspalte leer,
 damit nicht versehentlich die zuvor ausgewählte Spalte zugeordnet wird.
+
+## Pulsreihen automatisch vorbereiten (Version 0.1.8)
+
+1. App beenden und die aktualisierten Programmdateien übernehmen. `instance` und `.venv` behalten; keine Neuinstallation erforderlich.
+2. Die drei ursprünglichen Puls-CSV-Exporte in einen lokalen Ordner legen. Optional `OE_Liste.xlsx` dazulegen. Es dürfen auch nur einzelne Pulsreihen im Ordner liegen.
+3. `SEED_PULS.bat` ausführen und diesen Ordner angeben. Das Skript erkennt AWI, AFA und GS anhand der Survey ID. Alternativ zunächst `SEED_PULS.bat --dry-run` für eine Vorschau ohne Datenbankänderung.
+4. `instance/seed_puls_report.txt` lesen, dann `START.bat` ausführen.
+
+Vor Änderungen wird eine SQLite-Sicherung unter `instance/backups` angelegt. Die Einrichtung ergänzt vorhandene Projekte und Daten, übernimmt eindeutige bestehende Wellenbezeichnungen und lässt bereits gespeicherte Antworten sowie eigene Berichtstitel erhalten. Bei widersprüchlicher Wellenzuordnung bricht sie ab. Ein erneuter Lauf erzeugt keine doppelten Antworten. Die drei gelieferten Exporte enthalten gemäss Vorgabe ausschliesslich abgeschlossene Feedbacks; ein Statusfilter wird mangels Statusfeld nicht erfunden.
+
+Vorbereitet werden:
+
+- AWI: Juli 2024, Januar 2025, Juni/Juli 2025, Januar 2026 und Juni/Juli 2026. AFA: Oktober/November 2024, 2025 und 2026. GS: September 2024 und August 2026. Diese Zeitfenster sind Vorlagen für die vorliegenden Exporte; spätere Wellen müssen zusätzlich erfasst werden. Ein bestehendes Importprofil wird erhalten.
+- Berichtstitel ohne `(PAFA)`, `(PAWI)`, `(PGS)` oder `(PAFM)`, ohne unsichtbare Leerzeichen. GS: «Initiative» wird zu «Leistungsbereitschaft», der falsche Titel «Führungskultur im AWI» zu «Führungskultur im GS».
+- 15 geprüfte AFA-Fragenpaare und ein GS-Fragenpaar mit unterschiedlichen IDs. Das Skript kontrolliert zusätzlich Wortlaut, gleiche Einstellungen und doppelte Teilnahmen. Manuell konfigurierte Gruppen werden erhalten. Ähnliche Fragen mit unterschiedlicher Bedeutung bleiben getrennt, insbesondere Feedback durch Vorgesetzte und Feedbackkultur im Team. «Detail BGM» mit den IDs 144807/145766 bleibt wegen unterschiedlichem Inhalt getrennt.
+- AWI Januar 2025: sechs Zusatzfragen werden nur für diese Welle ausgeschlossen, wenn alle sechs tatsächlich nur derselben einzelnen Teilnahme zugeordnet sind. Alle Rohantworten, die übrigen Antworten und der Rücklauf bleiben erhalten. Keine pauschale Unterdrückung aller kleinen Fallzahlen.
+- Eindeutig benannte Segmentspalten werden als Ausgangsbasis ergänzt. Eine mitgelieferte OE-Liste wird als Referenz ergänzt. AI/AZ werden wegen der Reorganisation getrennt erhalten.
+
+**Noch zu prüfen:** Historische HS-/Hierarchiespalten sind nicht durchgehend identische Ebenen. Deshalb wird HS3 nicht pauschal als Abteilung oder RAV Gruppe gesetzt. Widersprüchliche historische OE-Zuordnungen bleiben offen; die Einrichtung liefert noch keine bereinigte Zuordnung pro Feedback ID für den Anbieter. Auch die vollständigen Optionskataloge für Mehrfachauswahlfragen fehlen im Antwortexport und müssen aus dem Fragebogen ergänzt werden. Vorher erscheinen diese Antworten als nicht auswertbar. Grundmengen für Rücklaufquoten werden nicht aus der Zahl der Antworten geschätzt.
+
+Ausschlüsse lassen sich unter **Fragen → Quellfragen und Erhebungen vergleichen** pro Quell-ID und Welle setzen oder wieder aufheben. «Alle Änderungen speichern» übernimmt sie gemeinsam mit den übrigen Einstellungen. Beim erneuten Seed-Lauf werden einmal bewusst aufgehobene Januar-Ausschlüsse nicht wieder gesetzt.
+
+CLI: `python seed_puls.py --input-dir "C:\Pfad\Exporte" --dry-run`; ohne `--dry-run` werden die Änderungen gespeichert. Für einen abweichenden Datenordner gibt es `--instance`. Keine neuen Python-Pakete erforderlich.
