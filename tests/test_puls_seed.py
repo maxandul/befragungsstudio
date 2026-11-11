@@ -75,7 +75,7 @@ class PulsSeedTests(unittest.TestCase):
         rows,people=aggregate(records,questions,exclusions=exclusions)
         self.assertEqual(people['2025-01'],2)
         self.assertEqual({r['canonical'] for r in rows if r['wave']=='2025-01'},{'base'})
-        self.assertTrue(any(r['wave']=='2025-06' and r['canonical']=='114621' for r in rows))
+        self.assertTrue(any(r['wave']=='2025-07' and r['canonical']=='114621' for r in rows))
         client=create_app(self.instance).test_client()
         page=client.get(f'/p/{pid}/questions')
         self.assertEqual(page.status_code,200)
@@ -108,3 +108,69 @@ class PulsSeedTests(unittest.TestCase):
         self.assertIn('gleichzeitige Antworten',text)
         with self.connection() as c:
             self.assertEqual(c.execute('SELECT COUNT(DISTINCT canonical) FROM questions').fetchone()[0],2)
+
+    def test_reset_rebuilds_only_supplied_pulses_and_backs_up(self):
+        self.sample();run(self.inputs,self.instance)
+        with self.connection() as c:
+            awi=c.execute("SELECT id FROM projects WHERE name='Puls AWI'").fetchone()[0]
+            gs=c.execute("SELECT id FROM projects WHERE name='Puls GS'").fetchone()[0]
+            c.execute("UPDATE projects SET name='Meine alte AWI-Einrichtung' WHERE id=?",(awi,))
+            c.execute("UPDATE questions SET label='Angefangen' WHERE project=?",(awi,))
+            c.execute("UPDATE answers SET wave='Falsch aufgeteilt' WHERE project=? AND feedback='regular'",(awi,))
+            c.execute("INSERT INTO projects(name,kind) VALUES('Kundenbefragung','other')")
+            other=c.execute("SELECT id FROM projects WHERE name='Kundenbefragung'").fetchone()[0]
+            c.execute("INSERT INTO questions(project,source,canonical,label,type) VALUES(?,'other','other','Erhalten','text')",(other,))
+            c.execute("INSERT INTO grounds VALUES(?,'Alt','','',100)",(awi,))
+            c.execute("INSERT INTO organisation VALUES('TEST','{}')")
+        # Nur AWI mitliefern: GS und andere Projekte bleiben unangetastet.
+        (self.inputs/'gs.csv').unlink()
+        before=(self.instance/'studio.sqlite3').read_bytes()
+        preview=run(self.inputs,self.instance,True,True)
+        self.assertIn('Zurückgesetzt: Meine alte AWI-Einrichtung',preview)
+        self.assertEqual(before,(self.instance/'studio.sqlite3').read_bytes())
+        text=run(self.inputs,self.instance,reset_puls=True)
+        self.assertIn('Neustart:',text)
+        with self.connection() as c:
+            names={r[0] for r in c.execute('SELECT name FROM projects')}
+            self.assertEqual(names,{'Puls AWI','Puls GS','Kundenbefragung'})
+            self.assertEqual(c.execute('SELECT label FROM questions WHERE project=?',(other,)).fetchone()[0],'Erhalten')
+            self.assertEqual(c.execute('SELECT COUNT(*) FROM answers WHERE project=?',(gs,)).fetchone()[0],2)
+            self.assertEqual(c.execute('SELECT COUNT(*) FROM grounds').fetchone()[0],0)
+            self.assertEqual(c.execute("SELECT COUNT(*) FROM organisation WHERE code='TEST'").fetchone()[0],1)
+            new_awi=c.execute("SELECT id FROM projects WHERE name='Puls AWI'").fetchone()[0]
+            waves={r[0] for r in c.execute('SELECT DISTINCT wave FROM answers WHERE project=?',(new_awi,))}
+            self.assertEqual(waves,{'2025-01','2025-07'})
+            self.assertEqual(c.execute('SELECT COUNT(*) FROM question_exclusions WHERE project=?',(new_awi,)).fetchone()[0],6)
+        backups=list((self.instance/'backups').glob('*.sqlite3'))
+        self.assertTrue(backups)
+        with sqlite3.connect(backups[-1]) as c:
+            self.assertIsNotNone(c.execute("SELECT 1 FROM projects WHERE name='Meine alte AWI-Einrichtung'").fetchone())
+
+    def test_reset_rolls_back_if_new_setup_fails(self):
+        from unittest.mock import patch
+        self.sample();run(self.inputs,self.instance)
+        before=(self.instance/'studio.sqlite3').read_bytes()
+        with patch('seed_puls.seed_file',side_effect=ValueError('Einrichtung fehlgeschlagen')):
+            with self.assertRaisesRegex(ValueError,'fehlgeschlagen'):
+                run(self.inputs,self.instance,reset_puls=True)
+        self.assertEqual(before,(self.instance/'studio.sqlite3').read_bytes())
+
+    def test_requested_report_exclusions_keep_raw_data_and_user_reenable(self):
+        from seed_puls import REPORT_EXCLUSIONS
+        awi_sources={s for sources in REPORT_EXCLUSIONS['AWI'].values() for s in sources}
+        afa_sources={s for sources in REPORT_EXCLUSIONS['AFA'].values() for s in sources}
+        self.assertEqual(len(awi_sources),29);self.assertEqual(len(afa_sources),8)
+        source=next(iter(awi_sources))
+        self.write('awi.csv',[self.row(source,'a','2025-01-15'),self.row('keep','a','2025-01-15')])
+        run(self.inputs,self.instance)
+        with self.connection() as c:
+            self.assertEqual(c.execute('SELECT include FROM questions WHERE source=?',(source,)).fetchone()[0],0)
+            self.assertEqual(c.execute("SELECT include FROM questions WHERE source='keep'").fetchone()[0],1)
+            self.assertEqual(c.execute('SELECT COUNT(*) FROM answers').fetchone()[0],2)
+            c.execute('UPDATE questions SET include=1 WHERE source=?',(source,))
+        run(self.inputs,self.instance)
+        with self.connection() as c:
+            self.assertEqual(c.execute('SELECT include FROM questions WHERE source=?',(source,)).fetchone()[0],1)
+        run(self.inputs,self.instance,reset_puls=True)
+        with self.connection() as c:
+            self.assertEqual(c.execute('SELECT include FROM questions WHERE source=?',(source,)).fetchone()[0],0)

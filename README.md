@@ -1,4 +1,4 @@
-# Befragungsstudio 0.1.8
+# Befragungsstudio 0.1.9
 
 Erste lokale Umsetzung für Befragungsdaten. Charts mit lokal mitgeliefertem Chart.js 4.4.8; Matplotlib wird nicht benötigt. Python 3.11 oder neuer mit Python
 Launcher unter Windows. Alle Oberflächendateien werden mitgeliefert.
@@ -247,3 +247,16 @@ Vorbereitet werden:
 Ausschlüsse lassen sich unter **Fragen → Quellfragen und Erhebungen vergleichen** pro Quell-ID und Welle setzen oder wieder aufheben. «Alle Änderungen speichern» übernimmt sie gemeinsam mit den übrigen Einstellungen. Beim erneuten Seed-Lauf werden einmal bewusst aufgehobene Januar-Ausschlüsse nicht wieder gesetzt.
 
 CLI: `python seed_puls.py --input-dir "C:\Pfad\Exporte" --dry-run`; ohne `--dry-run` werden die Änderungen gespeichert. Für einen abweichenden Datenordner gibt es `--instance`. Keine neuen Python-Pakete erforderlich.
+
+
+## Puls-Neustart statt vorhandene Einrichtung ergänzen (Version 0.1.9)
+
+Die separat bereitgestellte vollständige Fragenliste enthält 159 Berichtsfragen mit stabilen Kennungen, Quell-IDs, Typen, Wellen und sämtlichen Wortlautvarianten aus den vorliegenden Exporten. Die bestätigten Berichtsausschlüsse sind im Seed hinterlegt: 29 AWI- und 8 AFA-Berichtsfragen werden für alle Wellen ausgeschaltet. Zusätzlich bleiben die sechs AWI-Zusatzfragen im Januar 2025 wellenspezifisch ausgeschlossen. Die Rohantworten und die Teilnahmezählung bleiben erhalten.
+
+Für einen vollständigen Neustart die App beenden und **`SEED_PULS_NEUSTART.bat`** starten. Den Ordner mit den ursprünglichen Puls-CSV-Dateien angeben. Das Skript sichert die Datenbank, entfernt die bisherigen Projekte samt Antworten, Importprofilen, Grundmengen und Frage-/Segmentierungseinstellungen für die mitgelieferten Pulsreihen und richtet sie anschliessend frisch ein. Es ersetzt keine anderen Projekte und löscht nicht das gemeinsame OE-Verzeichnis. Alte Daten und Einstellungen bleiben in der Sicherung erhalten. Es findet keine Löschung auf deinem Rechner statt, bevor du das Skript dort ausführst.
+
+Die Projektzuordnung erfolgt über die Survey ID in den Daten, auch bei abweichenden Projektnamen. Leere Echonovum-Projekte mit dem Namen «Puls AWI», «Puls AFA», «Puls AWA» oder «Puls GS» werden nur entfernt, wenn der passende Export mitgeliefert wird. Enthält ein Projekt zusätzlich andere Befragungen, bricht der Neustart ab. Zurücksetzen und Neuimport laufen in einer gemeinsamen Transaktion: Schlägt die Neueinrichtung fehl, werden auch die Löschungen zurückgerollt.
+
+Vorschau ohne Änderung: `SEED_PULS_NEUSTART.bat --dry-run`. CLI: `python seed_puls.py --reset-puls --input-dir "C:\Pfad\Exporte"`. `SEED_PULS.bat` bleibt für das bisherige Ergänzen erhalten.
+
+Frisch angelegte Wellen heissen nun **AWI: 2024-07, 2025-01, 2025-07, 2026-01, 2026-07** und **AFA: 2024-10, 2025-10, 2026-10**. Die Sommerwellen umfassen weiterhin Juni/Juli und die AFA-Wellen Oktober/November. GS: 2024-09 und 2026-08. Beim blossen Ergänzen werden vorhandene eindeutige Wellenbezeichnungen weiterhin übernommen. Neue zukünftige Wellen müssen im Import einmal mit Namen und Zeitraum ergänzt werden.

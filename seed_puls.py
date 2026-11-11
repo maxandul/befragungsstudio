@@ -15,14 +15,14 @@ from core import read_table, normalize, content_hash, date_value
 PRESETS = {
     '2234': ('AWI', [('2024-07','2024-07-01','2024-07-31'),
                      ('2025-01','2025-01-01','2025-01-31'),
-                     ('2025-06','2025-06-01','2025-07-31'),
+                     ('2025-07','2025-06-01','2025-07-31'),
                      ('2026-01','2026-01-01','2026-01-31'),
-                     ('2026-06','2026-06-01','2026-07-31')]),
-    '2330': ('AFA', [('2024','2024-10-01','2024-11-30'),
-                     ('2025','2025-10-01','2025-11-30'),
-                     ('2026','2026-10-01','2026-11-30')]),
-    '2272': ('GS', [('2024','2024-09-01','2024-09-30'),
-                    ('2026','2026-08-01','2026-08-31')]),
+                     ('2026-07','2026-06-01','2026-07-31')]),
+    '2330': ('AFA', [('2024-10','2024-10-01','2024-11-30'),
+                     ('2025-10','2025-10-01','2025-11-30'),
+                     ('2026-10','2026-10-01','2026-11-30')]),
+    '2272': ('GS', [('2024-09','2024-09-01','2024-09-30'),
+                    ('2026-08','2026-08-01','2026-08-31')]),
 }
 # Geprüft anhand von Titel, Fragetyp und vollständigem Wortlaut der gelieferten Exporte.
 LINKS = {
@@ -36,6 +36,47 @@ LINKS = {
 AWI_EXTRA = {'114621','114624','114628','114629','114631','115184'}
 REASON = 'AWI Januar 2025: einmalig zusätzlich erhobene Frage; übrige Teilnahme bleibt enthalten.'
 SEED_VERSION = 'puls-2026-v1'
+
+# Berichtsausschlüsse gemäss der vom Nutzer geprüften Fragenliste vom 11.11.2026.
+REPORT_EXCLUSIONS = {'AWI': {'AWI-06': ('114643',),
+         'AWI-07': ('114647',),
+         'AWI-08': ('115935',),
+         'AWI-09': ('115936',),
+         'AWI-17': ('114660',),
+         'AWI-18': ('114669',),
+         'AWI-19': ('114663',),
+         'AWI-20': ('114665',),
+         'AWI-21': ('114661',),
+         'AWI-22': ('114667',),
+         'AWI-23': ('114658',),
+         'AWI-24': ('114670',),
+         'AWI-25': ('114664',),
+         'AWI-26': ('114666',),
+         'AWI-27': ('114662',),
+         'AWI-28': ('114668',),
+         'AWI-36': ('114654',),
+         'AWI-37': ('114653',),
+         'AWI-51': ('114640',),
+         'AWI-52': ('114645',),
+         'AWI-53': ('114648',),
+         'AWI-54': ('114639',),
+         'AWI-55': ('114655',),
+         'AWI-56': ('114656',),
+         'AWI-57': ('114652',),
+         'AWI-58': ('114651',),
+         'AWI-59': ('114650',),
+         'AWI-60': ('114649',),
+         'AWI-75': ('115111',)},
+ 'AFA': {'AFA-36': ('145098',),
+         'AFA-37': ('145115',),
+         'AFA-38': ('145120',),
+         'AFA-39': ('145121',),
+         'AFA-40': ('145116',),
+         'AFA-41': ('145117',),
+         'AFA-43': ('145118',),
+         'AFA-44': ('145119',)}}
+EXCLUSIONS_VERSION = 'report-exclusions-2026-v1'
+
 
 
 def clean(value):
@@ -102,11 +143,13 @@ def seed_file(c, path, messages):
     if len(set(mapped))!=len(mapped):
         raise ValueError(f'{org}: mehrere Erhebungszeiträume liegen bereits in derselben Welle. Bitte zuerst trennen.')
     cfg['periods']='\n'.join(' | '.join([wave_map[w],a,b]) for w,a,b in periods)
+    excluded_sources={source for sources in REPORT_EXCLUSIONS.get(org,{}).values() for source in sources}
+    excluded_done=c.execute('SELECT 1 FROM seed_runs WHERE project=? AND version=?',(pid,EXCLUSIONS_VERSION)).fetchone()
     messages.append(f'\nPuls {org} (Projekt {pid})')
     for r in records:
         r['wave']=wave_map[r['wave']]
-        c.execute('INSERT OR IGNORE INTO questions(project,source,canonical,label,type,missing) VALUES(?,?,?,?,?,?)',
-                  (pid,r['source'],r['source'],r['title'],r['type'],DEFAULT_MISSING))
+        c.execute('INSERT OR IGNORE INTO questions(project,source,canonical,label,type,missing,include) VALUES(?,?,?,?,?,?,?)',
+                  (pid,r['source'],r['source'],r['title'],r['type'],DEFAULT_MISSING,int(r['source'] not in excluded_sources)))
         # Seed ergänzt; ein erneuter Lauf überschreibt keine schon gespeicherten Antworten.
         c.execute('INSERT OR IGNORE INTO answers VALUES(?,?,?,?,?,?,?)',
                   (pid,r['wave'],r['feedback'],r['source'],r['answer'],r['date'],json.dumps(r['raw'],ensure_ascii=False)))
@@ -138,6 +181,12 @@ def seed_file(c, path, messages):
             messages.append(f'  Verknüpfung {a}/{b}: gleichzeitige Antworten, getrennt belassen.'); continue
         c.execute('UPDATE questions SET canonical=? WHERE project=? AND source=?',(a,pid,b))
         messages.append(f'  Verknüpft: {members[0]["label"]} ({a}, {b}).')
+    if excluded_sources and not excluded_done:
+        canonical={q['canonical'] for q in c.execute('SELECT source,canonical FROM questions WHERE project=?',(pid,)) if q['source'] in excluded_sources}
+        for key in canonical:
+            c.execute('UPDATE questions SET include=0 WHERE project=? AND canonical=?',(pid,key))
+        c.execute('INSERT OR IGNORE INTO seed_runs VALUES(?,?,?)',(pid,EXCLUSIONS_VERSION,datetime.now().isoformat()))
+        messages.append(f'  Berichtsausschlüsse übernommen: {len(canonical)} vorhandene Berichtsfragen; Rohdaten erhalten.')
     # Nur der geprüfte Ausnahmefall, nicht generell alle kleinen Stichproben.
     if org=='AWI' and not done:
         wave=wave_map['2025-01']
@@ -165,7 +214,53 @@ def seed_file(c, path, messages):
     return 1
 
 
-def run(input_dir, instance, dry_run=False):
+
+def reset_projects(c, paths, messages):
+    """Nur Pulsprojekte löschen, für die im selben Lauf ein geprüfter Export vorliegt."""
+    surveys=set()
+    for path in paths:
+        data=read_table(path.read_bytes(),path.name)
+        if 'Survey ID' not in data:
+            continue
+        ids=set(data['Survey ID'])
+        if len(ids)==1 and next(iter(ids)) in PRESETS:
+            # Vor dem Zurücksetzen auch Wellen/IDs/Zeilen prüfen.
+            survey=next(iter(ids))
+            _,periods=PRESETS[survey]
+            cfg=dict(mode='long',feedback='Feedback ID',qid='Question ID',title='Question title',
+                     type='Question type',answer='Answer',date='Answer given at',wave_mode='periods',
+                     periods='\n'.join(' | '.join(p) for p in periods))
+            required={'Feedback ID','Question ID','Question title','Question type','Question','Answer','Answer given at'}
+            if not required.issubset(data.columns):
+                raise ValueError(f'{path.name}: unvollständiger Puls-Export; kein Neustart.')
+            if not normalize(data,cfg,content_hash(path.read_bytes())):
+                raise ValueError(f'{path.name}: leerer Export; kein Neustart.')
+            surveys.add(survey)
+    if not surveys:
+        raise ValueError('Keine gültigen Puls-Exporte für einen Neustart gefunden.')
+    names={'Puls '+PRESETS[s][0] for s in surveys}
+    if '2330' in surveys:
+        names.add('Puls AWA')
+    targets=[]
+    for project in c.execute('SELECT * FROM projects'):
+        ids={json.loads(a['raw']).get('Survey ID','') for a in c.execute('SELECT raw FROM answers WHERE project=?',(project['id'],))}
+        if ids & surveys:
+            if not ids.issubset(surveys):
+                raise ValueError('Ein Pulsprojekt enthält zusätzliche Befragungen. Kein automatischer Neustart.')
+            targets.append(project)
+        elif not ids and project['kind']=='echonovum' and project['name'].strip().casefold() in {n.casefold() for n in names}:
+            targets.append(project)
+    for project in targets:
+        pid=project['id']
+        for table in ('staged','answers','questions','mappings','aliases','grounds','imports',
+                      'question_settings','question_exclusions','seed_runs'):
+            c.execute(f'DELETE FROM {table} WHERE project=?',(pid,))
+        c.execute('DELETE FROM projects WHERE id=?',(pid,))
+        messages.append(f'Zurückgesetzt: {project["name"]} (Projekt {pid}).')
+    messages.append('Neustart: nur die mitgelieferten Pulsreihen; andere Projekte und OE-Verzeichnis bleiben erhalten.')
+
+
+def run(input_dir, instance, dry_run=False, reset_puls=False):
     input_dir=Path(input_dir);instance=Path(instance)
     paths=sorted(input_dir.glob('*.csv'))
     if not paths: raise ValueError('Im gewählten Ordner sind keine CSV-Dateien.')
@@ -183,6 +278,10 @@ def run(input_dir, instance, dry_run=False):
         with sqlite3.connect(target/'studio.sqlite3') as c:
             c.row_factory=sqlite3.Row
             c.execute('CREATE TABLE IF NOT EXISTS seed_runs(project INTEGER,version TEXT,created TEXT,PRIMARY KEY(project,version))')
+            if reset_puls:
+                # Schema-DDL vorher; danach Reset und Neueinrichtung in einer Transaktion.
+                c.execute('BEGIN')
+                reset_projects(c,paths,messages)
             count=sum(seed_file(c,p,messages) for p in paths)
             oe=input_dir/'OE_Liste.xlsx'
             if oe.exists() and count:
@@ -202,10 +301,11 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description='Drei bestehende Pulsreihen vorbereiten; App vorher beenden.')
     parser.add_argument('--input-dir',type=Path,help='Ordner mit CSV-Exporten und optional OE_Liste.xlsx')
     parser.add_argument('--instance',type=Path,default=ROOT/'instance')
+    parser.add_argument('--reset-puls',action='store_true',help='Mitgelieferte Pulsreihen nach Sicherung löschen und neu einrichten')
     parser.add_argument('--dry-run',action='store_true',help='Vorschau ohne Änderung der Datenbank')
     args=parser.parse_args()
     try:
         folder=args.input_dir or Path(input('Ordner mit den Puls-Exporten: ').strip().strip('"'))
-        print(run(folder,args.instance,args.dry_run))
+        print(run(folder,args.instance,args.dry_run,args.reset_puls))
     except (ValueError,sqlite3.Error,OSError) as e:
         parser.exit(1,'Einrichtung abgebrochen: '+str(e)+'\n')
