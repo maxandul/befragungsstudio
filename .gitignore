@@ -1,0 +1,15 @@
+.venv/
+instance/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+import/
+upload/
+export/
+exports/
+backups/
+*.sqlite
+*.sqlite3
+*.db
+*.log
