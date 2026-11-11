@@ -1,4 +1,4 @@
-# Befragungsstudio 0.1.4
+# Befragungsstudio 0.1.5
 
 Erste lokale Umsetzung für Befragungsdaten. Charts mit lokal mitgeliefertem Chart.js 4.4.8; Matplotlib wird nicht benötigt. Python 3.11 oder neuer mit Python
 Launcher unter Windows. Alle Oberflächendateien werden mitgeliefert.
@@ -172,3 +172,21 @@ aktivierter Ausnahme nötig. Beim Update bleiben abweichende alte Fragenlisten a
 Ausnahme erhalten; unveränderte Standardlisten verwenden die gemeinsame Einstellung.
 Das Update ergänzt die Datenbank automatisch, ohne Neuimport oder Paketinstallation.
 Vor dem Update die App beenden und den Ordner instance sichern.
+
+## Speichern und Sitzungen ab 0.1.5
+
+Der AJAX-Speicheraufruf liest die Zieladresse nun ausdrücklich über getAttribute.
+Buttons mit dem Namen action können dadurch nicht mehr die Formularadresse
+überdecken und einen Aufruf an eine falsche URL verursachen.
+
+Die App verwendet einen eigenen Session-Cookie-Namen, damit andere localhost-Apps
+mit dem Standardnamen session sie nicht überschreiben. Bei abgelaufenem CSRF-Token
+wird die Sitzung einmal ohne Seitenwechsel erneuert und nur der zuvor abgewiesene
+Aufruf erneut gesendet. Andere Fehler werden nicht automatisch wiederholt.
+Validierungsfehler, HTTP-Fehler und interne Serverfehler liefern bei AJAX-Anfragen
+lesbare JSON-Meldungen. Interne Fehler erhalten eine Kennung und ein Protokoll in
+instance/app.log. Formularwerte werden dabei nicht gezielt protokolliert.
+
+Update: App beenden, Programmdateien ersetzen, .venv und instance beibehalten,
+START.bat ausführen und die Browserseite neu laden. Keine neuen Pakete nötig.
+Noch nicht gespeicherte Änderungen vor dem Neuladen separat sichern.

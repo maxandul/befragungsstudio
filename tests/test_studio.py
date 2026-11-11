@@ -14,6 +14,45 @@ from core import read_table,normalize,aggregate,parse_rules
 
 
 class StudioTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which('node'), 'Optionaler Entwicklungstest benötigt Node.js')
+    def test_question_save_url_and_csrf_retry(self):
+        subprocess.run(['node',str(Path(__file__).with_name('check_question_save.cjs'))],check=True,capture_output=True)
+    def test_question_session_isolated_and_renewable(self):
+        self.question_setup()
+        f=self.question_form()
+        # Andere localhost-Apps verwenden oft denselben Standardnamen "session".
+        self.client.set_cookie('session','other-local-app-cookie')
+        r=self.client.post('/p/1/questions',data=f,headers={'Accept':'application/json'})
+        self.assertEqual(r.status_code,200,r.data)
+        self.client.set_cookie('befragungsstudio_session','expired-cookie')
+        f['label_0']='Erhaltene Änderung'
+        r=self.client.post('/p/1/questions',data=f,headers={'Accept':'application/json'})
+        self.assertEqual(r.status_code,400)
+        self.assertEqual(r.json['code'],'csrf_expired')
+        with sqlite3.connect(Path(self.temp.name)/'studio.sqlite3') as c:
+            self.assertEqual(c.execute('SELECT COUNT(*) FROM questions WHERE label=?',('Erhaltene Änderung',)).fetchone()[0],0)
+        token=self.client.get('/session/csrf')
+        self.assertIn('no-store',token.headers['Cache-Control'])
+        f['csrf']=token.json['csrf']
+        r=self.client.post('/p/1/questions',data=f,headers={'Accept':'application/json'})
+        self.assertEqual(r.status_code,200,r.data)
+
+    def test_ajax_errors_are_specific_json(self):
+        r=self.client.get('/missing-page',headers={'Accept':'application/json'})
+        self.assertEqual(r.status_code,404)
+        self.assertEqual(r.json['code'],'http_error')
+        fresh_app=create_app(self.temp.name)
+        @fresh_app.get('/test-error')
+        def fail():
+            raise RuntimeError('Synthetic error for diagnostics')
+        with self.assertLogs(fresh_app.logger,level='ERROR'):
+            r=fresh_app.test_client().get('/test-error',headers={'Accept':'application/json'})
+        self.assertEqual(r.status_code,500)
+        self.assertEqual(r.json['code'],'server_error')
+        log=(Path(self.temp.name)/'app.log').read_text()
+        self.assertIn(r.json['reference'],log)
+        self.assertNotIn('Synthetic error',r.json['error'])
+
     def question_setup(self, overlap=False):
         self.post('/projects',dict(name='Puls',kind='echonovum'))
         data='Feedback ID,Question ID,Question title,Question type,Answer,Answer given at,Welle\na,old,Frage alt,scale,4,2026-06-01,Juni\nb,new,Frage neu,scale,5,2026-06-02,Juni\n'

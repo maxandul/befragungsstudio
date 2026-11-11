@@ -4,6 +4,7 @@ import json
 import secrets
 import sqlite3
 from pathlib import Path
+from werkzeug.exceptions import HTTPException
 
 from flask import (Flask, abort, flash, redirect, render_template, request, send_file, jsonify,
                    session, url_for)
@@ -26,6 +27,7 @@ def create_app(instance=None):
     app.secret_key = key.read_text()
     app.config.update(MAX_CONTENT_LENGTH=60*1024*1024, SESSION_COOKIE_HTTPONLY=True,
                       MAX_FORM_PARTS=20000,MAX_FORM_MEMORY_SIZE=5*1024*1024,
+                      SESSION_COOKIE_NAME='befragungsstudio_session',
                       SESSION_COOKIE_SAMESITE='Strict', DATA_DIR=data_dir)
 
     def db():
@@ -96,7 +98,15 @@ def create_app(instance=None):
     def protect():
         session.setdefault('csrf', secrets.token_hex(24))
         if request.method == 'POST' and request.form.get('csrf') != session['csrf']:
+            if request.accept_mimetypes.best=='application/json':
+                return jsonify(error='Die Formularsitzung wurde erneuert. Ihre Änderungen wurden noch nicht verarbeitet.',
+                               code='csrf_expired'),400
             abort(400, 'Formular abgelaufen. Bitte Seite neu laden.')
+
+    @app.get('/session/csrf')
+    def session_token():
+        # Gleicher Ursprung; keine Freigabe per CORS. Erlaubt die Erneuerung ohne Formularverlust.
+        return jsonify(csrf=session['csrf'])
 
     @app.after_request
     def headers(response):
@@ -113,7 +123,32 @@ def create_app(instance=None):
 
     @app.errorhandler(413)
     def too_large(error):
+        if request.accept_mimetypes.best=='application/json':
+            return jsonify(error='Die Anfrage ist zu gross. Bitte weniger Fragen auf einmal übertragen.',code='request_too_large'),413
         return render_template('error.html', error='Die Datei ist grösser als 60 MB.'), 413
+
+    @app.errorhandler(HTTPException)
+    def http_error(error):
+        if request.accept_mimetypes.best=='application/json':
+            return jsonify(error=error.description,code='http_error'),error.code
+        return render_template('error.html',error=error.description),error.code
+
+    @app.errorhandler(500)
+    def server_error(error):
+        import traceback
+        from datetime import datetime
+        reference=secrets.token_hex(4)
+        original=getattr(error,'original_exception',None) or error
+        try:
+            with (data_dir/'app.log').open('a',encoding='utf-8') as log:
+                log.write(f'\n{datetime.now().isoformat()} Fehler {reference}\n')
+                log.write(''.join(traceback.format_exception(original)))
+        except OSError:
+            pass
+        message=f'Serverfehler beim Verarbeiten. Kennung: {reference}. Details stehen in instance/app.log. Ihre Eingaben bleiben im Formular.'
+        if request.accept_mimetypes.best=='application/json':
+            return jsonify(error=message,code='server_error',reference=reference),500
+        return render_template('error.html',error=message),500
 
     @app.route('/')
     def home():

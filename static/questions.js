@@ -25,10 +25,28 @@
     status.classList.remove('save-error');
     status.textContent='Speichere Änderungen …';
     try {
-      const response=await fetch(form.action||location.href,{method:'POST',body:data,headers:{Accept:'application/json'}});
-      const type=response.headers.get('Content-Type')||'';
-      if(!type.includes('application/json'))throw new Error('Die Sitzung ist abgelaufen oder der Server ist nicht erreichbar. Änderungen sind noch im Formular.');
-      const result=await response.json();
+      // Buttons namens "action" überdecken form.action im DOM. Attribut explizit lesen.
+      const saveUrl=form.getAttribute('action') || location.href;
+      const send=()=>fetch(saveUrl,{method:'POST',body:data,credentials:'same-origin',headers:{Accept:'application/json'}});
+      const read=async response=>{
+        const type=response.headers.get('Content-Type')||'';
+        if(!type.includes('application/json'))throw new Error(`Der Server antwortet mit HTTP ${response.status}, aber nicht im erwarteten Format. Ihre Änderungen bleiben im Formular. Bitte diese Meldung und die letzte CMD-Ausgabe weitergeben.`);
+        return response.json();
+      };
+      let response=await send();
+      let result=await read(response);
+      if(response.status===400 && result.code==='csrf_expired'){
+        // Dieser Fehler entsteht vor dem Speichern. Genau ein Wiederholungsversuch ist sicher.
+        status.textContent='Erneuere Formularsitzung ohne Seitenwechsel …';
+        const tokenResponse=await fetch('/session/csrf',{credentials:'same-origin',headers:{Accept:'application/json'},cache:'no-store'});
+        if(!tokenResponse.ok)throw new Error('Formularsitzung konnte nicht erneuert werden. Änderungen bleiben im Formular.');
+        const token=await tokenResponse.json();
+        if(!token.csrf)throw new Error('Neue Formularsitzung ist ungültig. Änderungen bleiben im Formular.');
+        form.querySelector('input[name=csrf]').value=token.csrf;
+        data.set('csrf',token.csrf);
+        response=await send();
+        result=await read(response);
+      }
       if(!response.ok)throw new Error(result.error||'Speichern fehlgeschlagen.');
       dirty=false;
       status.textContent=result.message;
@@ -40,7 +58,7 @@
           card.querySelector('.question-title').textContent=card.querySelector('input[name^=label_]').value;
         });
       }
-    }catch(error){status.textContent=error.message;status.classList.add('save-error');}
+    }catch(error){status.textContent=error instanceof TypeError ? 'Die Verbindung zum Server ist fehlgeschlagen. Prüfen Sie, ob das CMD-Fenster noch läuft. Änderungen bleiben im Formular.' : error.message;status.classList.add('save-error');}
     finally{buttons.forEach(b=>b.disabled=false);}
   });
   const saved=sessionStorage.getItem(key);
