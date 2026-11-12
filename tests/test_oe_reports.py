@@ -118,6 +118,52 @@ class OrganisationReportTests(unittest.TestCase):
             self.assertEqual(c.execute("SELECT theme FROM questions WHERE source='q'").fetchone()[0],'Information und Orientierung')
             self.assertEqual(c.execute("SELECT theme FROM questions WHERE source='txt'").fetchone()[0],'Thema')
 
+    def test_download_omits_app_link_brand_and_duplicate_n_but_explains_agreement(self):
+        preview,_=self.payload()
+        self.assertIn('← Zur App'.encode(),preview.data)
+        download,_=self.payload('download=1')
+        self.assertNotIn('← Zur App'.encode(),download.data)
+        self.assertNotIn('BEFRAGUNGSSTUDIO · AUSWERTUNG'.encode(),download.data)
+        self.assertNotIn(b'G\xc3\xbcltige Antworten:',download.data)
+        self.assertIn(b'Antworten mit 4 oder 5',download.data)
+
+    def test_unanswered_counts_include_absent_rows_and_keep_invalid_separate(self):
+        with self.db() as c:
+            c.execute("DELETE FROM answers WHERE source='q' AND wave='2026' AND feedback='0'")
+            c.execute("UPDATE answers SET answer='' WHERE source='q' AND wave='2026' AND feedback='1'")
+            c.execute("UPDATE answers SET answer='unbekannt' WHERE source='q' AND wave='2026' AND feedback='2'")
+        response,payload=self.payload()
+        row=payload['cards'][0]['rows'][-1]
+        self.assertEqual((row['n'],row['unanswered'],row['missing'],row['invalid']),(2,2,1,1))
+        self.assertIn(b'Ohne auswertbare Antwort:',response.data)
+        self.assertIn(b'Ungekl',response.data)
+
+    def test_related_text_follows_parent_theme_inside_question_details(self):
+        from html.parser import HTMLParser
+        with self.db() as c:
+            c.execute("UPDATE questions SET text_parent='q',theme='Alter Abschnitt' WHERE source='txt'")
+            c.execute("UPDATE questions SET theme='Neuer Abschnitt' WHERE source='q'")
+        response,_=self.payload('include_texts=1')
+        self.assertNotIn(b'Alter Abschnitt',response.data)
+        class Placement(HTMLParser):
+            def __init__(self):
+                super().__init__();self.depth=0;self.outer=None;self.correct=False
+            def handle_starttag(self,tag,attrs):
+                attrs=dict(attrs)
+                if tag=='details':
+                    self.depth+=1
+                    if attrs.get('class')=='question-details':self.outer=self.depth
+                    if attrs.get('class')=='text-answers':self.correct=self.outer is not None and self.depth>self.outer
+            def handle_endtag(self,tag):
+                if tag=='details':
+                    if self.depth==self.outer:self.outer=None
+                    self.depth-=1
+        parser=Placement();parser.feed(response.data.decode())
+        self.assertTrue(parser.correct)
+        self.assertEqual(response.data.count(b'Vertraulicher Text 0'),1)
+        hidden,_=self.payload()
+        self.assertNotIn(b'Vertraulicher Text',hidden.data)
+
     def test_topic_overviews_keep_suppressed_current_results_empty(self):
         # Die Frage hat historisch genügend Antworten, aktuell aber nur eine.
         with self.db() as c:

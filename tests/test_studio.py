@@ -143,6 +143,25 @@ class StudioTests(unittest.TestCase):
             data[f'include_{i}']='on'
         return data
 
+    def test_question_order_is_saved_and_used_by_reports_and_linked_groups(self):
+        self.question_setup()
+        f=self.question_form();f.update(sort_order_0='20',sort_order_1='10',theme_0='Thema',theme_1='Thema')
+        r=self.client.post('/p/1/questions',data=f,headers={'Accept':'application/json'})
+        self.assertEqual(r.status_code,200,r.data)
+        page=self.client.get('/p/1/report?min_n=1').data.decode()
+        import re,json
+        payload=json.loads(re.search(r'<script id="chart-data" type="application/json">(.*?)</script>',page,re.S)[1])
+        self.assertEqual([c['label'] for c in payload['cards']],['Frage alt','Frage neu'])
+        self.assertEqual(payload['overviews'][0]['indices'],[0,1])
+        f['sort_order_0']='1.5'
+        self.assertEqual(self.client.post('/p/1/questions',data=f).status_code,400)
+        with sqlite3.connect(Path(self.temp.name)/'studio.sqlite3') as c:
+            self.assertEqual(c.execute("SELECT sort_order FROM questions WHERE source='new'").fetchone()[0],20)
+        f['sort_order_0']='20';f.update(action='link',selected_group=['old'],link_target='new')
+        self.assertEqual(self.client.post('/p/1/questions',data=f).status_code,302)
+        with sqlite3.connect(Path(self.temp.name)/'studio.sqlite3') as c:
+            self.assertEqual({r[0] for r in c.execute('SELECT sort_order FROM questions')},{20})
+
     def test_question_bulk_save_link_split_and_global_missing(self):
         self.question_setup()
         f=self.question_form();f['label_0']='Gemeinsame Frage';f.update(action='link',selected_group=['old'],link_target='new')

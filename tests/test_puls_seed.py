@@ -64,6 +64,41 @@ class PulsSeedTests(unittest.TestCase):
             self.assertEqual(c.execute('SELECT COUNT(*) FROM question_exclusions').fetchone()[0],0)
         self.assertTrue(list((self.instance/'backups').glob('*.sqlite3')))
 
+    def test_afa_bgm_catalog_and_text_links_work_without_reimport(self):
+        from report_themes import AFA_BGM_OPTIONS
+        from core import aggregate
+        rows=[self.row('121873','p','2026-10-10','2330','Entwicklungsmöglichkeiten (PAFA)'),
+              self.row('144795','p','2026-10-10','2330','Detail Entwicklungsmöglichkeiten (PAFA)','text'),
+              self.row('145767','p','2026-10-10','2330','BGM2 (PAFA)','choice_multiple')]
+        rows[-1]['Answer']='Physische Arbeitsbedingungen (z. B. Raumklima, Luft, Lärm, Licht, Möbel), Hohe Arbeitsmenge oder Zeitdruck'
+        rows.append({**rows[-1],'Feedback ID':'p2','Answer':'Nein, aktuell wirkt sich kein Aspekt negativ auf meine Gesundheit aus'})
+        self.write('afa.csv',rows);run(self.inputs,self.instance)
+        with self.connection() as c:
+            qs={r['source']:dict(r) for r in c.execute('SELECT * FROM questions')}
+            self.assertEqual(qs['144795']['text_parent'],'121873')
+            self.assertEqual(qs['121873']['theme'],'Arbeitsbedingungen und Gesundheit')
+            self.assertEqual(qs['145767']['options'].splitlines(),AFA_BGM_OPTIONS)
+            records=[dict(r) for r in c.execute('SELECT * FROM answers')]
+            for r in records:r['raw']=json.loads(r['raw'])
+            result,_=aggregate(records,qs)
+            bgm=next(r for r in result if r['canonical']=='145767')
+            self.assertEqual((bgm['n'],bgm['invalid'],len(bgm['counts'])),(2,0,3))
+            self.assertNotIn('Nein',bgm['counts'])
+            self.assertEqual(bgm['counts']['Nein, aktuell wirkt sich kein Aspekt negativ auf meine Gesundheit aus'],1)
+            c.execute("UPDATE questions SET theme='Eigener Abschnitt',sort_order=77 WHERE source='121873'")
+        create_app(self.instance)
+        with self.connection() as c:
+            self.assertEqual(tuple(c.execute("SELECT theme,sort_order FROM questions WHERE source='121873'").fetchone()),('Eigener Abschnitt',77))
+        # Simuliert die bisherige Einrichtung: Optionen fehlen und Entwicklung liegt im alten Abschnitt.
+        with self.connection() as c:
+            c.execute('DELETE FROM report_migrations')
+            c.execute("UPDATE questions SET options='' WHERE source='145767'")
+            c.execute("UPDATE questions SET theme='Engagement und Entwicklung' WHERE source='121873'")
+        create_app(self.instance)
+        with self.connection() as c:
+            self.assertTrue(c.execute("SELECT options FROM questions WHERE source='145767'").fetchone()[0])
+            self.assertEqual(c.execute("SELECT theme FROM questions WHERE source='121873'").fetchone()[0],'Arbeitsbedingungen und Gesundheit')
+
     def test_exclusion_keeps_participation_and_can_be_restored_in_form(self):
         self.sample();run(self.inputs,self.instance)
         with self.connection() as c:
