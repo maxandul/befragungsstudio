@@ -175,6 +175,71 @@ class OrganisationReportTests(unittest.TestCase):
             self.assertEqual(c.execute('SELECT total FROM population_oe').fetchone()[0],2)
             self.assertEqual(c.execute("SELECT total FROM grounds WHERE wave='2026' AND unit='B'").fetchone()[0],3)
 
+    def add_leadership(self):
+        with self.db() as c:
+            for wave,feedback,source,raw in c.execute('SELECT wave,feedback,source,raw FROM answers').fetchall():
+                values=json.loads(raw)
+                values['Kadertyp (subject)']={'0':'100','1':'100','2':'110','4':'100'}.get(feedback,'')
+                if feedback=='0':values['Team']=''
+                c.execute('UPDATE answers SET raw=? WHERE wave=? AND feedback=? AND source=?',
+                          (json.dumps(values),wave,feedback,source))
+            for wave in ['2024','2026']:
+                raw=json.dumps({'Amt':'AFA','Bereich':'','Team':'','Kadertyp (subject)':'100'})
+                for source,value in [('q','1'),('txt','Text der Amtsleitung')]:
+                    c.execute('INSERT INTO answers VALUES(1,?,?,?,?,?,?)',(wave,'root',source,value,wave+'-10-01',raw))
+
+    def test_only_own_oe_heads_are_excluded_and_subordinate_heads_remain(self):
+        self.add_leadership()
+        response,payload=self.payload('include_texts=1')
+        self.assertEqual(payload['cards'][0]['rows'][-1]['n'],5) # Nur Amtsleitung weg.
+        self.assertNotIn(b'Text der Amtsleitung',response.data)
+        self.assertEqual({r['unit']:r['n'] for r in payload['cards'][0]['children']},{'B':3}) # A hat nur n=1.
+        _,area=self.payload('oe='+self.node('Bereich','A')['id']+'&min_n=1')
+        self.assertEqual(area['cards'][0]['rows'][-1]['n'],1) # Unterstellte Teamleitung bleibt.
+        response,team=self.payload('oe='+self.node('Team','Gleich','B')['id']+'&include_texts=1')
+        self.assertEqual(team['cards'][0]['rows'][-1]['n'],2) # 110 und nicht leitende Person bleiben.
+        self.assertNotIn(b'Vertraulicher Text 4',response.data)
+        self.assertIn(b'Vertraulicher Text 2',response.data)
+        self.assertEqual(team['cards'][0]['comparisons'][0]['rows'][-1]['n'],3)
+        self.assertEqual(team['cards'][0]['comparisons'][1]['rows'][-1]['n'],5)
+        response,hidden=self.payload('oe='+self.node('Team','Gleich','B')['id']+'&min_n=3&include_texts=1')
+        self.assertEqual(hidden['cards'],[])
+        self.assertNotIn(b'Vertraulicher Text',response.data)
+
+    def test_leadership_ground_adjustment_requires_invited_count_not_responding_count(self):
+        self.add_leadership()
+        response,_=self.payload()
+        self.assertIn(b'Leitungsanteil der Grundmenge fehlt',response.data)
+        data=dict(csrf=self.csrf,action='update',original_wave='2026',original_dimension='',original_unit='',
+                  original_total='5',wave='2026',dimension='',unit='',total='10',leader_total='2')
+        self.assertEqual(self.client.post('/p/1/grounds',data=data).status_code,302)
+        response,_=self.payload()
+        self.assertIn(b'62.5 %',response.data) # n=5 / (10 minus 2 eingeladene eigene Leitungen).
+        with self.db() as c:
+            self.assertEqual(c.execute("SELECT total FROM grounds WHERE wave='2026' AND dimension=''").fetchone()[0],10)
+            self.assertEqual(c.execute('SELECT total FROM ground_leaders').fetchone()[0],2)
+        data.update(original_total='10',leader_total='11')
+        self.assertEqual(self.client.post('/p/1/grounds',data=data).status_code,400)
+        data.update(leader_total='0')
+        self.assertEqual(self.client.post('/p/1/grounds',data=data).status_code,302)
+        response,_=self.payload()
+        self.assertIn(b'50.0 %',response.data)
+        self.client.post('/p/1/grounds',data=dict(csrf=self.csrf,action='delete',original_wave='2026',original_dimension='',original_unit='',original_total='10',original_leaders='0'))
+        with self.db() as c:
+            self.assertEqual(c.execute('SELECT COUNT(*) FROM ground_leaders').fetchone()[0],0)
+
+    def test_multiple_direct_heads_with_code_100_are_all_excluded(self):
+        self.add_leadership()
+        with self.db() as c:
+            for wave,source,raw in c.execute("SELECT wave,source,raw FROM answers WHERE feedback='1'").fetchall():
+                values=json.loads(raw);values['Team']=''
+                c.execute("UPDATE answers SET raw=? WHERE wave=? AND source=? AND feedback='1'",(json.dumps(values),wave,source))
+        response,payload=self.payload('oe='+self.node('Bereich','A')['id']+'&min_n=1&include_texts=1')
+        self.assertEqual(payload['cards'],[])
+        self.assertNotIn(b'Vertraulicher Text',response.data)
+        _,overall=self.payload()
+        self.assertEqual(overall['cards'][0]['rows'][-1]['n'],5)
+
     def test_unanswered_counts_include_absent_rows_and_keep_invalid_separate(self):
         with self.db() as c:
             c.execute("DELETE FROM answers WHERE source='q' AND wave='2026' AND feedback='0'")

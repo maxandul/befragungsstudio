@@ -254,7 +254,7 @@ def reset_projects(c, paths, messages):
         pid=project['id']
         for table in ('staged','answers','questions','mappings','aliases','grounds','imports',
                       'question_settings','question_exclusions','seed_runs','population_oe','population_snapshots',
-                      'report_notes','report_evidence','report_migrations'):
+                      'report_notes','report_evidence','report_migrations','ground_leaders'):
             c.execute(f'DELETE FROM {table} WHERE project=?',(pid,))
         c.execute('DELETE FROM projects WHERE id=?',(pid,))
         messages.append(f'Zurückgesetzt: {project["name"]} (Projekt {pid}).')

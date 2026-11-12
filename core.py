@@ -192,11 +192,29 @@ def number(value):
         return None
 
 
-def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit='', exclusions=(), path=()):
+def oe_leaders(records, mappings=(), aliases=(), dimension='', unit='', path=()):
+    """Kadertyp 100 am exakten OE-Pfad; unterstellte Leitungen bleiben enthalten."""
+    from organisation import LEVELS
+    leaders=set()
+    for r in records:
+        raw=r['raw']
+        if str(raw.get('Kadertyp (subject)',raw.get('Kadertyp',''))).strip()!='100':
+            continue
+        dims=mapped_dimensions(r,mappings,aliases)
+        full=[(d,dims[d]) for d,_ in LEVELS if dims.get(d)]
+        direct=(full==list(path)) if path else (
+            bool(full) and full[-1]==(dimension,unit) if dimension else len(full)<=1)
+        if direct:
+            leaders.add((r['wave'],r['feedback']))
+    return leaders
+
+
+def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit='', exclusions=(), path=(), exclude_leaders=False):
     exclusions=set(exclusions)
     by_question = defaultdict(dict)
     participation = defaultdict(set)
     dim_cache = {}
+    leaders=oe_leaders(records,mappings,aliases,dimension,unit,path) if exclude_leaders else set()
     for r in records:
         cache_key = (r['wave'], r['feedback'])
         dims = mapped_dimensions(r, mappings, aliases)
@@ -207,6 +225,8 @@ def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit=''
         if path and not all(dims.get(d) == u for d,u in path):
             continue
         if dimension and dims.get(dimension) != unit:
+            continue
+        if cache_key in leaders:
             continue
         participation[r['wave']].add(r['feedback'])
         q = questions[r['source']]

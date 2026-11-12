@@ -1,4 +1,4 @@
-# Befragungsstudio 0.1.12
+# Befragungsstudio 0.1.13
 
 Erste lokale Umsetzung für Befragungsdaten. Charts mit lokal mitgeliefertem Chart.js 4.4.8; Matplotlib wird nicht benötigt. Python 3.11 oder neuer mit Python
 Launcher unter Windows. Alle Oberflächendateien werden mitgeliefert.
@@ -308,3 +308,13 @@ Unter «Grundmengen» steht bei jedem gespeicherten Eintrag «Bearbeiten». Anza
 Ein erneuter Seed-Lauf kann fehlende Grundmengen wieder aus der Mitarbeitendenbasis ergänzen. Manuelle Änderungen betreffen die im Bericht verwendeten Werte, nicht die gespeicherte Herkunft der ursprünglichen Berechnung.
 
 54 Tests bestanden, darunter Korrektur, Löschung, Kollisionen, Validierung, veraltete Browser-Tabs und Abgrenzung nach Projekt. Keine neuen Pakete, keine Datenbankänderung und kein Neuimport nötig. Der vollständige Browser-Layouttest bleibt in der Ausführungsumgebung eingeschränkt.
+
+## Leitung der eigenen OE ausschliessen (Version 0.1.13)
+
+In OE-Auswertungen werden ausschliesslich Teilnahmen mit Kadertyp `100` ausgeschlossen, deren vollständiger Organisationspfad genau der ausgewerteten OE entspricht. Leitungspersonen unterstellter Einheiten bleiben im übergeordneten Ergebnis enthalten. Andere Kadertypen, beispielsweise `110`, bleiben erhalten. Mehrere direkte Leitungspersonen mit `100` werden vollständig ausgeschlossen. Für die Gesamtauswertung betrifft dies die Leitung der obersten Organisationsebene. Die Zuordnung verwendet die gepflegten wellenbezogenen Segmentregeln und vollständigen Pfade, keine Personennamen oder pauschalen Kaderstufen.
+
+Der Ausschluss erfolgt vor Berechnung und Mindestfallzahlprüfung. Er gilt für Mittelwert, Zustimmung, Auswahlhäufigkeiten, Teilnahme, fehlende Antworten, Freitexte und ausgewählte Textbelege. Jede Vergleichs-OE wird nach derselben Regel für ihre eigene Leitung berechnet. Rohantworten und redaktionelle Zusammenfassungen bleiben unverändert; vorhandene Zusammenfassungen sind fachlich zu prüfen.
+
+Für Rücklaufquoten ist bei «Grundmengen» zusätzlich «Davon Leitungspersonen dieser OE (Kadertyp 100)» zu hinterlegen. Gezählt werden die eingeladenen eigenen Leitungspersonen, nicht die tatsächlich eingegangenen Leitungsantworten und nicht unterstellte Leitungen. Der Bericht zieht den bestätigten Anteil von der gespeicherten Grundmenge ab. `0` bedeutet, dass in der erfassten Grundmenge keine eigene Leitung enthalten ist; leer bedeutet unbekannt. Bei Exporten mit Kadertyp-Feld bleibt die Quote ohne bestätigten Leitungsanteil offen. Die bisherige Mitarbeitendenliste mit ausschliesslich OE-Kürzeln erlaubt keine automatische Bestimmung dieses Anteils. Bei einem Puls-Neustart werden diese Angaben nur für die zurückgesetzten Projekte entfernt.
+
+57 Tests bestanden. Neu geprüft sind eigene/unterstellte Leitungen, mehrere direkte Leitungen, Kadertyp 110, Freitext- und Fallzahlschutz, Vergleichswerte sowie ausdrücklich bestätigte Einladungszahlen unabhängig vom Rücklauf der Leitungspersonen. Das Update ergänzt eine Tabelle für Leitungsanteile automatisch; kein Neuimport nötig.
