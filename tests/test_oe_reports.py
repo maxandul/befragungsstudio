@@ -127,6 +127,54 @@ class OrganisationReportTests(unittest.TestCase):
         self.assertNotIn(b'G\xc3\xbcltige Antworten:',download.data)
         self.assertIn(b'Antworten mit 4 oder 5',download.data)
 
+    def test_ground_count_can_be_corrected_and_deleted_without_touching_answers(self):
+        identity=dict(original_wave='2026',original_dimension='',original_unit='',original_total='5')
+        update=dict(csrf=self.csrf,action='update',**identity,wave='2026',dimension='',unit='',total='10')
+        response=self.client.post('/p/1/grounds',data=update)
+        self.assertEqual(response.status_code,302)
+        response,_=self.payload()
+        self.assertIn(b'50.0 %',response.data)
+        page=self.client.get('/p/1/grounds')
+        self.assertIn(b'Grundmenge l',page.data)
+        self.assertIn(b'value="update"',page.data)
+        self.assertIn(b'value="10"',page.data)
+        # Ein alter Browser-Tab darf die Korrektur nicht versehentlich löschen.
+        response=self.client.post('/p/1/grounds',data=dict(csrf=self.csrf,action='delete',**identity))
+        self.assertEqual(response.status_code,400)
+        identity['original_total']='10'
+        response=self.client.post('/p/1/grounds',data=dict(csrf=self.csrf,action='delete',**identity))
+        self.assertEqual(response.status_code,302)
+        with self.db() as c:
+            self.assertIsNone(c.execute("SELECT 1 FROM grounds WHERE wave='2026' AND dimension='' ").fetchone())
+            self.assertEqual(c.execute('SELECT COUNT(*) FROM answers').fetchone()[0],20)
+            self.assertEqual(c.execute("SELECT total FROM grounds WHERE wave='2024' AND dimension='' ").fetchone()[0],5)
+
+    def test_ground_move_rejects_collisions_and_invalid_values_atomically(self):
+        data=dict(csrf=self.csrf,action='update',original_wave='2026',original_dimension='Bereich',original_unit='A',
+                  original_total='2',wave='2026',dimension='Bereich',unit='B',total='7')
+        self.assertEqual(self.client.post('/p/1/grounds',data=data).status_code,400)
+        with self.db() as c:
+            self.assertEqual(c.execute("SELECT total FROM grounds WHERE wave='2026' AND unit='A'").fetchone()[0],2)
+            self.assertEqual(c.execute("SELECT total FROM grounds WHERE wave='2026' AND unit='B'").fetchone()[0],3)
+        for overrides in [dict(unit='Neu',total='-1'),dict(unit='Neu',total='1.2'),dict(unit='Neu',wave='unknown'),dict(unit='',dimension='Bereich')]:
+            self.assertEqual(self.client.post('/p/1/grounds',data={**data,**overrides}).status_code,400)
+        self.assertEqual(self.client.post('/p/1/grounds',data={**data,'unit':'Neu'}).status_code,302)
+        with self.db() as c:
+            self.assertIsNone(c.execute("SELECT 1 FROM grounds WHERE wave='2026' AND unit='A'").fetchone())
+            self.assertEqual(c.execute("SELECT total FROM grounds WHERE wave='2026' AND unit='Neu'").fetchone()[0],7)
+        with self.db() as c:
+            c.execute("INSERT INTO projects(id,name,kind) VALUES(2,'Andere Befragung','other')")
+        self.assertEqual(self.client.post('/p/2/grounds',data={**data,'unit':'Neu'}).status_code,400)
+
+    def test_ground_delete_keeps_population_provenance_and_other_units(self):
+        with self.db() as c:
+            c.execute("INSERT INTO population_oe VALUES(1,'2026','TEST',2)")
+        response=self.client.post('/p/1/grounds',data=dict(csrf=self.csrf,action='delete',original_wave='2026',original_dimension='Bereich',original_unit='A',original_total='2'))
+        self.assertEqual(response.status_code,302)
+        with self.db() as c:
+            self.assertEqual(c.execute('SELECT total FROM population_oe').fetchone()[0],2)
+            self.assertEqual(c.execute("SELECT total FROM grounds WHERE wave='2026' AND unit='B'").fetchone()[0],3)
+
     def test_unanswered_counts_include_absent_rows_and_keep_invalid_separate(self):
         with self.db() as c:
             c.execute("DELETE FROM answers WHERE source='q' AND wave='2026' AND feedback='0'")
