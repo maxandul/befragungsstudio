@@ -52,6 +52,11 @@ def create_app(instance=None):
           dimension TEXT,source TEXT,target TEXT,UNIQUE(project,wave,dimension,source));
         CREATE TABLE IF NOT EXISTS grounds(project INTEGER,wave TEXT,dimension TEXT,unit TEXT,
           total INTEGER NOT NULL,PRIMARY KEY(project,wave,dimension,unit));
+        CREATE TABLE IF NOT EXISTS population_snapshots(project INTEGER,wave TEXT,
+          source TEXT,source_hash TEXT,reference_hash TEXT,details TEXT,created TEXT,
+          PRIMARY KEY(project,wave));
+        CREATE TABLE IF NOT EXISTS population_oe(project INTEGER,wave TEXT,code TEXT,total INTEGER,
+          PRIMARY KEY(project,wave,code));
         CREATE TABLE IF NOT EXISTS imports(id INTEGER PRIMARY KEY,project INTEGER,filename TEXT,
           hash TEXT,rows INTEGER,created TEXT DEFAULT CURRENT_TIMESTAMP);
         CREATE TABLE IF NOT EXISTS organisation(code TEXT PRIMARY KEY,attributes TEXT);
@@ -443,7 +448,13 @@ def create_app(instance=None):
                 flash('Grundmenge gespeichert. Werte gelten jeweils inklusive Untereinheiten und werden nicht addiert.')
                 return redirect(url_for('grounds',pid=pid))
             grounds=c.execute('SELECT * FROM grounds WHERE project=? ORDER BY wave,dimension,unit',(pid,)).fetchall()
-        return render_template('grounds.html',**ctx,grounds=grounds,tab='grounds')
+            snapshots=[]
+            for row in c.execute('SELECT * FROM population_snapshots WHERE project=? ORDER BY wave',(pid,)):
+                snapshot=dict(row)
+                snapshot['details']=json.loads(row['details'])
+                snapshot['oes']=[dict(r) for r in c.execute('SELECT code,total FROM population_oe WHERE project=? AND wave=? ORDER BY code',(pid,row['wave']))]
+                snapshots.append(snapshot)
+        return render_template('grounds.html',**ctx,grounds=grounds,snapshots=snapshots,tab='grounds')
 
     @app.route('/organisation',methods=['GET','POST'])
     def organisation():

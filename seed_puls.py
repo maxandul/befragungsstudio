@@ -253,11 +253,70 @@ def reset_projects(c, paths, messages):
     for project in targets:
         pid=project['id']
         for table in ('staged','answers','questions','mappings','aliases','grounds','imports',
-                      'question_settings','question_exclusions','seed_runs'):
+                      'question_settings','question_exclusions','seed_runs','population_oe','population_snapshots'):
             c.execute(f'DELETE FROM {table} WHERE project=?',(pid,))
         c.execute('DELETE FROM projects WHERE id=?',(pid,))
         messages.append(f'Zurückgesetzt: {project["name"]} (Projekt {pid}).')
     messages.append('Neustart: nur die mitgelieferten Pulsreihen; andere Projekte und OE-Verzeichnis bleiben erhalten.')
+
+
+def seed_afa_population(c, input_dir, messages):
+    # Die beiden Dateien bleiben lokal. Zahlen und OE-Namen werden nicht im Quellcode hinterlegt.
+    from population import population_from_oe
+    files={p.name.casefold():p for p in input_dir.iterdir() if p.is_file()}
+    employee_path=files.get('export_sendout.xlsx')
+    if not employee_path:
+        messages.append('AFA Oktober 2026: für Grundmengen optional EXPORT_Sendout.XLSX und OE_Liste.xlsx beilegen.')
+        return
+    reference_path=files.get('oe_liste.xlsx')
+    if not reference_path:
+        raise ValueError('Für EXPORT_Sendout.XLSX wird auch OE_Liste.xlsx im selben Ordner benötigt.')
+    employee_data=employee_path.read_bytes(); reference_data=reference_path.read_bytes()
+    employees=read_table(employee_data,employee_path.name)
+    if len(employees.columns)!=1:
+        raise ValueError('EXPORT_Sendout.XLSX muss genau eine Spalte mit einem OE-Kürzel pro Person enthalten.')
+    reference=read_table(reference_data,reference_path.name,sheet='OE Liste')
+    population=population_from_oe(employees.iloc[:,0],reference,'AFA')
+    candidates=[]
+    for project in c.execute('SELECT id FROM projects'):
+        first=c.execute('SELECT raw FROM answers WHERE project=? LIMIT 1',(project['id'],)).fetchone()
+        if first and json.loads(first['raw']).get('Survey ID')=='2330':
+            waves=[r[0] for r in c.execute("SELECT DISTINCT wave FROM answers WHERE project=? AND date>=? AND date<?",
+                                          (project['id'],'2026-10-01','2026-12-01'))]
+            candidates.extend((project['id'],wave) for wave in waves)
+    if not candidates:
+        messages.append('AFA-Grundmengen noch nicht gespeichert: keine AFA-Erhebung Oktober/November 2026 vorhanden.')
+        return
+    if len(candidates)!=1:
+        raise ValueError('AFA Oktober 2026 ist auf mehrere Projekte/Wellen verteilt. Grundmengen bitte erst nach eindeutiger Zuordnung übernehmen.')
+    pid,wave=candidates[0]
+    conflicts=0
+    for row in population['grounds']:
+        existing=c.execute('SELECT total FROM grounds WHERE project=? AND wave=? AND dimension=? AND unit=?',
+                           (pid,wave,row['dimension'],row['unit'])).fetchone()
+        if existing and existing['total']!=row['total']:
+            conflicts+=1
+        c.execute('INSERT OR IGNORE INTO grounds VALUES(?,?,?,?,?)',
+                  (pid,wave,row['dimension'],row['unit'],row['total']))
+    c.execute('DELETE FROM population_oe WHERE project=? AND wave=?',(pid,wave))
+    c.executemany('INSERT INTO population_oe VALUES(?,?,?,?)',
+                  [(pid,wave,code,total) for code,total in population['oe_counts'].items()])
+    details={k:population[k] for k in ('total','input_rows','by_amt','missing')}
+    details['grounds_preserved']=conflicts
+    c.execute('''INSERT INTO population_snapshots VALUES(?,?,?,?,?,?,?)
+        ON CONFLICT(project,wave) DO UPDATE SET source=excluded.source,source_hash=excluded.source_hash,
+        reference_hash=excluded.reference_hash,details=excluded.details,created=excluded.created''',
+        (pid,wave,employee_path.name,content_hash(employee_data),content_hash(reference_data),
+         json.dumps(details,ensure_ascii=False),datetime.now().isoformat()))
+    messages.append(f'AFA {wave}: {population["total"]} Personen aus {population["input_rows"]} Quellzeilen; alle OE-Kürzel eindeutig zugeordnet.')
+    messages.append(f'  {len(population["grounds"])} Grundmengen für Gesamtauswertung und benannte Hierarchieebenen; '
+                    f'{len(population["oe_counts"])} direkte OE-Besetzungen einschliesslich unbesetzter OEs gespeichert.')
+    messages.append('  Nur AFA Oktober 2026. Andere Ämter und Erhebungen erhalten keine Grundmengen.')
+    if conflicts:
+        messages.append(f'  Achtung: {conflicts} abweichende vorhandene Grundmengen erhalten. Unter Grundmengen prüfen oder bewusst neu einrichten.')
+    missing_area=population['missing']['Bereich']
+    if missing_area:
+        messages.append(f'  {missing_area} Personen ohne Bereich gemäss OE-Liste: im Gesamtamt enthalten, keinem Bereich zugeschlagen.')
 
 
 def run(input_dir, instance, dry_run=False, reset_puls=False):
@@ -292,6 +351,7 @@ def run(input_dir, instance, dry_run=False, reset_puls=False):
                         c.execute('INSERT OR IGNORE INTO organisation VALUES(?,?)',(row['OE_Kürzel'],json.dumps(row,ensure_ascii=False)))
                 messages.append('OE-Liste als Referenz ergänzt; vorhandene Einträge erhalten.')
             if not count: raise ValueError('Keine der drei bekannten Pulsbefragungen im Ordner gefunden.')
+            seed_afa_population(c,input_dir,messages)
         text=('VORSCHAU – keine Änderungen gespeichert.\n' if dry_run else 'Puls-Einrichtung gespeichert.\n')+'\n'.join(messages)
         if not dry_run:(instance/'seed_puls_report.txt').write_text(text,encoding='utf-8')
         return text

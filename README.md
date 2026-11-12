@@ -1,4 +1,4 @@
-# Befragungsstudio 0.1.9
+# Befragungsstudio 0.1.10
 
 Erste lokale Umsetzung für Befragungsdaten. Charts mit lokal mitgeliefertem Chart.js 4.4.8; Matplotlib wird nicht benötigt. Python 3.11 oder neuer mit Python
 Launcher unter Windows. Alle Oberflächendateien werden mitgeliefert.
@@ -260,3 +260,18 @@ Die Projektzuordnung erfolgt über die Survey ID in den Daten, auch bei abweiche
 Vorschau ohne Änderung: `SEED_PULS_NEUSTART.bat --dry-run`. CLI: `python seed_puls.py --reset-puls --input-dir "C:\Pfad\Exporte"`. `SEED_PULS.bat` bleibt für das bisherige Ergänzen erhalten.
 
 Frisch angelegte Wellen heissen nun **AWI: 2024-07, 2025-01, 2025-07, 2026-01, 2026-07** und **AFA: 2024-10, 2025-10, 2026-10**. Die Sommerwellen umfassen weiterhin Juni/Juli und die AFA-Wellen Oktober/November. GS: 2024-09 und 2026-08. Beim blossen Ergänzen werden vorhandene eindeutige Wellenbezeichnungen weiterhin übernommen. Neue zukünftige Wellen müssen im Import einmal mit Namen und Zeitraum ergänzt werden.
+
+
+## AFA-Grundmengen Oktober 2026 (Version 0.1.10)
+
+`EXPORT_Sendout.XLSX` und `OE_Liste.xlsx` zu den Puls-CSV-Exporten in denselben lokalen Ordner legen. Nach dem App-Update `SEED_PULS.bat` ausführen, um die Grundmengen zu einer bereits eingerichteten AFA-Befragung zu ergänzen. Ein Neustart der Einrichtung ist dafür nicht erforderlich. Bei einer vollständigen Neueinrichtung übernimmt auch `SEED_PULS_NEUSTART.bat` diese Grundmengen. Beide Skripte unterstützen weiterhin `--dry-run` und legen vor dem Speichern eine Datenbanksicherung an.
+
+Die Mitarbeitendenliste enthält eine Spalte mit einem OE-Kürzel pro Person. Jede Zeile zählt eine Person; gleiche Kürzel werden nicht dedupliziert. Die Zuordnung zum Amt erfolgt über das Blatt «OE Liste» des OE-Verzeichnisses, unabhängig vom Spaltentitel der Mitarbeitendenliste. Es werden ausschliesslich Grundmengen für das AFA und die Erhebung Oktober/November 2026 gespeichert. Bestehende eindeutige Wellenbezeichnungen werden übernommen. Andere Ämter und frühere AFA-Wellen erhalten keine Grundmengen aus diesem Export.
+
+Gespeichert werden die Gesamtgrundmenge, Amt, Bereiche, Abteilungen, RAV-Gruppen, RAVs und Teams gemäss den Zuordnungsspalten der OE-Liste. Jede Person zählt auf jeder zugeordneten Ebene genau einmal. Übergeordnete Werte enthalten die über ihre Pfadmerkmale zugehörigen Untereinheiten. Personen mit leerem Bereich bleiben in der Gesamtgrundmenge enthalten, ohne einem Bereich zugeschlagen zu werden. Referenzeinheiten ohne zugeordnete Mitarbeitende werden mit null gespeichert. Direkte OE-Besetzungen werden separat für alle AFA-Kürzel des Verzeichnisses gespeichert, damit direkte Besetzung und Grundmengen inklusive Untereinheiten unterscheidbar bleiben.
+
+Unter «Grundmengen» ist die gespeicherte Mitarbeitendenbasis mit den direkten Besetzungen je OE-Kürzel einsehbar. Ein Quellen- und OE-Verzeichnis-Fingerabdruck dokumentiert die Basis. Die Originaldateien und die berechneten Ist-Zahlen werden nicht ins öffentliche Repository übernommen.
+
+Unbekannte oder mehrdeutige OE-Kürzel, fehlende Pflichtspalten und eine auf mehrere Wellen verteilte AFA-Erhebung führen zum Abbruch statt zu einer unvollständigen Grundmenge. Abweichende bereits manuell hinterlegte Grundmengen werden beim Ergänzen beibehalten und im Seed-Protokoll zur Prüfung ausgewiesen. Bei bewusstem vollständigem Neustart werden sie aus den Dateien neu aufgebaut. Die Stammdateien müssen nach wie vor die tatsächlich eingeladenen Personen abbilden; das Skript erfindet keine weiteren Teilnahmefilter. Historische Segmentkonflikte in den Befragungsdaten werden durch den Grundmengenimport nicht umgedeutet.
+
+Für die zukünftige Profilerstellung steht die wiederverwendbare Berechnung in `population.py` bereit. Die Erstellung der Profile samt automatischer Grundmengensicherung im UI ist noch nicht umgesetzt. Keine zusätzlichen Python-Pakete erforderlich.
