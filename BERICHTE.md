@@ -9,6 +9,40 @@ Eine Bezugswelle ist kein reiner Datumsfilter: Sie bestimmt den Fragenumfang, w�
 
 Die Reihenfolge ergibt sich aus den Antwortdaten der Wellen. Die Häkchen unter «Vergleichswellen für die Gesamtauswertung» gelten nur ohne Bezugswelle. Globale Frageausschlüsse und Ausschlüsse einzelner Quellfragen je Welle werden berücksichtigt. Eine Frage, die in der Bezugswelle vollständig ausgeschlossen ist, erscheint auch nicht mit historischen Ergebnissen im Bericht zu dieser Welle.
 
-Segmentfilter und Mindestfallzahl gelten weiterhin für jeden dargestellten Messzeitpunkt. Liegt eine Frage in der Bezugswelle unter der Mindestfallzahl, können ausreichend grosse historische Stichproben weiterhin gezeigt werden; die geschützten Ergebnisse bleiben ausgeblendet. Freitexte sind weiterhin nicht Teil der Weitergabeberichte.
+Segmentfilter und Mindestfallzahl gelten weiterhin für jeden dargestellten Messzeitpunkt. Liegt eine Frage in der Bezugswelle unter der Mindestfallzahl, können ausreichend grosse historische Stichproben weiterhin gezeigt werden; die geschützten Ergebnisse bleiben ausgeblendet. Vollständige Freitexte sind standardmässig nicht Teil der Weitergabeberichte; die explizite Freigabe ist unten beschrieben.
 
-Die Auswahl gilt für die Ergebnisansicht, Berichtsvorschau, heruntergeladene HTML-Berichte und PNG-/ZIP-Exporte. Bericht und Charttitel nennen die Bezugswelle. Der Rücklauf wird für die einbezogenen Vergleichswellen dargestellt.
+Die Auswahl gilt für die Ergebnisansicht, Berichtsvorschau, heruntergeladene HTML-Berichte und PNG-/ZIP-Exporte. Der Berichtskopf nennt die Bezugswelle; Charts zeigen die tatsächlich dargestellten Zeitpunkte. Der Rücklauf wird für die einbezogenen Vergleichswellen dargestellt.
+
+## OE-Berichte und thematische Besprechungsgrundlage
+
+Unter «Ergebnisse & Berichte» ersetzt eine Auswahl nach Organisationspfad die bisherigen Freitextfelder Merkmal/Einheit. Die Vorschau öffnet in einem neuen Tab und bietet einen Link zurück zur App. HTML-Downloads bleiben eigenständig nutzbar.
+
+Das gemeinsame OE-Verzeichnis unter «Organisation» unterstützt vollständige CSV-/XLSX-Importe und das Anlegen/Bearbeiten einzelner Einträge. Die ausgefüllten Ebenen bilden den Pfad Amt → Bereich → RAV-Gruppe → Abteilung → RAV → Team; leere Zwischenebenen werden übersprungen. Ein Import ersetzt den vollständigen Verzeichnisstand ab dem angegebenen Datum. Änderungen am selben Gültigkeitsdatum ersetzen diesen Stand; spätere Stände gelten bis zur nächsten Änderung. Die vorhandene Liste wird bei der ersten Änderung als Ausgangsstand erhalten. Das Verzeichnis ändert weder Antwortzuordnungen noch gespeicherte Grundmengen. Beim Import gilt weiterhin die erste Tabelle.
+
+Die Auswahl berücksichtigt den vollständigen Pfad, damit gleich benannte Untereinheiten verschiedener Bereiche getrennt bleiben. Historische, tatsächlich in Antworten vorkommende Pfade bleiben auswählbar. Die Untereinheiten für den aktuellen Vergleich stammen aus dem Verzeichnisstand zum Beginn der Bezugswelle; fehlt ein Verzeichnis, werden die beobachteten Antwortpfade verwendet. Eine neue Verzeichnisversion erzeugt keine rückwirkende Umorganisation historischer Antworten. Umbenennungen bilden zunächst unterschiedliche Pfade; fachlich gewollte historische Zusammenführungen benötigen weiterhin geprüfte wellenbezogene Segmentregeln. Stabile, von der Bezeichnung unabhängige OE-Identitäten und Profilgenerierung sind eine spätere Ausbaustufe.
+
+Berichte gliedern die freigegebenen Fragen nach dem Feld «Thema» aus der Fragenverwaltung. Für Puls AFA kann ein Themenvorschlag übernommen werden; er ergänzt nur leere Themenfelder:
+
+- Engagement und Entwicklung
+- Führung und Feedback
+- Information und Orientierung
+- Zusammenarbeit und Austausch
+- Arbeitsbedingungen und Gesundheit
+
+Unter «Weitere Fragen» stehen nicht zugeordnete Fragen. Die Zuordnung ist anschliessend unter «Fragen» editierbar. Aus Themen werden keine neuen Summenscores gebildet.
+
+Jedes Thema zeigt einzelne Fragen als kompakte Diagrammkarten: Zeitverlauf der ausgewählten OE und aktueller Vergleich der direktunterstellten Einheiten. Der vollständige Fragewortlaut stammt aus der Exportspalte `Question`, ersatzweise aus dem konfigurierten Fragetitel. Mittelwert/Zustimmung werden für den Bericht gemeinsam umgeschaltet. Skalenachsen beschriften ganze Werte; halbe Werte erhalten dezente Hilfslinien. Tabellen unter einzelnen Charts entfallen; gültige n bleiben sichtbar.
+
+Vergleichslinien zeigen die direkt übergeordnete OE und das Projektgesamtresultat. Sie lassen sich gemeinsam per Checkbox und einzeln per Legende schalten. Der PNG-Export übernimmt den sichtbaren Linienzustand. Beide Vergleichsgrössen enthalten die ausgewählte OE. Alle Ergebnisse werden aus Antworten berechnet, nicht als ungewichteter Durchschnitt der Untereinheiten. Die Mindestfallzahl gilt auch für Untereinheiten und Vergleichslinien.
+
+Teilnahme/Grundmengen/Rücklauf stehen am Anfang, zusätzlich für die direktunterstellten Einheiten in der Bezugswelle (bei Gesamtauswertung: letzte ausgewählte Welle). Grundmengen werden nicht addiert. Bei mehrfach vergebenem Dimensionswert mit verschiedenen Eltern bleibt eine nur nach Dimension/Wert hinterlegte Grundmenge offen: Sie lässt sich dem konkreten Teilpfad nicht eindeutig zuordnen. Fehlende historische Grundmengen werden nicht ersetzt. Personen ohne Untereinheitszuordnung können im übergeordneten Ergebnis enthalten sein; die Untereinheiten müssen sich deshalb nicht zum Gesamtergebnis summieren.
+
+## Berichtstexte und Freitexte
+
+In der App können pro OE-Pfad und Bezugswelle «Erkenntnisse auf einen Blick» sowie redaktionelle Texte pro Thema gespeichert werden. Freigegebene Textantworten der aktuellen Welle stehen dort zum Sichten bereit; die Mindestfallzahl gilt je Frage. Die Texte werden nicht automatisch zusammengefasst, codiert oder quantitativ interpretiert. Eigene Zusammenfassungen werden im HTML-Bericht dargestellt und HTML-sicher ausgegeben.
+
+Vollständige Textantworten bleiben standardmässig aus dem Weitergabebericht ausgeschlossen. Die ausdrücklich aktivierte Option nimmt die Texte der aktuellen Welle aufklappbar unter dem jeweiligen Thema auf. Nicht angezeigte Textantworten sind auch nicht im Chart-JSON enthalten. Ein allgemeines Codierungssystem, Belegverknüpfungen für Zusammenfassungen und qualitative Zeitvergleiche stehen noch aus.
+
+PNG-/ZIP-Exporte enthalten weiterhin drei Grössen, zusätzlich die OE-Vergleichsgrafiken. Die Grafiken nennen Befragung, OE, Fragewortlaut, Zeitpunkte und gültige n; die wiederholten Befragungsmetadaten entfallen in der HTML-Chartdarstellung. Der Export ganzer Themenblöcke ist noch nicht enthalten.
+
+Validierung: `python -m unittest discover -s tests -q`; ergänzt um Pfadtrennung, gewichtete Elternwerte, Untereinheiten, Fallzahlschutz, Freitextfreigabe, redaktionelle Texte und Verzeichnisstände. Zusätzlich Berichtserzeugung mit lokalen Puls-AFA-Exporten und tatsächliches PNG-Rendering. Ein vollständiger Browser-Layouttest war in der Ausführungsumgebung nicht möglich (Chromium-Start durch Socket-Beschränkung verhindert).

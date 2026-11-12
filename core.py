@@ -192,7 +192,7 @@ def number(value):
         return None
 
 
-def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit='', exclusions=()):
+def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit='', exclusions=(), path=()):
     exclusions=set(exclusions)
     by_question = defaultdict(dict)
     participation = defaultdict(set)
@@ -204,6 +204,8 @@ def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit=''
         if cache_key in dim_cache and dim_cache[cache_key] != dims:
             raise ValueError('Widersprüchliche Segmentmerkmale innerhalb eines Fragebogens.')
         dim_cache[cache_key] = dims
+        if path and not all(dims.get(d) == u for d,u in path):
+            continue
         if dimension and dims.get(dimension) != unit:
             continue
         participation[r['wave']].add(r['feedback'])
@@ -256,7 +258,7 @@ def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit=''
                 counts[value] += 1
             valid_people += 1
         rows.append(dict(wave=wave, canonical=canonical, label=q['label'], type=q['type'],
-                         theme=q['theme'], n=valid_people, missing=missing, invalid=invalid,
+                         theme=q['theme'], wording=str(r['raw'].get('Question','')).strip() or q['label'], n=valid_people, missing=missing, invalid=invalid,
                          mean=sum(values)/len(values) if values else None,
                          top2=100*sum(n >= q['top_from'] for n in values)/len(values) if values else None,
                          counts=dict(counts), texts=texts, minimum=q['minimum'], maximum=q['maximum']))

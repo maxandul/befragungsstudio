@@ -21,16 +21,16 @@
   }};
   const valueLabels = {id: 'valueLabels', afterDatasetsDraw(chart, args, options) {
     const ctx = chart.ctx, ds = chart.data.datasets[0]; ctx.save(); ctx.fillStyle = '#18394f';
-    ctx.font = `${options.fontSize || 13}px Arial`; ctx.textBaseline = 'middle';
+    ctx.font = `${options.fontSize || 13}px Arial, sans-serif`; ctx.textBaseline = 'middle';
     chart.getDatasetMeta(0).data.forEach((point, i) => {
       const v = ds.data[i]; if (v == null) return;
-      const text = fmt(v, chart.config.type === 'line' ? 2 : 1) + (options.percent ? ' %' : '');
+      const text = fmt(v, options.percent ? 1 : 2) + (options.percent ? ' %' : '');
       if (chart.config.type === 'line') {ctx.textAlign = 'center'; ctx.fillText(text, point.x, point.y - 22);}
       else {ctx.textAlign = 'left'; ctx.fillText(text, point.x + 9, point.y);}
     }); ctx.restore();
   }};
 
-  function config(card, metric = 'mean', layout = 'screen') {
+  function config(card, metric = 'mean', layout = 'screen', view = 'history') {
     const scale = card.rows[0].type === 'scale', latest = card.rows[card.rows.length - 1];
     const small = layout === 'half', exporting = layout !== 'screen', top = metric === 'top2';
     const fontSize = exporting ? (small ? 22 : 25) : 14;
@@ -38,49 +38,67 @@
       : Object.keys(latest.counts).map(s => wrap(s, small ? 22 : (exporting ? 38 : 35)));
     const values = scale ? card.rows.map(r => top ? r.top2 : r.mean)
       : Object.values(latest.counts).map(n => 100 * n / latest.n);
+    const children = view === 'children';
+    const datasets = [{label: scale ? payload.unit : 'Anteil (%)',
+        ns:children ? card.children.map(r=>r.n) : card.rows.map(r=>r.n),
+        data: children ? card.children.map(r => top ? r.top2 : r.mean) : values,
+        borderColor:'#0070b4',backgroundColor:'#0070b4',borderWidth:3,
+        pointRadius:exporting ? 7 : 5,pointHoverRadius:7,tension:0,maxBarThickness:30,
+        showLine:!children}];
+    if (scale && !children && document.getElementById('show-comparisons')?.checked !== false) {
+      (card.comparisons || []).forEach((comp,i) => datasets.push({
+        label:comp.label + (exporting ? ' · n=' + card.rows.map(row=>comp.rows.find(r=>r.wave===row.wave)?.n ?? '–').join('/') : ''),ns:card.rows.map(row=>comp.rows.find(r=>r.wave===row.wave)?.n),data:card.rows.map(row => {const r=comp.rows.find(r=>r.wave===row.wave);return r ? (top ? r.top2 : r.mean) : null;}),
+        borderColor:['#ed8b23','#647887'][i%2],backgroundColor:['#ed8b23','#647887'][i%2],
+        borderDash:[7,5],pointRadius:3,spanGaps:false
+      }));
+    }
+    const chartLabels=children ? card.children.map(r=>wrap(`${r.unit} · n=${r.n}`,small?22:35)) : labels;
     return {
-      type: scale ? 'line' : 'bar',
-      data: {labels, datasets: [{label: scale ? (top ? 'Zustimmung (%)' : 'Mittelwert') : 'Anteil (%)',
-        data: values, borderColor: '#0070b4', backgroundColor: '#0070b4', borderWidth: scale ? 3 : 0,
-        pointRadius: exporting ? 7 : 5, pointHoverRadius: 7, tension: 0, maxBarThickness: exporting ? 48 : 30}]},
+      type: scale && !children ? 'line' : 'bar',
+      data: {labels:chartLabels,datasets},
       plugins: [whiteBackground, valueLabels],
       options: {
-        indexAxis: scale ? 'x' : 'y', responsive: !exporting, maintainAspectRatio: false,
+        indexAxis: scale && !children ? 'x' : 'y', responsive: !exporting, maintainAspectRatio: false,
         animation: false, devicePixelRatio: exporting ? 1 : Math.min(window.devicePixelRatio || 1, 2),
         layout: {padding: {top: 12, left: 12, right: exporting ? 115 : 85, bottom: 10}},
         plugins: {
-          legend: {display: false},
-          title: {display: true, text: [payload.project + ' · ' + payload.unit + (payload.focus_wave ? ' · Bezugswelle ' + payload.focus_wave : ''),
-            ...wrap(card.label, small ? 43 : (exporting ? 82 : 75))], color: '#172c3b',
-            font: {family: 'Arial', size: exporting ? (small ? 27 : 32) : 19, weight: 'bold'}, padding: {bottom: exporting ? 30 : 20}},
-          subtitle: {display: true, text: scale ? (top ? 'Zustimmungsanteil · gültige Antworten' : `Mittelwert · Skala ${latest.minimum}–${latest.maximum}`)
+          legend: {display: datasets.length>1,labels:{font:{size:fontSize}}},
+          title: {display: exporting, text: [...(exporting ? [payload.project + ' · ' + payload.unit] : []),...wrap(card.wording || card.label, small ? 43 : (exporting ? 82 : 75))], color: '#172c3b',
+            font: {family: 'Arial, sans-serif', size: exporting ? (small ? 27 : 32) : 19, weight: 'bold'}, padding: {bottom: exporting ? 30 : 20}},
+          subtitle: {display: exporting, text: scale ? (top ? 'Zustimmungsanteil · gültige Antworten' : `Mittelwert · Skala ${latest.minimum}–${latest.maximum}`) + (children ? ` · ${latest.wave}` : '')
             : `${latest.wave} · n=${latest.n}` + (latest.type === 'choice_multiple' ? ' · Mehrfachnennungen möglich' : ''),
-            font: {family: 'Arial', size: fontSize}, color: '#607381', padding: {bottom: 35}},
-          tooltip: {enabled: !exporting}, valueLabels: {fontSize, percent: !scale || top}
+            font: {family: 'Arial, sans-serif', size: fontSize}, color: '#607381', padding: {bottom: 35}},
+          tooltip: {enabled: !exporting,callbacks:{label:ctx=>`${ctx.dataset.label}: ${fmt(scale && !children ? ctx.parsed.y : ctx.parsed.x,top ? 1 : 2)}${top ? ' %' : ''} · n=${ctx.dataset.ns?.[ctx.dataIndex] ?? latest.n}`}}, valueLabels: {fontSize, percent: !scale || top}
         },
         scales: {
-          x: {min: scale ? undefined : 0, max: scale ? undefined : 100,
-            grid: {display: !scale, color: '#edf1f5'}, border: {display: false},
-            ticks: {font: {family: 'Arial', size: fontSize}, color: '#455c6c', maxRotation: 0, autoSkip: false}},
-          y: {min: scale ? (top ? 0 : latest.minimum) : undefined, max: scale ? (top ? 100 : latest.maximum) : undefined,
-            grid: {display: scale, color: '#edf1f5'}, border: {display: false},
-            ticks: {font: {family: 'Arial', size: fontSize}, color: '#455c6c', autoSkip: false}}
+          x: {min: children ? (top ? 0 : latest.minimum) : (scale ? undefined : 0), max: children ? (top ? 100 : latest.maximum) : (scale ? undefined : 100),
+            grid: {display: !scale || children, color: '#edf1f5'}, border: {display: false},
+            ticks: {font: {family: 'Arial, sans-serif', size: fontSize}, color: '#455c6c', maxRotation: 0, autoSkip: false, stepSize:children ? (top ? 20 : 1) : undefined}},
+          y: {min: scale && !children ? (top ? 0 : latest.minimum) : undefined, max: scale && !children ? (top ? 100 : latest.maximum) : undefined,
+            grid: {display: scale && !children, color:context=>Number.isInteger(context.tick?.value) ? '#dde5ec' : '#f1f4f7'}, border: {display: false},
+            ticks: {font: {family: 'Arial, sans-serif', size: fontSize}, color: '#455c6c', autoSkip: false,stepSize:scale && !children ? (top ? 20 : 0.5) : undefined,callback:scale && !children ? (top ? value=>value : value=>Number.isInteger(value)?value:'') : function(value){return this.getLabelForValue(value);}}}
         }
       }
     };
   }
+  function metricFor(index) {return document.getElementById('report-metric')?.value || document.getElementById(`metric-${index}`)?.value || 'mean';}
   function draw(index) {
     const canvas = document.getElementById(`chart-${index}`);
-    const metric = document.getElementById(`metric-${index}`)?.value || 'mean';
+    const metric = metricFor(index);
     if (charts.has(index)) charts.get(index).destroy();
     charts.set(index, new Chart(canvas, config(payload.cards[index], metric)));
+    const childCanvas=document.getElementById(`children-${index}`);
+    if(childCanvas){const key='child-'+index;if(charts.has(key))charts.get(key).destroy();charts.set(key,new Chart(childCanvas,config(payload.cards[index],metric,'screen','children')));}
   }
-  async function png(index, layout) {
+  async function png(index, layout, view = 'history') {
     if (document.fonts) await document.fonts.ready;
     const canvas = document.createElement('canvas'), size = sizes[layout];
     canvas.width = size[0]; canvas.height = size[1];
-    const metric = document.getElementById(`metric-${index}`)?.value || 'mean';
-    const chart = new Chart(canvas, config(payload.cards[index], metric, layout));
+    const metric = metricFor(index);
+    const cfg=config(payload.cards[index], metric, layout, view);
+    const current=charts.get(index);
+    if(view==='history' && current?.isDatasetVisible)cfg.data.datasets.forEach((ds,i)=>{ds.hidden=!current.isDatasetVisible(i);});
+    const chart = new Chart(canvas, cfg);
     try {
       chart.update('none');
       const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
@@ -88,10 +106,10 @@
       return blob;
     } finally { chart.destroy(); }
   }
-  function filename(index, layout) {
-    const metric = document.getElementById(`metric-${index}`)?.value || 'mean';
+  function filename(index, layout, view = 'history') {
+    const metric = metricFor(index);
     const label = payload.cards[index].label.replace(/[^a-zA-Z0-9äöüÄÖÜ_-]+/g, '_').slice(0, 70);
-    return `${String(index + 1).padStart(2, '0')}_${label}_${metric}_${layout}.png`;
+    return `${String(index + 1).padStart(2, '0')}_${label}_${metric}_${layout}_${view}.png`;
   }
   function download(blob, name) {
     const url = URL.createObjectURL(blob), link = document.createElement('a');
@@ -138,6 +156,10 @@
         for (const layout of Object.keys(sizes)) {
           const blob = await png(i, layout);
           files.push({name: filename(i, layout), bytes: new Uint8Array(await blob.arrayBuffer())});
+          if (payload.cards[i].children?.length && payload.cards[i].rows[0].type==='scale') {
+            const childBlob=await png(i,layout,'children');
+            files.push({name:filename(i,layout,'children'),bytes:new Uint8Array(await childBlob.arrayBuffer())});
+          }
         }
       }
       if (!files.length) {status.textContent = 'Keine freigegebenen Charts vorhanden.'; return;}
@@ -148,13 +170,14 @@
   async function start() {
     try {
       if (typeof Chart === 'undefined') throw new Error('Die eingebettete Chartbibliothek wurde nicht geladen.');
-      Chart.defaults.font.family = 'Arial';
+      Chart.defaults.font.family = 'Arial, sans-serif';
       payload.cards.forEach((card, i) => {draw(i); document.getElementById(`metric-${i}`)?.addEventListener('change', () => draw(i));});
+      for (const id of ['report-metric','show-comparisons']) document.getElementById(id)?.addEventListener('change',()=>payload.cards.forEach((card,i)=>draw(i)));
       document.querySelectorAll('[data-png]').forEach(button => button.addEventListener('click', async () => {
         button.disabled = true;
         try {
           const i = Number(button.dataset.index), layout = button.dataset.png;
-          download(await png(i, layout), filename(i, layout)); status.textContent = 'PNG erstellt.';
+          download(await png(i, layout, button.dataset.view), filename(i, layout, button.dataset.view)); status.textContent = 'PNG erstellt.';
         } catch (error) {status.textContent = 'Export fehlgeschlagen: ' + error.message;}
         finally {button.disabled = false;}
       }));

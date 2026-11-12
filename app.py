@@ -7,8 +7,9 @@ from pathlib import Path
 from werkzeug.exceptions import HTTPException
 
 from flask import (Flask, abort, flash, redirect, render_template, request, send_file, jsonify,
-                   session, url_for)
-from core import read_table, normalize, content_hash, aggregate
+                   session, url_for, g)
+from core import read_table, normalize, content_hash, aggregate, mapped_dimensions
+from organisation import tree
 
 ROOT = Path(__file__).resolve().parent
 DIMENSIONS = ['Amt', 'Bereich', 'Abteilung', 'RAV Gruppe', 'RAV', 'Team']
@@ -60,6 +61,9 @@ def create_app(instance=None):
         CREATE TABLE IF NOT EXISTS imports(id INTEGER PRIMARY KEY,project INTEGER,filename TEXT,
           hash TEXT,rows INTEGER,created TEXT DEFAULT CURRENT_TIMESTAMP);
         CREATE TABLE IF NOT EXISTS organisation(code TEXT PRIMARY KEY,attributes TEXT);
+        CREATE TABLE IF NOT EXISTS organisation_history(valid_from TEXT PRIMARY KEY,entries TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS report_notes(project INTEGER,scope TEXT,wave TEXT,theme TEXT,body TEXT,
+          PRIMARY KEY(project,scope,wave,theme));
         CREATE TABLE IF NOT EXISTS question_exclusions(project INTEGER,source TEXT,wave TEXT,reason TEXT,
           PRIMARY KEY(project,source,wave));
         CREATE TABLE IF NOT EXISTS question_settings(project INTEGER PRIMARY KEY,missing TEXT NOT NULL);
@@ -84,7 +88,9 @@ def create_app(instance=None):
                 columns.update(json.loads(r[0]))
         return dict(p=p, waves=waves, columns=sorted(columns), dimensions=DIMENSIONS, types=TYPES)
 
-    def results(pid, dimension='', unit=''):
+    def result_sources(pid):
+        if getattr(g,'result_project',None)==pid:
+            return g.result_sources
         with db() as c:
             records = [dict(r) for r in c.execute('SELECT * FROM answers WHERE project=?', (pid,))]
             for r in records:
@@ -99,8 +105,14 @@ def create_app(instance=None):
             aliases = [dict(r) for r in c.execute("SELECT * FROM aliases WHERE project=? ORDER BY (wave != '*'),id", (pid,))]
             grounds = [dict(r) for r in c.execute('SELECT * FROM grounds WHERE project=?', (pid,))]
             exclusions={(r['source'],r['wave']) for r in c.execute('SELECT source,wave FROM question_exclusions WHERE project=?',(pid,))}
-        rows, participation = aggregate(records, qs, mappings, aliases, dimension, unit, exclusions)
-        return rows, participation, grounds
+        g.result_project=pid
+        g.result_sources=(records,qs,mappings,aliases,grounds,exclusions)
+        return g.result_sources
+
+    def results(pid, dimension='', unit='', path=()):
+        records,qs,mappings,aliases,grounds,exclusions=result_sources(pid)
+        rows,participation=aggregate(records,qs,mappings,aliases,dimension,unit,exclusions,path)
+        return rows,participation,grounds
 
     @app.before_request
     def protect():
@@ -456,23 +468,66 @@ def create_app(instance=None):
                 snapshots.append(snapshot)
         return render_template('grounds.html',**ctx,grounds=grounds,snapshots=snapshots,tab='grounds')
 
+    def organisation_entries(c, date=''):
+        version=c.execute('SELECT entries FROM organisation_history WHERE valid_from<=? ORDER BY valid_from DESC LIMIT 1',
+                          (date or '9999-12-31',)).fetchone()
+        return json.loads(version[0]) if version else [json.loads(r[0]) for r in c.execute('SELECT attributes FROM organisation ORDER BY code')]
+
     @app.route('/organisation',methods=['GET','POST'])
     def organisation():
+        from datetime import date
         with db() as c:
             if request.method=='POST':
-                f=request.files['file']
-                df=read_table(f.read(),f.filename)
-                if 'OE_Kürzel' not in df:
-                    raise ValueError('Die OE-Liste benötigt eine Spalte OE_Kürzel.')
-                if df['OE_Kürzel'].eq('').any() or df['OE_Kürzel'].duplicated().any():
-                    raise ValueError('OE-Kürzel müssen ausgefüllt und eindeutig sein.')
-                for row in df.to_dict('records'):
-                    c.execute('INSERT INTO organisation VALUES(?,?) ON CONFLICT(code) DO UPDATE SET attributes=excluded.attributes',
-                              (row['OE_Kürzel'],json.dumps(row,ensure_ascii=False)))
-                flash('OE-Verzeichnis ergänzt und aktualisiert. Befragungsdaten wurden nicht verändert.')
+                if request.form.get('action')=='entry':
+                    row={k:request.form.get(k,'').strip() for k in ['OE_Kürzel','Amt','Bereich','RAV_Gruppe','Abteilung','RAV','Team']}
+                    if not row['OE_Kürzel'] or not row['Amt']:
+                        raise ValueError('OE-Kürzel und Amt sind erforderlich.')
+                    entries={r['OE_Kürzel']:r for r in organisation_entries(c,request.form.get('valid_from',''))}
+                    entries[row['OE_Kürzel']]=row
+                    entries=list(entries.values())
+                else:
+                    f=request.files['file']
+                    df=read_table(f.read(),f.filename)
+                    if 'OE_Kürzel' not in df or 'Amt' not in df:
+                        raise ValueError('Die OE-Liste benötigt OE_Kürzel und Amt.')
+                    df=df.apply(lambda col:col.str.strip())
+                    if df['OE_Kürzel'].eq('').any() or df['OE_Kürzel'].duplicated().any():
+                        raise ValueError('OE-Kürzel müssen ausgefüllt und eindeutig sein.')
+                    entries=df.to_dict('records')
+                valid=request.form.get('valid_from','').strip()
+                if not valid:
+                    raise ValueError('Bitte den Gültigkeitsbeginn des Verzeichnisses angeben.')
+                date.fromisoformat(valid)
+                if not c.execute('SELECT 1 FROM organisation_history LIMIT 1').fetchone():
+                    baseline=[json.loads(r[0]) for r in c.execute('SELECT attributes FROM organisation')]
+                    c.execute('INSERT INTO organisation_history VALUES(?,?)',('',json.dumps(baseline,ensure_ascii=False)))
+                c.execute('INSERT INTO organisation_history VALUES(?,?) ON CONFLICT(valid_from) DO UPDATE SET entries=excluded.entries',
+                          (valid,json.dumps(entries,ensure_ascii=False)))
+                # Gemeinsames aktuelles Lookup bleibt auch für bestehende Werkzeuge verfügbar.
+                latest=organisation_entries(c)
+                c.execute('DELETE FROM organisation')
+                c.executemany('INSERT INTO organisation VALUES(?,?)',[(r['OE_Kürzel'],json.dumps(r,ensure_ascii=False)) for r in latest])
+                flash('Organisationsstand gespeichert. Bestehende Antwortzuordnungen und Grundmengen bleiben erhalten.')
                 return redirect(url_for('organisation'))
-            entries=[json.loads(r[0]) for r in c.execute('SELECT attributes FROM organisation ORDER BY code')]
-        return render_template('organisation.html',entries=entries)
+            entries=organisation_entries(c)
+            versions=[r[0] for r in c.execute('SELECT valid_from FROM organisation_history ORDER BY valid_from DESC')]
+        return render_template('organisation.html',entries=entries,nodes=tree(entries),versions=versions,today=date.today().isoformat())
+
+    def report_tree(pid, date=''):
+        with db() as c:
+            entries=organisation_entries(c,date)
+        records,_,mappings,aliases,_,_=result_sources(pid)
+        observed={}
+        for r in records:
+            key=(r['wave'],r['feedback'])
+            if key not in observed:
+                observed[key]=mapped_dimensions(r,mappings,aliases)
+        amts={d['Amt'] for d in observed.values() if d.get('Amt')}
+        if amts:
+            entries=[e for e in entries if e.get('Amt') in amts]
+        # Historische Antwortpfade bleiben auswählbar, auch wenn sie nicht mehr im Lookup stehen.
+        nodes=tree(entries,observed.values())
+        return nodes,tree(entries) if entries else nodes
 
     def report_data(pid):
         p=project(pid)
@@ -480,7 +535,6 @@ def create_app(instance=None):
         unit=request.args.get('unit','').strip()
         if bool(dimension)!=bool(unit):
             raise ValueError('Merkmal und Einheit bitte gemeinsam auswählen oder beide leer lassen.')
-        rows,participation,grounds=results(pid,dimension,unit)
         with db() as c:
             dated={r[0]:r[1] for r in c.execute('SELECT wave,MIN(NULLIF(date,\'\')) FROM answers WHERE project=? GROUP BY wave',(pid,))}
         available=sorted(dated,key=lambda w:(dated.get(w) or '9999',w))
@@ -496,12 +550,24 @@ def create_app(instance=None):
                     LEFT JOIN question_exclusions e ON e.project=a.project AND e.source=a.source AND e.wave=a.wave
                     WHERE a.project=? AND a.wave=? AND q.include=1 AND e.source IS NULL''',(pid,focus_wave))}
             selected=available[:available.index(focus_wave)+1]
-            rows=[r for r in rows if r['canonical'] in eligible]
         else:
             selected=request.args.getlist('wave') or available
             if any(w not in available for w in selected):
                 raise ValueError('Eine ausgewählte Welle ist nicht vorhanden.')
+        selected=[w for w in available if w in selected]
+        reference_wave=focus_wave or (selected[-1] if selected else '')
+        nodes,reference_nodes=report_tree(pid,(dated.get(reference_wave) or '')[:10])
+        node_id=request.args.get('oe','')
+        node=next((n for n in nodes if n['id']==node_id),None)
+        if node_id and node is None:
+            raise ValueError('Die ausgewählte Organisationseinheit ist nicht vorhanden.')
+        if node:
+            dimension,unit=node['dimension'],node['unit']
+        rows,participation,grounds=results(pid,dimension,unit,node['path'] if node else ())
+        if focus_wave:
+            rows=[r for r in rows if r['canonical'] in eligible]
         rows=[r for r in rows if r['wave'] in selected]
+
         minimum=max(1,int(request.args.get('min_n',p['min_n'])))
         rates=[]
         for wave in available:
@@ -510,9 +576,16 @@ def create_app(instance=None):
                 continue
             matches=[g for g in grounds if g['wave']==wave and g['dimension']==dimension and g['unit']==unit]
             total=matches[0]['total'] if matches else None
+            if node and sum(n['dimension']==dimension and n['unit']==unit for n in nodes)>1:
+                total=None  # Mehrdeutige Grundmengen dürfen nicht für Teilpfade verwendet werden.
             rates.append(dict(wave=wave,n=n,total=total,rate=100*n/total if total else None,
                               warning=total is not None and n>total))
-        # Freitexte sind in dieser Etappe nicht in Weitergabeberichten enthalten.
+        text_groups={}
+        for r in rows:
+            if r['type']=='text' and r['wave']==reference_wave and r['n']>=minimum:
+                text_groups.setdefault(r['theme'] or 'Weitere Fragen',[]).append(r)
+        include_texts=request.args.get('include_texts')=='1'
+
         grouped={}
         hidden=0
         for r in rows:
@@ -524,8 +597,37 @@ def create_app(instance=None):
             grouped.setdefault(r['canonical'],[]).append(r)
         for group in grouped.values():
             group.sort(key=lambda row:available.index(row['wave']))
+        child_parent=node_id or ''
+        roots=[n for n in reference_nodes if not n['parent']]
+        if not node and not dimension and len(roots)==1:
+            child_parent=roots[0]['id']
+        child_nodes=[n for n in reference_nodes if n['parent']==child_parent]
+        child_rates=[]
+        child_results=[]
+        for child in child_nodes:
+            cr,cp,cg=results(pid,path=child['path'])
+            child_results.append((child,cr))
+            n=cp.get(reference_wave,0)
+            totals=[g['total'] for g in cg if g['wave']==reference_wave and g['dimension']==child['dimension'] and g['unit']==child['unit']]
+            total=totals[0] if totals and sum(x['dimension']==child['dimension'] and x['unit']==child['unit'] for x in nodes)==1 else None
+            child_rates.append(dict(unit=child['unit'],n=n,total=total,rate=100*n/total if total else None))
+        parent=next((x for x in nodes if node and x['id']==node['parent']),None)
+        comparisons=[]
+        for label,path in ([(parent['unit'],parent['path'])] if parent else []) + [('Gesamtergebnis',[])]:
+            if not node:
+                continue
+            comp,_,_=results(pid,path=path)
+            comparisons.append(dict(label=label,rows=[r for r in comp if r['wave'] in selected and r['n']>=minimum and r['type']!='text']))
+        scope=node_id or (dimension+'|'+unit if dimension else '')
+        with db() as c:
+            notes={r['theme']:r['body'] for r in c.execute('SELECT theme,body FROM report_notes WHERE project=? AND scope=? AND wave=?',(pid,scope,reference_wave))}
+        records,_,_,_,_,_=result_sources(pid)
+        afa=any(r['raw'].get('Survey ID')=='2330' for r in records)
         return dict(p=p,grouped=grouped,rates=rates,minimum=minimum,hidden=hidden,
-                    dimension=dimension,unit=unit,selected=selected,available=available,focus_wave=focus_wave)
+                    dimension=dimension,unit=unit,selected=selected,available=available,focus_wave=focus_wave,
+                    nodes=nodes,node=node,node_id=node_id,child_rates=child_rates,child_results=child_results,
+                    comparisons=comparisons,reference_wave=reference_wave,notes=notes,scope=scope,
+                    text_groups=text_groups,include_texts=include_texts,afa=afa)
 
     @app.route('/p/<int:pid>/results')
     def view_results(pid):
@@ -534,19 +636,54 @@ def create_app(instance=None):
     @app.route('/p/<int:pid>/report')
     def report(pid):
         ctx=report_data(pid)
-        cards=[dict(label=rows[0]['label'],theme=rows[0]['theme'],rows=rows)
-               for rows in ctx['grouped'].values()]
+        cards=[]
+        for canonical,rows in ctx['grouped'].items():
+            children=[dict(unit=child['unit'],**next(r for r in cr if r['canonical']==canonical and r['wave']==ctx['reference_wave']))
+                      for child,cr in ctx['child_results'] if any(r['canonical']==canonical and r['wave']==ctx['reference_wave'] and r['n']>=ctx['minimum'] for r in cr)]
+            comparisons=[dict(label=comp['label'],rows=[r for r in comp['rows'] if r['canonical']==canonical]) for comp in ctx['comparisons']]
+            cards.append(dict(label=rows[-1]['label'],wording=rows[-1]['wording'],theme=rows[-1]['theme'] or 'Weitere Fragen',rows=rows,children=children,comparisons=comparisons))
+        themes={}
+        for index,card in enumerate(cards):
+            themes.setdefault(card['theme'],[]).append(dict(card,index=index))
+        for theme in ctx['text_groups']:
+            themes.setdefault(theme,[])
         chart_library=(ROOT/'static/vendor/chart.umd.js').read_text(encoding='utf-8')
         chart_renderer=(ROOT/'static/report-charts.js').read_text(encoding='utf-8')
         payload=dict(project=ctx['p']['name'],unit=ctx['unit'] or 'Gesamtbefragung',
                      focus_wave=ctx['focus_wave'],cards=cards)
         html=render_template('report.html',**ctx,cards=cards,chart_library=chart_library,
                              chart_renderer=chart_renderer,chart_payload=payload,
-                             auto_zip=request.args.get('zip')=='1')
+                             auto_zip=request.args.get('zip')=='1',themes=themes,
+                             app_url=request.url_root.rstrip('/')+url_for('view_results',pid=pid)+'?'+request.query_string.decode())
         if request.args.get('download'):
             return send_file(io.BytesIO(html.encode()),mimetype='text/html',as_attachment=True,
                              download_name=f'Pulsbericht_{pid}.html')
         return html
+
+    @app.post('/p/<int:pid>/report/themes')
+    def report_themes(pid):
+        from report_themes import AFA_THEMES
+        ctx=report_data(pid)
+        if not ctx['afa']:
+            raise ValueError('Dieser Themenvorschlag gilt für Puls AFA.')
+        with db() as c:
+            for theme,labels in AFA_THEMES.items():
+                for label in labels:
+                    # Alle Quellfragen einer gemeinsamen Frage erhalten dieselbe Zuordnung.
+                    c.execute("UPDATE questions SET theme=? WHERE project=? AND theme='' AND canonical IN (SELECT canonical FROM questions WHERE project=? AND label=?)",
+                              (theme,pid,pid,label))
+        flash('AFA-Themenvorschlag übernommen. Eigene Themen bleiben erhalten; Anpassungen sind unter «Fragen» möglich.')
+        return redirect(url_for('view_results',pid=pid)+'?'+request.query_string.decode())
+
+    @app.post('/p/<int:pid>/report/notes')
+    def report_notes(pid):
+        ctx=report_data(pid)
+        theme=request.form.get('theme','')
+        with db() as c:
+            c.execute('INSERT INTO report_notes VALUES(?,?,?,?,?) ON CONFLICT(project,scope,wave,theme) DO UPDATE SET body=excluded.body',
+                      (pid,ctx['scope'],ctx['reference_wave'],theme,request.form.get('body','').strip()))
+        flash('Berichtstext gespeichert.')
+        return redirect(url_for('view_results',pid=pid)+'?'+request.query_string.decode())
 
     @app.route('/p/<int:pid>/charts.zip')
     def charts(pid):
