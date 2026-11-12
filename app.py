@@ -54,6 +54,8 @@ def create_app(instance=None):
           dimension TEXT,source TEXT,target TEXT,UNIQUE(project,wave,dimension,source));
         CREATE TABLE IF NOT EXISTS grounds(project INTEGER,wave TEXT,dimension TEXT,unit TEXT,
           total INTEGER NOT NULL,PRIMARY KEY(project,wave,dimension,unit));
+        CREATE TABLE IF NOT EXISTS ground_leaders(project INTEGER,wave TEXT,dimension TEXT,unit TEXT,
+          total INTEGER NOT NULL,PRIMARY KEY(project,wave,dimension,unit));
         CREATE TABLE IF NOT EXISTS population_snapshots(project INTEGER,wave TEXT,
           source TEXT,source_hash TEXT,reference_hash TEXT,details TEXT,created TEXT,
           PRIMARY KEY(project,wave));
@@ -126,8 +128,21 @@ def create_app(instance=None):
 
     def results(pid, dimension='', unit='', path=()):
         records,qs,mappings,aliases,grounds,exclusions=result_sources(pid)
-        rows,participation=aggregate(records,qs,mappings,aliases,dimension,unit,exclusions,path)
-        return rows,participation,grounds
+        rows,participation=aggregate(records,qs,mappings,aliases,dimension,unit,exclusions,path,exclude_leaders=True)
+        role_waves={r['wave'] for r in records if 'Kadertyp (subject)' in r['raw'] or 'Kadertyp' in r['raw']}
+        with db() as c:
+            leader_totals={(r['wave'],r['dimension'],r['unit']):r['total'] for r in c.execute('SELECT * FROM ground_leaders WHERE project=?',(pid,))}
+        adjusted=[]
+        for ground in grounds:
+            row=dict(ground)
+            leaders=leader_totals.get((row['wave'],row['dimension'],row['unit']))
+            row['inclusive_total']=row['total']
+            row['leaders']=leaders
+            row['leader_basis_missing']=row['wave'] in role_waves and (leaders is None or leaders>row['total'])
+            if row['wave'] in role_waves:
+                row['total']=row['total']-leaders if leaders is not None and leaders<=row['total'] else None
+            adjusted.append(row)
+        return rows,participation,adjusted
 
     @app.before_request
     def protect():
@@ -486,6 +501,7 @@ def create_app(instance=None):
                 if action not in ('save','update','delete'):
                     raise ValueError('Unbekannte Grundmengenaktion.')
                 original=None
+                original_leaders=None
                 if action in ('update','delete'):
                     original=tuple(f.get('original_'+field,'') for field in ('wave','dimension','unit'))
                     row=c.execute('SELECT total FROM grounds WHERE project=? AND wave=? AND dimension=? AND unit=?',(pid,*original)).fetchone()
@@ -493,8 +509,13 @@ def create_app(instance=None):
                         raise ValueError('Dieser Eintrag ist nicht mehr vorhanden. Bitte die Seite neu laden.')
                     if f.get('original_total') is not None and str(row['total'])!=f['original_total']:
                         raise ValueError('Der Eintrag wurde zwischenzeitlich geändert. Bitte die Seite neu laden.')
+                    leader_row=c.execute('SELECT total FROM ground_leaders WHERE project=? AND wave=? AND dimension=? AND unit=?',(pid,*original)).fetchone()
+                    original_leaders=leader_row[0] if leader_row else None
+                    if 'original_leaders' in f and f['original_leaders']!=(str(original_leaders) if original_leaders is not None else ''):
+                        raise ValueError('Der Leitungsanteil wurde zwischenzeitlich geändert. Bitte die Seite neu laden.')
                 if action=='delete':
                     c.execute('DELETE FROM grounds WHERE project=? AND wave=? AND dimension=? AND unit=?',(pid,*original))
+                    c.execute('DELETE FROM ground_leaders WHERE project=? AND wave=? AND dimension=? AND unit=?',(pid,*original))
                     flash('Grundmenge gelöscht. Die Rücklaufquote bleibt ohne hinterlegte Grundmenge offen.')
                 else:
                     try:
@@ -508,15 +529,31 @@ def create_app(instance=None):
                         raise ValueError('Bitte eine vorhandene Erhebung auswählen.')
                     if bool(dim)!=bool(unit):
                         raise ValueError('Für eine Einheit sind Merkmal und Wert gemeinsam anzugeben.')
+                    leader_total=original_leaders
+                    if not original and 'leader_total' not in f:
+                        existing_leaders=c.execute('SELECT total FROM ground_leaders WHERE project=? AND wave=? AND dimension=? AND unit=?',(pid,wave,dim,unit)).fetchone()
+                        leader_total=existing_leaders[0] if existing_leaders else None
+                    if 'leader_total' in f:
+                        try:
+                            leader_total=int(f['leader_total']) if f['leader_total'].strip() else None
+                        except ValueError:
+                            raise ValueError('Bitte eine ganze Zahl für die eingeladenen Leitungspersonen angeben.')
+                    if leader_total is not None and not 0<=leader_total<=total:
+                        raise ValueError('Der Leitungsanteil muss zwischen null und der Grundmenge liegen.')
                     if original and (wave,dim,unit)!=original:
                         if c.execute('SELECT 1 FROM grounds WHERE project=? AND wave=? AND dimension=? AND unit=?',(pid,wave,dim,unit)).fetchone():
                             raise ValueError('Für diese Erhebung und Einheit gibt es bereits eine Grundmenge. Bitte den bestehenden Eintrag bearbeiten.')
                         c.execute('DELETE FROM grounds WHERE project=? AND wave=? AND dimension=? AND unit=?',(pid,*original))
+                        c.execute('DELETE FROM ground_leaders WHERE project=? AND wave=? AND dimension=? AND unit=?',(pid,*original))
                     c.execute('INSERT INTO grounds VALUES(?,?,?,?,?) ON CONFLICT(project,wave,dimension,unit) DO UPDATE SET total=excluded.total',
                               (pid,wave,dim,unit,total))
+                    if leader_total is not None:
+                        c.execute('INSERT INTO ground_leaders VALUES(?,?,?,?,?) ON CONFLICT(project,wave,dimension,unit) DO UPDATE SET total=excluded.total',(pid,wave,dim,unit,leader_total))
+                    elif 'leader_total' in f:
+                        c.execute('DELETE FROM ground_leaders WHERE project=? AND wave=? AND dimension=? AND unit=?',(pid,wave,dim,unit))
                     flash('Grundmenge gespeichert. Werte gelten jeweils inklusive Untereinheiten und werden nicht addiert.')
                 return redirect(url_for('grounds',pid=pid))
-            grounds=c.execute('SELECT * FROM grounds WHERE project=? ORDER BY wave,dimension,unit',(pid,)).fetchall()
+            grounds=[dict(r) for r in c.execute('SELECT g.*,l.total leaders FROM grounds g LEFT JOIN ground_leaders l ON l.project=g.project AND l.wave=g.wave AND l.dimension=g.dimension AND l.unit=g.unit WHERE g.project=? ORDER BY g.wave,g.dimension,g.unit',(pid,))]
             snapshots=[]
             for row in c.execute('SELECT * FROM population_snapshots WHERE project=? ORDER BY wave',(pid,)):
                 snapshot=dict(row)
@@ -636,6 +673,7 @@ def create_app(instance=None):
             if node and sum(n['dimension']==dimension and n['unit']==unit for n in nodes)>1:
                 total=None  # Mehrdeutige Grundmengen dürfen nicht für Teilpfade verwendet werden.
             rates.append(dict(wave=wave,n=n,total=total,rate=100*n/total if total else None,
+                              leader_basis_missing=bool(matches and matches[0].get('leader_basis_missing')),
                               warning=total is not None and n>total))
         text_groups={}
         for r in rows:
@@ -676,7 +714,8 @@ def create_app(instance=None):
             n=cp.get(reference_wave,0)
             totals=[g['total'] for g in cg if g['wave']==reference_wave and g['dimension']==child['dimension'] and g['unit']==child['unit']]
             total=totals[0] if totals and sum(x['dimension']==child['dimension'] and x['unit']==child['unit'] for x in nodes)==1 else None
-            child_rates.append(dict(unit=child['unit'],n=n,total=total,rate=100*n/total if total else None))
+            child_ground=next((g for g in cg if g['wave']==reference_wave and g['dimension']==child['dimension'] and g['unit']==child['unit']),{})
+            child_rates.append(dict(unit=child['unit'],n=n,total=total,rate=100*n/total if total else None,leader_basis_missing=child_ground.get('leader_basis_missing',False)))
         parent=next((x for x in nodes if node and x['id']==node['parent']),None)
         comparisons=[]
         for kind,label,path in ([('parent','Übergeordnete OE: '+parent['unit'],parent['path'])] if parent else []) + [('total',p['name']+' · gesamt',[])]:

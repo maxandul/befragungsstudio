@@ -70,3 +70,11 @@ Die Berichtsabschnitte erhalten eigene Flächen mit klaren Abständen und Themen
 Gespeicherte Grundmengen lassen sich je Zeile bearbeiten oder löschen. Eine Änderung der Welle oder Einheit wird atomar durchgeführt und bei einem bereits belegten Ziel abgewiesen. Die Bearbeitung prüft Projekt und bisherigen Wert, damit eine veraltete Seite keine neuere Korrektur überschreibt. Gelöscht wird nur die konkrete Grundmenge, nicht die Antworten oder die zugrunde liegende Mitarbeitendenbasis. Ohne Grundmenge wird kein Rücklauf berechnet; ein späterer Seed-Lauf kann einen fehlenden Wert erneut ergänzen.
 
 54 automatisierte Tests bestanden. Neue Fälle prüfen korrigierte Rücklaufquoten, Löschung, Projektabgrenzung, unveränderte Antwort- und Herkunftsdaten, ungültige Eingaben, Zielkonflikte und veraltete Formularstände. Ein vollständiger Browser-Layouttest ist weiterhin offen.
+
+## OE-Leitung und Rücklaufbasis ab 0.1.13
+
+Die Leitung der jeweils dargestellten OE wird anhand von Kadertyp `100` und exaktem vollständigem Organisationspfad ausgeschlossen. Unterstellte Leitungen bleiben enthalten; `110` und andere Werte führen nicht zum Ausschluss. Das gilt unabhängig für die ausgewählte OE, ihre Untereinheiten, Eltern- und Gesamtvergleiche. Der Filter wirkt vor allen Kennzahlen und Mindestfallzahlen sowie vor Freitextanzeige und Belegauswahl. Ohne verfügbare Kadertyp-Kennzeichnung können keine Leitungspersonen aus den Antworten identifiziert werden.
+
+Die Grundmenge wird nicht anhand der beobachteten Leitungsantworten verändert. Unter Grundmengen kann stattdessen die Anzahl der darin enthaltenen eingeladenen eigenen Leitungspersonen bestätigt werden. Der Bericht zieht diese Zahl ab; unbekannte Anteile lassen die Rücklaufquote offen, wenn das Exportformat Kadertypen führt. Bereits ohne eigene Leitung erfasste Grundmengen werden mit Leitungsanteil `0` bestätigt. Einzelkorrekturen, Verschiebung und Löschung behandeln Grundmenge und Leitungsanteil gemeinsam; die Quelldaten bleiben erhalten.
+
+57 automatisierte Tests bestanden. Die redaktionellen Zusammenfassungen werden nicht automatisch umgeschrieben. Vollständige Browserprüfung weiterhin offen.
