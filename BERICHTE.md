@@ -62,3 +62,11 @@ Validierung: `python -m unittest discover -s tests -q`; 51 Tests. Ergänzt um ak
 - HTML-Downloads enthalten keinen Rücklink zur lokalen App; die Vorschau behält ihn. Die Produktzeile entfällt. Die Zustimmungserklärung nennt für die Standardskala ausdrücklich Antworten 4 und 5; PNGs mit einer abweichenden Grenze nennen diese.
 
 Zusätzliche Prüfungen: persistente Reihenfolge samt atomarer Validierung und Verknüpfungen, Platzierung/Abschnittsnachführung der Textantworten, Download ohne App-Link/Produktzeile, fehlende Antwortzeilen und ungeklärte Werte sowie BGM2 mit Kommas innerhalb vollständiger Optionen. Tatsächliche Ganz- und Halbfolien-PNGs mit lokalen AFA-Daten gerendert und visuell geprüft. Die vollständige Browserprüfung bleibt durch die bekannte Chromium-Beschränkung der Umgebung offen.
+
+## Lesestruktur und Grundmengenverwaltung ab 0.1.12
+
+Die Berichtsabschnitte erhalten eigene Flächen mit klaren Abständen und Themenköpfen. Diagramme stehen auf weissen Flächen mit dezenter Umrandung und Schatten; Textantworten werden als blaue Aufklappfelder mit Beitragszahl hervorgehoben und geöffnet als einzelne nummerierte Aussagen gezeigt. Vorschau und HTML-Download verwenden dieselbe Darstellung. Druckausgaben lassen die Schatten weg.
+
+Gespeicherte Grundmengen lassen sich je Zeile bearbeiten oder löschen. Eine Änderung der Welle oder Einheit wird atomar durchgeführt und bei einem bereits belegten Ziel abgewiesen. Die Bearbeitung prüft Projekt und bisherigen Wert, damit eine veraltete Seite keine neuere Korrektur überschreibt. Gelöscht wird nur die konkrete Grundmenge, nicht die Antworten oder die zugrunde liegende Mitarbeitendenbasis. Ohne Grundmenge wird kein Rücklauf berechnet; ein späterer Seed-Lauf kann einen fehlenden Wert erneut ergänzen.
+
+54 automatisierte Tests bestanden. Neue Fälle prüfen korrigierte Rücklaufquoten, Löschung, Projektabgrenzung, unveränderte Antwort- und Herkunftsdaten, ungültige Eingaben, Zielkonflikte und veraltete Formularstände. Ein vollständiger Browser-Layouttest ist weiterhin offen.

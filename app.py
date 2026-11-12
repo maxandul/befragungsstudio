@@ -482,15 +482,39 @@ def create_app(instance=None):
         with db() as c:
             if request.method=='POST':
                 f=request.form
-                total=int(f['total'])
-                if total<0:
-                    raise ValueError('Die Grundmenge darf nicht negativ sein.')
-                dim,unit=f['dimension'].strip(),f['unit'].strip()
-                if bool(dim)!=bool(unit):
-                    raise ValueError('Für eine Einheit sind Merkmal und Wert gemeinsam anzugeben.')
-                c.execute('INSERT INTO grounds VALUES(?,?,?,?,?) ON CONFLICT(project,wave,dimension,unit) DO UPDATE SET total=excluded.total',
-                          (pid,f['wave'],dim,unit,total))
-                flash('Grundmenge gespeichert. Werte gelten jeweils inklusive Untereinheiten und werden nicht addiert.')
+                action=f.get('action','save')
+                if action not in ('save','update','delete'):
+                    raise ValueError('Unbekannte Grundmengenaktion.')
+                original=None
+                if action in ('update','delete'):
+                    original=tuple(f.get('original_'+field,'') for field in ('wave','dimension','unit'))
+                    row=c.execute('SELECT total FROM grounds WHERE project=? AND wave=? AND dimension=? AND unit=?',(pid,*original)).fetchone()
+                    if not row:
+                        raise ValueError('Dieser Eintrag ist nicht mehr vorhanden. Bitte die Seite neu laden.')
+                    if f.get('original_total') is not None and str(row['total'])!=f['original_total']:
+                        raise ValueError('Der Eintrag wurde zwischenzeitlich geändert. Bitte die Seite neu laden.')
+                if action=='delete':
+                    c.execute('DELETE FROM grounds WHERE project=? AND wave=? AND dimension=? AND unit=?',(pid,*original))
+                    flash('Grundmenge gelöscht. Die Rücklaufquote bleibt ohne hinterlegte Grundmenge offen.')
+                else:
+                    try:
+                        total=int(f.get('total',''))
+                    except ValueError:
+                        raise ValueError('Bitte eine ganze Zahl für die eingeladenen Personen angeben.')
+                    if total<0:
+                        raise ValueError('Die Grundmenge darf nicht negativ sein.')
+                    wave,dim,unit=(f.get(field,'').strip() for field in ('wave','dimension','unit'))
+                    if wave not in ctx['waves'] and (not original or wave!=original[0]):
+                        raise ValueError('Bitte eine vorhandene Erhebung auswählen.')
+                    if bool(dim)!=bool(unit):
+                        raise ValueError('Für eine Einheit sind Merkmal und Wert gemeinsam anzugeben.')
+                    if original and (wave,dim,unit)!=original:
+                        if c.execute('SELECT 1 FROM grounds WHERE project=? AND wave=? AND dimension=? AND unit=?',(pid,wave,dim,unit)).fetchone():
+                            raise ValueError('Für diese Erhebung und Einheit gibt es bereits eine Grundmenge. Bitte den bestehenden Eintrag bearbeiten.')
+                        c.execute('DELETE FROM grounds WHERE project=? AND wave=? AND dimension=? AND unit=?',(pid,*original))
+                    c.execute('INSERT INTO grounds VALUES(?,?,?,?,?) ON CONFLICT(project,wave,dimension,unit) DO UPDATE SET total=excluded.total',
+                              (pid,wave,dim,unit,total))
+                    flash('Grundmenge gespeichert. Werte gelten jeweils inklusive Untereinheiten und werden nicht addiert.')
                 return redirect(url_for('grounds',pid=pid))
             grounds=c.execute('SELECT * FROM grounds WHERE project=? ORDER BY wave,dimension,unit',(pid,)).fetchall()
             snapshots=[]

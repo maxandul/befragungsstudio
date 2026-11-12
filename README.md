@@ -1,4 +1,4 @@
-# Befragungsstudio 0.1.11
+# Befragungsstudio 0.1.12
 
 Erste lokale Umsetzung für Befragungsdaten. Charts mit lokal mitgeliefertem Chart.js 4.4.8; Matplotlib wird nicht benötigt. Python 3.11 oder neuer mit Python
 Launcher unter Windows. Alle Oberflächendateien werden mitgeliefert.
@@ -298,3 +298,13 @@ Die bisherigen doppelten n-Angaben unter den Einzelcharts entfallen. Stattdessen
 Heruntergeladene HTML-Berichte enthalten keinen Link zur App; in der Vorschau bleibt er verfügbar. Die zusätzliche Produktzeile entfällt. Zustimmungsanteile werden als Antworten 4 und 5 der gültigen Antworten erklärt; abweichende Grenzen werden weiterhin beachtet.
 
 Update: App beenden, `instance` sichern, Programmdateien aktualisieren und `START.bat` starten. Kein Neuimport und kein erneuter Seed-Lauf erforderlich. Die einmaligen AFA-Anpassungen respektieren eigene Abschnittszuordnungen und bereits gespeicherte Reihenfolgen; spätere Änderungen werden nicht bei jedem Start zurückgesetzt. 51 automatisierte Tests bestanden; BGM2-PNGs mit AFA-Daten in Ganz- und Halbfoliengrösse visuell geprüft.
+
+## Lesbarkeit und Grundmengen korrigieren (Version 0.1.12)
+
+Berichte trennen Kopf, Teilnahme, Navigation und Themen durch eigene Flächen und grössere Abstände. Diagramme erhalten dezente Rahmen und Schatten. Textantworten stehen in deutlich erkennbaren blauen Aufklappfeldern mit Beitragszahl; geöffnet sind die einzelnen Aussagen nummeriert und voneinander abgegrenzt. Das gilt auch für die eigenständigen HTML-Downloads. Im Druck entfallen die Schatten.
+
+Unter «Grundmengen» steht bei jedem gespeicherten Eintrag «Bearbeiten». Anzahl, Welle, Merkmal und Einheit können korrigiert werden. Existiert für ein neues Ziel bereits eine Grundmenge, wird die Änderung abgewiesen und keiner der beiden Einträge überschrieben. «Grundmenge löschen» entfernt ausschliesslich den betreffenden Wert. Antwortdaten, andere Einheiten und die ursprüngliche Mitarbeitendenbasis bleiben erhalten; ohne Grundmenge bleibt die Rücklaufquote offen. Zwischenzeitlich geänderte Einträge können aus einem alten Browser-Tab nicht überschrieben oder gelöscht werden.
+
+Ein erneuter Seed-Lauf kann fehlende Grundmengen wieder aus der Mitarbeitendenbasis ergänzen. Manuelle Änderungen betreffen die im Bericht verwendeten Werte, nicht die gespeicherte Herkunft der ursprünglichen Berechnung.
+
+54 Tests bestanden, darunter Korrektur, Löschung, Kollisionen, Validierung, veraltete Browser-Tabs und Abgrenzung nach Projekt. Keine neuen Pakete, keine Datenbankänderung und kein Neuimport nötig. Der vollständige Browser-Layouttest bleibt in der Ausführungsumgebung eingeschränkt.
