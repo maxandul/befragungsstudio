@@ -34,7 +34,7 @@ blockquote{margin:16px 0;padding:12px 20px;border-left:4px solid #0070b4;backgro
 {% set theme_overviews=overviews|selectattr('theme','equalto',theme)|list %}{% for overview in theme_overviews %}{% set oi=overviews.index(overview) %}
 <div class="overview"><h3>Themenübersicht{% if overview.parts>1 %} · Teil {{overview.part}}/{{overview.parts}}{% endif %}</h3>
 <p>Jede Zeile zeigt eine Frage. Farben unterscheiden die Wellen bzw. Einheiten; jede Frage wird einzeln ausgewertet.</p>
-<h4>Entwicklung der ausgewählten OE</h4><div class="overview-chart" style="height:{{180+overview.indices|length*100}}px"><canvas id="overview-history-{{oi}}" role="img" aria-label="{{theme}}: Zeitvergleich"></canvas></div>
+<h4>Entwicklung der ausgewählten OE ({{unit or 'Gesamtbefragung'}})</h4><div class="overview-chart" style="height:{{180+overview.indices|length*100}}px"><canvas id="overview-history-{{oi}}" role="img" aria-label="{{theme}}: Zeitvergleich"></canvas></div>
 <div class="downloads"><button type="button" data-topic="{{oi}}" data-topic-view="history">Themenverlauf als PNG</button></div>
 {% if child_rates or comparisons %}<h4>Aktueller OE-Vergleich · {{reference_wave}}</h4><div class="overview-chart" style="height:{{180+overview.indices|length*100}}px"><canvas id="overview-children-{{oi}}" role="img" aria-label="{{theme}}: aktueller OE-Vergleich"></canvas></div><div class="downloads"><button type="button" data-topic="{{oi}}" data-topic-view="children">Themenvergleich als PNG</button></div>{% endif %}
 <p><small>Gültiges n und vollständiger Fragewortlaut: im Tooltip und unter «Einzelfragen und Details». Leere Stellen bedeuten: nicht erhoben, keine gültige Antwort oder Mindestfallzahl nicht erreicht. Zustimmungsgrenzen können je Frage abweichen.</small></p></div>
