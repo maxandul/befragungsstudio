@@ -4,10 +4,13 @@ import re
 import sqlite3
 import tempfile
 import unittest
+import shutil
+import subprocess
 from pathlib import Path
 
 from app import create_app, DEFAULT_MISSING
 from organisation import tree
+from report_themes import topic_overviews
 
 
 class OrganisationReportTests(unittest.TestCase):
@@ -114,3 +117,31 @@ class OrganisationReportTests(unittest.TestCase):
         with self.db() as c:
             self.assertEqual(c.execute("SELECT theme FROM questions WHERE source='q'").fetchone()[0],'Information und Orientierung')
             self.assertEqual(c.execute("SELECT theme FROM questions WHERE source='txt'").fetchone()[0],'Thema')
+
+    def test_topic_overviews_keep_suppressed_current_results_empty(self):
+        # Die Frage hat historisch genügend Antworten, aktuell aber nur eine.
+        with self.db() as c:
+            c.execute("DELETE FROM answers WHERE source='q' AND wave='2026' AND feedback!='0'")
+        response,payload=self.payload()
+        self.assertEqual(payload['overviews'][0]['reference_wave'],'2026')
+        self.assertEqual(payload['overviews'][0]['indices'],[0])
+        self.assertEqual([r['wave'] for r in payload['cards'][0]['rows']],['2024'])
+        self.assertEqual(payload['cards'][0]['children'],[])
+        self.assertNotIn(b'Vertraulicher Text',response.data)
+        self.assertIn(b'data-topic="0"',response.data)
+        self.assertIn(b'<details class="question-details">',response.data)
+        self.assertIn(b'Einzelfragen und Details',response.data)
+
+    def test_topic_overviews_separate_scales_and_limit_slide_size(self):
+        def card(minimum=1,maximum=5,typ='scale'):
+            return dict(theme='Thema',rows=[dict(type=typ,minimum=minimum,maximum=maximum)])
+        cards=[card() for _ in range(7)]+[card(0,10),card(typ='choice_single')]
+        cards.append(dict(theme='Thema',rows=[dict(type='scale',minimum=1,maximum=5),dict(type='scale',minimum=0,maximum=10)]))
+        groups=topic_overviews(cards,'2026')
+        self.assertEqual([o['indices'] for o in groups],[[0,1,2,3,4],[5,6],[7]])
+        self.assertEqual([(o['part'],o['parts']) for o in groups],[(1,2),(2,2),(1,1)])
+
+    @unittest.skipUnless(shutil.which('node'),'Optionaler Entwicklungstest benötigt Node.js')
+    def test_topic_export_metrics_missing_values_and_legend_visibility(self):
+        result=subprocess.run(['node',str(Path(__file__).with_name('check_topic_exports.cjs'))],capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)

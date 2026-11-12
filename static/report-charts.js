@@ -20,10 +20,11 @@
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, chart.width, chart.height); ctx.restore();
   }};
   const valueLabels = {id: 'valueLabels', afterDatasetsDraw(chart, args, options) {
+    if (chart.isDatasetVisible && !chart.isDatasetVisible(0)) return;
     const ctx = chart.ctx, ds = chart.data.datasets[0]; ctx.save(); ctx.fillStyle = '#18394f';
     ctx.font = `${options.fontSize || 13}px Arial, sans-serif`; ctx.textBaseline = 'middle';
     chart.getDatasetMeta(0).data.forEach((point, i) => {
-      const v = ds.data[i]; if (v == null) return;
+      const entry = ds.data[i], v = entry && typeof entry === 'object' ? entry.x : entry; if (v == null) return;
       const text = fmt(v, options.percent ? 1 : 2) + (options.percent ? ' %' : '');
       if (chart.config.type === 'line') {ctx.textAlign = 'center'; ctx.fillText(text, point.x, point.y - 22);}
       else {ctx.textAlign = 'left'; ctx.fillText(text, point.x + 9, point.y);}
@@ -82,6 +83,72 @@
     };
   }
   function metricFor(index) {return document.getElementById('report-metric')?.value || document.getElementById(`metric-${index}`)?.value || 'mean';}
+  const palette = ['#0070b4','#d16a00','#667b35','#8d57a1','#a34354','#247f78','#586778','#9b7710'];
+  function overviewConfig(index, view, exporting = false) {
+    const overview = payload.overviews[index], cards = overview.indices.map(i => payload.cards[i]);
+    const top = metricFor(overview.indices[0]) === 'top2';
+    const keys = view === 'history' ? [...payload.selected].reverse()
+      : [payload.unit, ...new Set(cards.flatMap(c => c.children.map(r => r.unit)))];
+    const rows = keys.map((key, k) => cards.map(card => view === 'history'
+      ? card.rows.find(r => r.wave === key)
+      : k === 0 ? card.rows.find(r => r.wave === overview.reference_wave)
+      : card.children.find(r => r.unit === key && r.wave === overview.reference_wave)));
+    const labels = cards.map((card, i) => [
+      ...wrap(exporting ? card.wording || card.label : card.label, exporting ? 58 : 34),
+      ...(exporting ? wrap('n: ' + rows.map(rs => rs[i]?.n ?? '–').join(' / '), 58) : [])
+    ]);
+    return {
+      type:'scatter', plugins:[whiteBackground, valueLabels],
+      data:{labels,datasets:keys.map((key,k) => ({label:key, ns:rows[k].map(r => r?.n),
+        data:rows[k].map((r,i) => ({x:r ? (top ? r.top2 : r.mean) : null,y:i})),
+        borderColor:palette[k % palette.length],backgroundColor:palette[k % palette.length],
+        pointStyle:['circle','rectRot','triangle','rect','crossRot','star','cross','dash'][k % 8],
+        pointRadius:exporting ? (k === 0 ? 9 : 7) : (k === 0 ? 6 : 5),showLine:false}))},
+      options:{responsive:!exporting,maintainAspectRatio:false,animation:false,
+        devicePixelRatio:exporting ? 1 : Math.min(window.devicePixelRatio || 1,2),
+        layout:{padding:{top:10,right:exporting ? 100 : 65,bottom:10}},
+        plugins:{legend:{position:'bottom',labels:{font:{size:exporting ? 21 : 13},usePointStyle:true}},
+          title:{display:exporting,text:[...wrap(payload.project+' · '+payload.unit,85),...wrap(overview.theme,85)],font:{size:30},color:'#172c3b'},
+          subtitle:{display:true,text:[view === 'history' ? 'Zeitvergleich' : 'OE-Vergleich · '+overview.reference_wave,
+            top ? 'Zustimmungsanteil (%) · Grenze je Frage konfiguriert' : `Mittelwert · Skala ${overview.minimum}–${overview.maximum}`,
+            ...(exporting ? ['n je Frage in Reihenfolge der Legende · – = kein freigegebenes Ergebnis'] : [])],font:{size:exporting ? 20 : 13}},
+          valueLabels:{fontSize:exporting ? 21 : 13,percent:top},
+          tooltip:{enabled:!exporting,callbacks:{title:items => cards[items[0].dataIndex].wording || cards[items[0].dataIndex].label,
+            label:ctx => `${ctx.dataset.label}: ${fmt(ctx.parsed.x,top ? 1 : 2)}${top ? ' %' : ''} · n=${ctx.dataset.ns[ctx.dataIndex]}`}}},
+        scales:{x:{min:top ? 0 : overview.minimum,max:top ? 100 : overview.maximum,
+          ticks:{stepSize:top ? 20 : 1,font:{size:exporting ? 23 : 14}},grid:{color:'#e2e9ef'}},
+          y:{type:'category',labels,reverse:true,offset:true,grid:{color:'#edf1f5'},
+            ticks:{autoSkip:false,font:{size:exporting ? 23 : 13}}}}
+      }
+    };
+  }
+  function drawOverviews() {
+    (payload.overviews || []).forEach((overview,i) => {
+      for (const view of ['history','children']) {
+        const key=`overview-${view}-${i}`, canvas=document.getElementById(key);
+        if (!canvas) continue;
+        charts.get(key)?.destroy();
+        charts.set(key,new Chart(canvas,overviewConfig(i,view)));
+      }
+    });
+  }
+  async function topicPng(index, view) {
+    if (document.fonts) await document.fonts.ready;
+    const canvas=document.createElement('canvas');canvas.width=1920;canvas.height=1080;
+    const cfg=overviewConfig(index,view,true), current=charts.get(`overview-${view}-${index}`);
+    cfg.data.datasets.forEach((ds,i)=>{if(current?.isDatasetVisible)ds.hidden=!current.isDatasetVisible(i);});
+    const chart=new Chart(canvas,cfg);
+    try {
+      chart.update('none');
+      const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+      if(!blob)throw new Error('Themen-PNG konnte nicht erstellt werden.');
+      return blob;
+    } finally {chart.destroy();}
+  }
+  function topicFilename(index,view) {
+    const overview=payload.overviews[index], label=overview.theme.replace(/[^a-zA-Z0-9äöüÄÖÜ_-]+/g,'_').slice(0,60);
+    return `Thema_${index+1}_${label}_${metricFor(overview.indices[0])}_${view}.png`;
+  }
   function draw(index) {
     const canvas = document.getElementById(`chart-${index}`);
     const metric = metricFor(index);
@@ -150,6 +217,15 @@
     const button = document.getElementById('all-charts'); button.disabled = true;
     try {
       const files = [];
+      for (let i=0;i<(payload.overviews || []).length;i++) {
+        for(const view of ['history','children']) {
+          if(!document.getElementById(`overview-${view}-${i}`))continue;
+          status.textContent=`Erstelle Themenübersicht ${i+1} …`;
+          await new Promise(resolve=>requestAnimationFrame(resolve));
+          const blob=await topicPng(i,view);
+          files.push({name:topicFilename(i,view),bytes:new Uint8Array(await blob.arrayBuffer())});
+        }
+      }
       for (let i = 0; i < payload.cards.length; i++) {
         status.textContent = `Erstelle Charts: ${i + 1} von ${payload.cards.length} …`;
         await new Promise(resolve => requestAnimationFrame(resolve));
@@ -172,7 +248,14 @@
       if (typeof Chart === 'undefined') throw new Error('Die eingebettete Chartbibliothek wurde nicht geladen.');
       Chart.defaults.font.family = 'Arial, sans-serif';
       payload.cards.forEach((card, i) => {draw(i); document.getElementById(`metric-${i}`)?.addEventListener('change', () => draw(i));});
-      for (const id of ['report-metric','show-comparisons']) document.getElementById(id)?.addEventListener('change',()=>payload.cards.forEach((card,i)=>draw(i)));
+      drawOverviews();
+      for (const id of ['report-metric','show-comparisons']) document.getElementById(id)?.addEventListener('change',()=>{payload.cards.forEach((card,i)=>draw(i));drawOverviews();});
+      document.querySelectorAll('[data-topic]').forEach(button=>button.addEventListener('click',async()=>{
+        button.disabled=true;
+        try {const i=Number(button.dataset.topic),view=button.dataset.topicView;download(await topicPng(i,view),topicFilename(i,view));status.textContent='Themen-PNG erstellt.';}
+        catch(error){status.textContent='Export fehlgeschlagen: '+error.message;}
+        finally{button.disabled=false;}
+      }));
       document.querySelectorAll('[data-png]').forEach(button => button.addEventListener('click', async () => {
         button.disabled = true;
         try {

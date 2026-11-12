@@ -647,13 +647,18 @@ def create_app(instance=None):
             themes.setdefault(card['theme'],[]).append(dict(card,index=index))
         for theme in ctx['text_groups']:
             themes.setdefault(theme,[])
+        from report_themes import AFA_THEMES, topic_overviews
+        theme_order={name:i for i,name in enumerate(AFA_THEMES)}
+        themes=dict(sorted(themes.items(),key=lambda item:(theme_order.get(item[0],len(theme_order)),item[0])))
+        overviews=topic_overviews(cards,ctx['reference_wave'])
         chart_library=(ROOT/'static/vendor/chart.umd.js').read_text(encoding='utf-8')
         chart_renderer=(ROOT/'static/report-charts.js').read_text(encoding='utf-8')
         payload=dict(project=ctx['p']['name'],unit=ctx['unit'] or 'Gesamtbefragung',
-                     focus_wave=ctx['focus_wave'],cards=cards)
+                     focus_wave=ctx['focus_wave'],cards=cards,overviews=overviews,
+                     selected=ctx['selected'],reference_wave=ctx['reference_wave'])
         html=render_template('report.html',**ctx,cards=cards,chart_library=chart_library,
                              chart_renderer=chart_renderer,chart_payload=payload,
-                             auto_zip=request.args.get('zip')=='1',themes=themes,
+                             auto_zip=request.args.get('zip')=='1',themes=themes,overviews=overviews,
                              app_url=request.url_root.rstrip('/')+url_for('view_results',pid=pid)+'?'+request.query_string.decode())
         if request.args.get('download'):
             return send_file(io.BytesIO(html.encode()),mimetype='text/html',as_attachment=True,
