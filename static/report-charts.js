@@ -24,6 +24,8 @@
       document.getElementById(`show-${comp.kind || 'total'}`)?.checked !== false;
   }
   const fmt = (v, digits = 1) => new Intl.NumberFormat('de-CH', {maximumFractionDigits: digits, minimumFractionDigits: digits}).format(v);
+  const agreementLabel = row => row.minimum===1 && row.maximum===5 && (row.top_from ?? 4)===4
+    ? 'Zustimmung: Antworten 4 und 5' : `Zustimmung: Antworten ab ${row.top_from ?? 4}`;
   function wrap(text, width) {
     const lines = []; let line = '';
     for (const word of String(text).split(/\s+/)) {
@@ -52,9 +54,10 @@
   function config(card, metric = 'mean', layout = 'screen', view = 'history') {
     const scale = card.rows[0].type === 'scale', latest = card.rows[card.rows.length - 1];
     const small = layout === 'half', exporting = layout !== 'screen', top = metric === 'top2';
-    const fontSize = exporting ? (small ? 22 : 25) : 14;
+    const manyOptions=!scale && Object.keys(latest.counts).length>10;
+    const fontSize = exporting ? (manyOptions ? (small ? 14 : 18) : (small ? 22 : 25)) : 14;
     const labels = scale ? card.rows.map(r => wrap(`${r.wave} · n=${r.n}`, small ? 17 : 29))
-      : Object.keys(latest.counts).map(s => wrap(s, small ? 22 : (exporting ? 38 : 35)));
+      : Object.keys(latest.counts).map(s => wrap(s, manyOptions ? (small ? 37 : 60) : (small ? 22 : (exporting ? 38 : 35))));
     const values = scale ? card.rows.map(r => top ? r.top2 : r.mean)
       : Object.values(latest.counts).map(n => 100 * n / latest.n);
     const children = view === 'children';
@@ -84,7 +87,7 @@
           legend: {display: datasets.length>1,labels:{font:{size:fontSize}}},
           title: {display: exporting, text: [...(exporting ? [payload.project + ' · ' + payload.unit] : []),...wrap(card.wording || card.label, small ? 43 : (exporting ? 82 : 75))], color: '#172c3b',
             font: {family: 'Arial, sans-serif', size: exporting ? (small ? 27 : 32) : 19, weight: 'bold'}, padding: {bottom: exporting ? 30 : 20}},
-          subtitle: {display: exporting, text: scale ? (top ? 'Zustimmungsanteil · gültige Antworten' : `Mittelwert · Skala ${latest.minimum}–${latest.maximum}`) + (children ? ` · ${latest.wave}` : '')
+          subtitle: {display: exporting || !scale, text: scale ? (top ? agreementLabel(latest)+' · gültige Antworten' : `Mittelwert · Skala ${latest.minimum}–${latest.maximum}`) + (children ? ` · ${latest.wave}` : '')
             : `${latest.wave} · n=${latest.n}` + (latest.type === 'choice_multiple' ? ' · Mehrfachnennungen möglich' : ''),
             font: {family: 'Arial, sans-serif', size: fontSize}, color: '#607381', padding: {bottom: 35}},
           tooltip: {enabled: !exporting,callbacks:{label:ctx=>`${ctx.dataset.label}: ${fmt(scale && !children ? ctx.parsed.y : ctx.parsed.x,top ? 1 : 2)}${top ? ' %' : ''} · n=${ctx.dataset.ns?.[ctx.dataIndex] ?? latest.n}`}}, valueLabels: {fontSize, percent: !scale || top}
@@ -140,7 +143,7 @@
             label:ctx => `${ctx.dataset.label}: ${fmt(ctx.parsed.x,top ? 1 : 2)}${top ? ' %' : ''} · n=${ctx.dataset.ns[ctx.dataIndex]}`}}},
         scales:{x:{min:top ? 0 : overview.minimum,max:top ? 100 : overview.maximum,
           ticks:{stepSize:top ? 20 : 1,font:{size:exporting ? 23 : 14}},grid:{color:'#e2e9ef'}},
-          y:{type:'category',labels,reverse:true,offset:true,grid:{color:'#edf1f5'},
+          y:{type:'category',labels,reverse:false,offset:true,grid:{color:'#edf1f5'},
             ticks:{autoSkip:false,font:{size:exporting ? 23 : 13}}}}
       }
     };

@@ -39,6 +39,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
   assert.equal(children.data.datasets[1].data[1].x,null);
   assert.equal(children.options.scales.x.min,1);
   assert.equal(children.options.scales.x.max,5);
+  assert.equal(children.options.scales.y.reverse,false);
   assert.equal(children.data.datasets.find(ds=>ds.id==='parent').data[0].x,3.5);
   assert.equal(children.data.datasets.find(ds=>ds.id==='parent').data[1].x,null);
   assert.equal(children.data.datasets.find(ds=>ds.id==='total').ns[0],30);

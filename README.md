@@ -1,4 +1,4 @@
-# Befragungsstudio 0.1.10
+# Befragungsstudio 0.1.11
 
 Erste lokale Umsetzung für Befragungsdaten. Charts mit lokal mitgeliefertem Chart.js 4.4.8; Matplotlib wird nicht benötigt. Python 3.11 oder neuer mit Python
 Launcher unter Windows. Alle Oberflächendateien werden mitgeliefert.
@@ -90,8 +90,7 @@ Python-Abhängigkeiten wie Flask, Waitress, pandas und openpyxl bleiben erforder
 Wenn diese fehlen, kann die App ohne deren Installation weiterhin nicht starten.
 
 Die App beenden und die Programmdateien aus dem ZIP ersetzen; den bestehenden
-Ordner instance mit Daten und Konfiguration beibehalten. Das Datenbankschema bleibt
-unverändert. Nach dem Update START.bat ausführen. Eine erneute Installation nur
+Ordner instance mit Daten und Konfiguration beibehalten. Neue Datenbankfelder werden beim Start automatisch ergänzt. Nach dem Update START.bat ausführen. Eine erneute Installation nur
 wegen des Chartwechsels ist nicht nötig.
 
 PNGs werden im Browser erstellt, mit weissem Hintergrund, Berichtskontext und
@@ -285,3 +284,17 @@ Themenverlauf und Themenvergleich können als PNG für eine ganze PPT-Folie heru
 Pro Themenzusammenfassung können passende Textbelege ausgewählt werden. «Berichtstext und Belege speichern» speichert beides je OE und Welle. Die separate Option «Ausgewählte Textbelege im Bericht anzeigen» nimmt nur die gewählten Aussagen auf. Geänderte, ausgeschlossene oder unter der Mindestfallzahl liegende Belege werden nicht ausgegeben und in der Redaktion zur Prüfung angezeigt. Das Update ergänzt die Referenztabelle automatisch; kein Neuimport und keine neuen Pakete erforderlich.
 
 Aktuelle Themenübersichten zeigen zusätzlich die direkt übergeordnete OE und das klar benannte Gesamtergebnis als getrennt schaltbare Referenzen. Das funktioniert auch ohne Untereinheiten. Ausgeblendete Legendenreihen bleiben beim Wechsel von Mittelwert/Zustimmung und im PNG-/ZIP-Export ausgeblendet.
+
+## Fragenreihenfolge und Berichtsdetails (Version 0.1.11)
+
+Unter «Fragen» legt «Reihenfolge im Berichtsabschnitt» die Reihenfolge fest: kleinere ganze Zahlen zuerst, etwa 10, 20, 30. Gleiche Zahlen werden nach Fragetitel sortiert. «Alle Änderungen speichern» übernimmt die Reihenfolge für den HTML-Bericht, die Themenübersichten und die PNGs.
+
+Textfragen können einer zugehörigen quantitativen Frage zugeordnet werden. Sie folgen dann deren Berichtsabschnitt und erscheinen bei aktivierten vollständigen Textantworten unter der Frage innerhalb von «Einzelfragen und Details». Ohne Zuordnung verwenden sie ihren eigenen Abschnitt und stehen dort in den Details. Die bekannten AFA-Zuordnungen werden beim Update ergänzt. Entwicklungsmöglichkeiten und die zugehörige Textfrage wechseln aus dem bisherigen Standardabschnitt zu «Arbeitsbedingungen und Gesundheit».
+
+BGM2 erhält für Puls AFA den geprüften Optionskatalog mit beiden vorliegenden Wortlautversionen. Die vollständige Option «Nein, aktuell wirkt sich kein Aspekt negativ auf meine Gesundheit aus» und Kommas innerhalb von Optionen bleiben zusammen. Vorhandene eigene Optionskataloge bleiben erhalten. Neue, nicht im Katalog enthaltene Inhalte bleiben ungeklärt; andere Multiple-Choice-Fragen erhalten keinen geratenen Optionskatalog.
+
+Die bisherigen doppelten n-Angaben unter den Einzelcharts entfallen. Stattdessen steht dort die Anzahl ohne auswertbare Antwort, zusätzlich zu gegebenenfalls ungeklärten Antworten. «Ohne auswertbare Antwort» schliesst leere/als fehlend definierte Werte und Teilnahmen ohne Eintrag zur Frage ein. Nicht beantwortet und nicht angezeigt lassen sich aus dem Export nicht zuverlässig unterscheiden. Die Antwortbasis von Auswahlcharts wird separat ausgewiesen.
+
+Heruntergeladene HTML-Berichte enthalten keinen Link zur App; in der Vorschau bleibt er verfügbar. Die zusätzliche Produktzeile entfällt. Zustimmungsanteile werden als Antworten 4 und 5 der gültigen Antworten erklärt; abweichende Grenzen werden weiterhin beachtet.
+
+Update: App beenden, `instance` sichern, Programmdateien aktualisieren und `START.bat` starten. Kein Neuimport und kein erneuter Seed-Lauf erforderlich. Die einmaligen AFA-Anpassungen respektieren eigene Abschnittszuordnungen und bereits gespeicherte Reihenfolgen; spätere Änderungen werden nicht bei jedem Start zurückgesetzt. 51 automatisierte Tests bestanden; BGM2-PNGs mit AFA-Daten in Ganz- und Halbfoliengrösse visuell geprüft.

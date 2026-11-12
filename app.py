@@ -67,6 +67,7 @@ def create_app(instance=None):
           PRIMARY KEY(project,scope,wave,theme));
         CREATE TABLE IF NOT EXISTS report_evidence(project INTEGER,scope TEXT,wave TEXT,theme TEXT,token TEXT,
           PRIMARY KEY(project,scope,wave,theme,token));
+        CREATE TABLE IF NOT EXISTS report_migrations(project INTEGER,version TEXT,PRIMARY KEY(project,version));
         CREATE TABLE IF NOT EXISTS question_exclusions(project INTEGER,source TEXT,wave TEXT,reason TEXT,
           PRIMARY KEY(project,source,wave));
         CREATE TABLE IF NOT EXISTS question_settings(project INTEGER PRIMARY KEY,missing TEXT NOT NULL);
@@ -74,6 +75,11 @@ def create_app(instance=None):
         if 'missing_override' not in [r[1] for r in c.execute('PRAGMA table_info(questions)')]:
             c.execute('ALTER TABLE questions ADD COLUMN missing_override INTEGER NOT NULL DEFAULT 0')
             c.execute('UPDATE questions SET missing_override=1 WHERE missing != ?', (DEFAULT_MISSING,))
+        for column,definition in [('sort_order','INTEGER NOT NULL DEFAULT 0'),('text_parent',"TEXT NOT NULL DEFAULT ''")]:
+            if column not in [r[1] for r in c.execute('PRAGMA table_info(questions)')]:
+                c.execute(f'ALTER TABLE questions ADD COLUMN {column} {definition}')
+        from report_themes import apply_afa_report_defaults
+        apply_afa_report_defaults(c)
 
     def project(pid):
         with db() as c:
@@ -104,6 +110,12 @@ def create_app(instance=None):
             for q in qs.values():
                 if not q['missing_override']:
                     q['missing']=common_missing
+            parents={q['canonical']:q for q in qs.values() if q['type']!='text'}
+            for q in qs.values():
+                if q['type']=='text' and q['text_parent'] in parents:
+                    parent=parents[q['text_parent']]
+                    q['theme']=parent['theme']
+                    q['sort_order']=parent['sort_order']
             mappings = [dict(r) for r in c.execute("SELECT * FROM mappings WHERE project=? ORDER BY (wave != '*'),id", (pid,))]
             aliases = [dict(r) for r in c.execute("SELECT * FROM aliases WHERE project=? ORDER BY (wave != '*'),id", (pid,))]
             grounds = [dict(r) for r in c.execute('SELECT * FROM grounds WHERE project=?', (pid,))]
@@ -276,7 +288,7 @@ def create_app(instance=None):
     def questions(pid):
         ctx = context(pid)
         with db() as c:
-            qs = [dict(r) for r in c.execute('SELECT * FROM questions WHERE project=? ORDER BY theme,label,source', (pid,))]
+            qs = [dict(r) for r in c.execute('SELECT * FROM questions WHERE project=? ORDER BY theme,sort_order,label,source', (pid,))]
             groups={}
             for q in qs:
                 groups.setdefault(q['canonical'],[]).append(q)
@@ -303,11 +315,22 @@ def create_app(instance=None):
                     typ,label=value('type'),value('label').strip()
                     if typ not in TYPES or typ=='ignore' or not label:
                         raise ValueError('Jede Frage benötigt eine Bezeichnung und einen gültigen Typ.')
+                    try:
+                        order=int(f.get(f'sort_order_{i}',groups[key][0]['sort_order']))
+                    except (ValueError,TypeError):
+                        raise ValueError('Die Reihenfolge muss eine ganze Zahl sein.')
+                    if not 0<=order<=1000000:
+                        raise ValueError('Die Reihenfolge muss zwischen 0 und 1000000 liegen.')
+                    text_parent=f.get(f'text_parent_{i}',groups[key][0]['text_parent']) if typ=='text' else ''
+                    if text_parent and (text_parent not in groups or groups[text_parent][0]['type']=='text'):
+                        raise ValueError('Die zugehörige Frage muss eine vorhandene quantitative Frage sein.')
                     pending.append(dict(canonical=key,label=label,type=typ,theme=value('theme').strip(),
                         minimum=lo,maximum=hi,top_from=top,missing=value('missing').strip(),
                         missing_override=int(value('missing_override')=='on'),options=value('options'),
-                        include=int(value('include')=='on')))
+                        include=int(value('include')=='on'),sort_order=order,text_parent=text_parent))
                 selected=set(f.getlist('selected_group'))
+                order_changed=any(q['sort_order']!=groups[q['canonical']][0]['sort_order'] or
+                                  q['theme']!=groups[q['canonical']][0]['theme'] for q in pending)
                 action=f.get('action','save')
                 split_source=f.get('split_source','')
                 if action=='link':
@@ -334,6 +357,12 @@ def create_app(instance=None):
                     pending=[{**q,'old_key':q['canonical']} for q in pending]
                 if split_source and split_source not in {q['source'] for q in qs}:
                     raise ValueError('Die zu trennende Quellfrage wurde nicht gefunden.')
+                types_after={q['canonical']:q['type'] for q in pending}
+                for q in pending:
+                    if action=='link' and q['text_parent'] in all_keys:
+                        q['text_parent']=target
+                    if q['text_parent'] and types_after.get(q['text_parent']) in (None,'text'):
+                        raise ValueError('Die zugehörige Frage muss auch nach dem Speichern quantitativ sein.')
                 if f.get('wave_settings_present')=='yes':
                     valid_pairs={(r['source'],r['wave']) for r in c.execute('SELECT DISTINCT source,wave FROM answers WHERE project=?',(pid,))}
                     excluded=set()
@@ -349,16 +378,16 @@ def create_app(instance=None):
                             c.execute('DELETE FROM question_exclusions WHERE project=? AND source=? AND wave=?',(pid,source,wave))
                 for q in pending:
                     c.execute("""UPDATE questions SET canonical=?,label=?,type=?,theme=?,minimum=?,maximum=?,
-                      top_from=?,missing=?,options=?,include=?,missing_override=? WHERE project=? AND canonical=?""",
+                      top_from=?,missing=?,options=?,include=?,missing_override=?,sort_order=?,text_parent=? WHERE project=? AND canonical=?""",
                       (q['canonical'],q['label'],q['type'],q['theme'],q['minimum'],q['maximum'],q['top_from'],
-                       q['missing'],q['options'],q['include'],q['missing_override'],pid,q['old_key']))
+                       q['missing'],q['options'],q['include'],q['missing_override'],q['sort_order'],q['text_parent'],pid,q['old_key']))
                 if split_source:
                     c.execute('UPDATE questions SET canonical=? WHERE project=? AND source=?',
                               ('separate_'+secrets.token_hex(8),pid,split_source))
                 c.execute('INSERT INTO question_settings VALUES(?,?) ON CONFLICT(project) DO UPDATE SET missing=excluded.missing',
                           (pid,common_missing))
                 if request.accept_mimetypes.best=='application/json':
-                    return jsonify(message='Alle Änderungen gespeichert.',reload=action=='link' or bool(split_source))
+                    return jsonify(message='Alle Änderungen gespeichert.',reload=action=='link' or bool(split_source) or order_changed)
                 flash('Alle Änderungen gespeichert.')
                 return redirect(url_for('questions',pid=pid))
             wave_sources={}
@@ -383,7 +412,8 @@ def create_app(instance=None):
                 q['source_waves']={m['source']:wave_sources.get(m['source'],[]) for m in members}
                 q['originals']={m['source']:sorted(originals.get(m['source'],[])) for m in members}
                 cards.append(q)
-        return render_template('questions.html', **ctx, cards=cards, common_missing=common_missing,tab='questions')
+        return render_template('questions.html', **ctx, cards=cards, common_missing=common_missing,
+                               parent_choices=[q for q in cards if q['type']!='text'],tab='questions')
 
     @app.route('/p/<int:pid>/segments', methods=['GET','POST'])
     def segments(pid):
@@ -663,7 +693,7 @@ def create_app(instance=None):
             children=[dict(unit=child['unit'],**next(r for r in cr if r['canonical']==canonical and r['wave']==ctx['reference_wave']))
                       for child,cr in ctx['child_results'] if any(r['canonical']==canonical and r['wave']==ctx['reference_wave'] and r['n']>=ctx['minimum'] for r in cr)]
             comparisons=[dict(kind=comp['kind'],label=comp['label'],rows=[r for r in comp['rows'] if r['canonical']==canonical]) for comp in ctx['comparisons']]
-            cards.append(dict(label=rows[-1]['label'],wording=rows[-1]['wording'],theme=rows[-1]['theme'] or 'Weitere Fragen',rows=rows,children=children,comparisons=comparisons))
+            cards.append(dict(canonical=canonical,label=rows[-1]['label'],wording=rows[-1]['wording'],theme=rows[-1]['theme'] or 'Weitere Fragen',rows=rows,children=children,comparisons=comparisons))
         themes={}
         for index,card in enumerate(cards):
             themes.setdefault(card['theme'],[]).append(dict(card,index=index))
@@ -681,6 +711,7 @@ def create_app(instance=None):
         html=render_template('report.html',**ctx,cards=cards,chart_library=chart_library,
                              chart_renderer=chart_renderer,chart_payload=payload,
                              auto_zip=request.args.get('zip')=='1',themes=themes,overviews=overviews,
+                             standalone=bool(request.args.get('download')),
                              app_url=request.url_root.rstrip('/')+url_for('view_results',pid=pid)+'?'+request.query_string.decode())
         if request.args.get('download'):
             return send_file(io.BytesIO(html.encode()),mimetype='text/html',as_attachment=True,

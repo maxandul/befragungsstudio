@@ -68,7 +68,7 @@
       const state=JSON.parse(saved);
       document.querySelectorAll('.question-card').forEach(card=>{card.open=state.open.includes(card.dataset.key);});
       requestAnimationFrame(()=>window.scrollTo(0,state.scroll));
-      status.textContent='Verknüpfung gespeichert. Fragenliste aktualisiert.';
+      status.textContent='Änderungen gespeichert. Fragenliste aktualisiert.';
     }catch(error){/* Keine gespeicherte Position. */}
   }
 })();

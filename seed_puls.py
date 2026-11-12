@@ -254,7 +254,7 @@ def reset_projects(c, paths, messages):
         pid=project['id']
         for table in ('staged','answers','questions','mappings','aliases','grounds','imports',
                       'question_settings','question_exclusions','seed_runs','population_oe','population_snapshots',
-                      'report_notes','report_evidence'):
+                      'report_notes','report_evidence','report_migrations'):
             c.execute(f'DELETE FROM {table} WHERE project=?',(pid,))
         c.execute('DELETE FROM projects WHERE id=?',(pid,))
         messages.append(f'Zurückgesetzt: {project["name"]} (Projekt {pid}).')
@@ -343,6 +343,8 @@ def run(input_dir, instance, dry_run=False, reset_puls=False):
                 c.execute('BEGIN')
                 reset_projects(c,paths,messages)
             count=sum(seed_file(c,p,messages) for p in paths)
+            from report_themes import apply_afa_report_defaults
+            apply_afa_report_defaults(c)
             oe=input_dir/'OE_Liste.xlsx'
             if oe.exists() and count:
                 frame=read_table(oe.read_bytes(),oe.name,sheet='OE Liste')

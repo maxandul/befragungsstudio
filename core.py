@@ -261,8 +261,10 @@ def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit=''
                          theme=q['theme'], wording=str(r['raw'].get('Question','')).strip() or q['label'], n=valid_people, missing=missing, invalid=invalid,
                          mean=sum(values)/len(values) if values else None,
                          top2=100*sum(n >= q['top_from'] for n in values)/len(values) if values else None,
-                         counts=dict(counts), texts=texts, minimum=q['minimum'], maximum=q['maximum']))
-    return sorted(rows, key=lambda x: (x['theme'], x['label'], x['wave'])), {
+                         counts=dict(counts), texts=texts, minimum=q['minimum'], maximum=q['maximum'],
+                         top_from=q['top_from'],sort_order=q.get('sort_order',0),text_parent=q.get('text_parent',''),
+                         unanswered=len(participation[wave])-valid_people-invalid))
+    return sorted(rows, key=lambda x: (x['theme'], x['sort_order'],x['label'], x['wave'])), {
         wave: len(ids) for wave, ids in participation.items()}
 
 
