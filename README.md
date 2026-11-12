@@ -55,7 +55,7 @@ aller besprochenen Funktionen. Implementiert sind zwei Importwege, gespeicherte
 Konfiguration, Fragen- und Wertzuordnung, manuelle Grundmengen, Mittelwerte,
 Zustimmungsanteile, Auswahlhäufigkeiten und HTML/PNG-Exporte. Im Bericht kann bei Skalen zwischen Mittelwert und Zustimmungsanteil gewechselt werden.
 
-Noch offen: bearbeitbarer Organisationsbaum und historische OE-Versionen,
+Noch offen: stabile OE-Identitäten und historische Zuordnungsbereinigung,
 Grundmengen-Tabellenimport, Berichtspakete für ganze Hierarchiezweige,
 gestapelte Antwortverteilungen und Top-2-Zeitdiagramme, Engagement-Index,
 Freitextprüfung und -freigabe, Optionsspalten als gemeinsame Multiple-Choice-Frage,
@@ -63,7 +63,7 @@ Vorlagenverwaltung, Profilgenerierung und Echonovum-Upload.
 
 Das OE-Verzeichnis kann bereits importiert werden. Es ändert keine historischen
 Antwortzuordnungen. Diese werden vorerst über die Segmentregeln gepflegt.
-Die Auswahl einer Einheit erfolgt über Merkmal und exakten Wert.
+Die Berichtsauswahl erfolgt über den vollständigen Organisationspfad inklusive unterstellter Einheiten. Unter «Organisation» lassen sich Einträge und datierte Verzeichnisstände pflegen.
 Skalencharts zeigen Mittelwerte oder Zustimmungsanteile über die Wellen. Auswahlcharts zeigen die letzte
 Welle nach dem frühesten Antwortdatum. Rücklaufquoten werden als Tabelle gezeigt.
 Fragen werden zunächst anhand ihrer Quell-ID angelegt. Änderungen des Wortlauts
@@ -275,3 +275,13 @@ Unter «Grundmengen» ist die gespeicherte Mitarbeitendenbasis mit den direkten 
 Unbekannte oder mehrdeutige OE-Kürzel, fehlende Pflichtspalten und eine auf mehrere Wellen verteilte AFA-Erhebung führen zum Abbruch statt zu einer unvollständigen Grundmenge. Abweichende bereits manuell hinterlegte Grundmengen werden beim Ergänzen beibehalten und im Seed-Protokoll zur Prüfung ausgewiesen. Bei bewusstem vollständigem Neustart werden sie aus den Dateien neu aufgebaut. Die Stammdateien müssen nach wie vor die tatsächlich eingeladenen Personen abbilden; das Skript erfindet keine weiteren Teilnahmefilter. Historische Segmentkonflikte in den Befragungsdaten werden durch den Grundmengenimport nicht umgedeutet.
 
 Für die zukünftige Profilerstellung steht die wiederverwendbare Berechnung in `population.py` bereit. Die Erstellung der Profile samt automatischer Grundmengensicherung im UI ist noch nicht umgesetzt. Keine zusätzlichen Python-Pakete erforderlich.
+
+## Thematische Berichte für Besprechungen
+
+Die Berichte zeigen pro Thema gemeinsame Punktdiagramme für Zeitverlauf und aktuelle Untereinheiten. Einzelfragen stehen darunter aufklappbar zur Verfügung. Bis zu fünf Fragen gleicher Skala werden auf einer Übersicht zusammengefasst; eine Übersicht berechnet keinen Summenscore. Mittelwert und Zustimmung lassen sich gemeinsam umschalten. Fehlende aktuelle Werte bleiben leer.
+
+Themenverlauf und Themenvergleich können als PNG für eine ganze PPT-Folie heruntergeladen werden. Die Themen-PNGs stehen zusätzlich im vollständigen PNG-ZIP und enthalten Fragewortlaut, OE, Wellen und gültige n. Redaktionelle Texte und gegebenenfalls freigegebene vollständige Textantworten ergänzen die Themen im HTML-Bericht. Einzelheiten und Grenzen: `BERICHTE.md`.
+
+Pro Themenzusammenfassung können passende Textbelege ausgewählt werden. «Berichtstext und Belege speichern» speichert beides je OE und Welle. Die separate Option «Ausgewählte Textbelege im Bericht anzeigen» nimmt nur die gewählten Aussagen auf. Geänderte, ausgeschlossene oder unter der Mindestfallzahl liegende Belege werden nicht ausgegeben und in der Redaktion zur Prüfung angezeigt. Das Update ergänzt die Referenztabelle automatisch; kein Neuimport und keine neuen Pakete erforderlich.
+
+Aktuelle Themenübersichten zeigen zusätzlich die direkt übergeordnete OE und das klar benannte Gesamtergebnis als getrennt schaltbare Referenzen. Das funktioniert auch ohne Untereinheiten. Ausgeblendete Legendenreihen bleiben beim Wechsel von Mittelwert/Zustimmung und im PNG-/ZIP-Export ausgeblendet.
