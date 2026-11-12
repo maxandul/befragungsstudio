@@ -122,6 +122,9 @@ class PulsSeedTests(unittest.TestCase):
             c.execute("INSERT INTO questions(project,source,canonical,label,type) VALUES(?,'other','other','Erhalten','text')",(other,))
             c.execute("INSERT INTO grounds VALUES(?,'Alt','','',100)",(awi,))
             c.execute("INSERT INTO organisation VALUES('TEST','{}')")
+            for pid in [awi,other]:
+                c.execute("INSERT INTO report_notes VALUES(?,'','2026','Thema','Berichtstext')",(pid,))
+                c.execute("INSERT INTO report_evidence VALUES(?,'','2026','Thema','Referenz')",(pid,))
         # Nur AWI mitliefern: GS und andere Projekte bleiben unangetastet.
         (self.inputs/'gs.csv').unlink()
         before=(self.instance/'studio.sqlite3').read_bytes()
@@ -137,6 +140,8 @@ class PulsSeedTests(unittest.TestCase):
             self.assertEqual(c.execute('SELECT COUNT(*) FROM answers WHERE project=?',(gs,)).fetchone()[0],2)
             self.assertEqual(c.execute('SELECT COUNT(*) FROM grounds').fetchone()[0],0)
             self.assertEqual(c.execute("SELECT COUNT(*) FROM organisation WHERE code='TEST'").fetchone()[0],1)
+            for table in ['report_notes','report_evidence']:
+                self.assertEqual([r[0] for r in c.execute(f'SELECT project FROM {table}')],[other])
             new_awi=c.execute("SELECT id FROM projects WHERE name='Puls AWI'").fetchone()[0]
             waves={r[0] for r in c.execute('SELECT DISTINCT wave FROM answers WHERE project=?',(new_awi,))}
             self.assertEqual(waves,{'2025-01','2025-07'})

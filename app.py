@@ -2,6 +2,7 @@ from __future__ import annotations
 import io
 import json
 import secrets
+import hashlib
 import sqlite3
 from pathlib import Path
 from werkzeug.exceptions import HTTPException
@@ -64,6 +65,8 @@ def create_app(instance=None):
         CREATE TABLE IF NOT EXISTS organisation_history(valid_from TEXT PRIMARY KEY,entries TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS report_notes(project INTEGER,scope TEXT,wave TEXT,theme TEXT,body TEXT,
           PRIMARY KEY(project,scope,wave,theme));
+        CREATE TABLE IF NOT EXISTS report_evidence(project INTEGER,scope TEXT,wave TEXT,theme TEXT,token TEXT,
+          PRIMARY KEY(project,scope,wave,theme,token));
         CREATE TABLE IF NOT EXISTS question_exclusions(project INTEGER,source TEXT,wave TEXT,reason TEXT,
           PRIMARY KEY(project,source,wave));
         CREATE TABLE IF NOT EXISTS question_settings(project INTEGER PRIMARY KEY,missing TEXT NOT NULL);
@@ -585,6 +588,15 @@ def create_app(instance=None):
             if r['type']=='text' and r['wave']==reference_wave and r['n']>=minimum:
                 text_groups.setdefault(r['theme'] or 'Weitere Fragen',[]).append(r)
         include_texts=request.args.get('include_texts')=='1'
+        include_evidence=request.args.get('include_evidence')=='1'
+        evidence_options={}
+        for theme,items in text_groups.items():
+            options={}
+            for item in items:
+                for text in item['texts']:
+                    token=hashlib.sha256(json.dumps([item['canonical'],text],ensure_ascii=False).encode()).hexdigest()
+                    options.setdefault(token,dict(token=token,text=text,label=item['label'],wording=item['wording']))
+            evidence_options[theme]=options
 
         grouped={}
         hidden=0
@@ -621,13 +633,23 @@ def create_app(instance=None):
         scope=node_id or (dimension+'|'+unit if dimension else '')
         with db() as c:
             notes={r['theme']:r['body'] for r in c.execute('SELECT theme,body FROM report_notes WHERE project=? AND scope=? AND wave=?',(pid,scope,reference_wave))}
+            evidence={}
+            for row in c.execute('SELECT theme,token FROM report_evidence WHERE project=? AND scope=? AND wave=?',(pid,scope,reference_wave)):
+                evidence.setdefault(row['theme'],[]).append(row['token'])
+        selected_evidence={theme:[option for token,option in options.items() if token in evidence.get(theme,[])]
+                           for theme,options in evidence_options.items()}
+        stale_evidence={theme:len(set(tokens)-set(evidence_options.get(theme,{}))) for theme,tokens in evidence.items()}
+        note_themes=['Erkenntnisse auf einen Blick']+list(dict.fromkeys(
+            [group[0]['theme'] or 'Weitere Fragen' for group in grouped.values()]+list(text_groups)))
         records,_,_,_,_,_=result_sources(pid)
         afa=any(r['raw'].get('Survey ID')=='2330' for r in records)
         return dict(p=p,grouped=grouped,rates=rates,minimum=minimum,hidden=hidden,
                     dimension=dimension,unit=unit,selected=selected,available=available,focus_wave=focus_wave,
                     nodes=nodes,node=node,node_id=node_id,child_rates=child_rates,child_results=child_results,
                     comparisons=comparisons,reference_wave=reference_wave,notes=notes,scope=scope,
-                    text_groups=text_groups,include_texts=include_texts,afa=afa)
+                    text_groups=text_groups,include_texts=include_texts,afa=afa,
+                    include_evidence=include_evidence,evidence_options=evidence_options,evidence=evidence,
+                    selected_evidence=selected_evidence,stale_evidence=stale_evidence,note_themes=note_themes)
 
     @app.route('/p/<int:pid>/results')
     def view_results(pid):
@@ -684,9 +706,16 @@ def create_app(instance=None):
     def report_notes(pid):
         ctx=report_data(pid)
         theme=request.form.get('theme','')
+        tokens=set(request.form.getlist('evidence'))
+        if not tokens.issubset(ctx['evidence_options'].get(theme,{})):
+            raise ValueError('Ein ausgewählter Textbeleg ist für diese OE, Welle und dieses Thema nicht mehr verfügbar. Bitte die Ansicht neu laden und die Auswahl prüfen.')
         with db() as c:
             c.execute('INSERT INTO report_notes VALUES(?,?,?,?,?) ON CONFLICT(project,scope,wave,theme) DO UPDATE SET body=excluded.body',
                       (pid,ctx['scope'],ctx['reference_wave'],theme,request.form.get('body','').strip()))
+            c.execute('DELETE FROM report_evidence WHERE project=? AND scope=? AND wave=? AND theme=?',
+                      (pid,ctx['scope'],ctx['reference_wave'],theme))
+            c.executemany('INSERT INTO report_evidence VALUES(?,?,?,?,?)',
+                          [(pid,ctx['scope'],ctx['reference_wave'],theme,token) for token in sorted(tokens)])
         flash('Berichtstext gespeichert.')
         return redirect(url_for('view_results',pid=pid)+'?'+request.query_string.decode())
 

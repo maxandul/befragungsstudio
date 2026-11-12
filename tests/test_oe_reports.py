@@ -145,3 +145,74 @@ class OrganisationReportTests(unittest.TestCase):
     def test_topic_export_metrics_missing_values_and_legend_visibility(self):
         result=subprocess.run(['node',str(Path(__file__).with_name('check_topic_exports.cjs'))],capture_output=True,text=True)
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+
+    def evidence_token(self,query='',text=None):
+        page=self.client.get('/p/1/results?focus_wave=2026&'+query).data.decode()
+        tokens=re.findall(r'name="evidence" value="([a-f0-9]{64})"',page)
+        self.assertTrue(tokens)
+        return tokens[0]
+
+    def save_evidence(self,tokens,query='',body='Redaktionelle Zusammenfassung'):
+        return self.client.post('/p/1/report/notes?focus_wave=2026&'+query,
+                                data=dict(csrf=self.csrf,theme='Thema',body=body,evidence=tokens))
+
+    def test_selected_evidence_is_opt_in_and_excludes_other_comments(self):
+        token=self.evidence_token()
+        self.assertEqual(self.save_evidence([token]).status_code,302)
+        response,payload=self.payload()
+        self.assertIn(b'Redaktionelle Zusammenfassung',response.data)
+        self.assertNotIn(b'Vertraulicher Text',response.data)
+        response,payload=self.payload('include_evidence=1')
+        self.assertIn(b'Vertraulicher Text 0',response.data)
+        self.assertNotIn(b'Vertraulicher Text 1',response.data)
+        self.assertNotIn('Vertraulicher Text',json.dumps(payload))
+        response,_=self.payload('include_texts=1')
+        self.assertIn(b'Vertraulicher Text 1',response.data)
+
+    def test_evidence_is_scoped_to_oe_wave_theme_and_minimum(self):
+        area_a='oe='+self.node('Bereich','A')['id']
+        area_b='oe='+self.node('Bereich','B')['id']
+        token=self.evidence_token(area_a)
+        self.assertEqual(self.save_evidence([token],area_a).status_code,302)
+        response,_=self.payload(area_a+'&include_evidence=1')
+        self.assertIn(b'Vertraulicher Text 0',response.data)
+        response,_=self.payload(area_b+'&include_evidence=1')
+        self.assertNotIn(b'Vertraulicher Text',response.data)
+        response,_=self.payload(area_a+'&include_evidence=1&min_n=3')
+        self.assertNotIn(b'Vertraulicher Text',response.data)
+        response=self.client.get('/p/1/report?focus_wave=2024&'+area_a+'&include_evidence=1')
+        self.assertNotIn(b'Vertraulicher Text',response.data)
+        # Fremde/unterdrückte Referenzen dürfen auch nicht gespeichert werden.
+        self.assertEqual(self.save_evidence([token],area_b).status_code,400)
+        self.assertEqual(self.save_evidence([token],area_a+'&min_n=3').status_code,400)
+
+    def test_changed_evidence_disappears_and_rejected_save_is_atomic(self):
+        token=self.evidence_token()
+        self.save_evidence([token])
+        with self.db() as c:
+            c.execute("UPDATE answers SET answer='Geänderter Text' WHERE wave='2026' AND source='txt' AND feedback='0'")
+        response,_=self.payload('include_evidence=1')
+        self.assertNotIn(b'Vertraulicher Text 0',response.data)
+        self.assertNotIn('Geänderter Text'.encode(),response.data)
+        page=self.client.get('/p/1/results?focus_wave=2026').data
+        self.assertIn(b'bisher ausgew',page)
+        self.assertEqual(self.save_evidence([token],body='Nicht speichern').status_code,400)
+        with self.db() as c:
+            self.assertEqual(c.execute('SELECT body FROM report_notes').fetchone()[0],'Redaktionelle Zusammenfassung')
+            self.assertEqual(c.execute('SELECT COUNT(*) FROM report_evidence').fetchone()[0],1)
+        self.assertEqual(self.save_evidence([]).status_code,302)
+        with self.db() as c:
+            self.assertEqual(c.execute('SELECT COUNT(*) FROM report_evidence').fetchone()[0],0)
+
+    def test_evidence_html_is_escaped_and_duplicate_quotes_are_single_choices(self):
+        with self.db() as c:
+            c.execute("UPDATE answers SET answer='<script>Zitat</script>' WHERE wave='2026' AND source='txt'")
+        page=self.client.get('/p/1/results?focus_wave=2026').data.decode()
+        tokens=re.findall(r'name="evidence" value="([a-f0-9]{64})"',page)
+        self.assertEqual(len(tokens),1)
+        self.save_evidence(tokens)
+        # Die Referenzen überleben einen erneuten App-Start ohne neue Duplikate.
+        client=create_app(self.root).test_client()
+        response=client.get('/p/1/report?focus_wave=2026&include_evidence=1')
+        self.assertIn(b'&lt;script&gt;Zitat&lt;/script&gt;',response.data)
+        self.assertNotIn(b'<script>Zitat</script>',response.data)
