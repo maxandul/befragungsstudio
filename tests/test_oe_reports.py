@@ -141,6 +141,19 @@ class OrganisationReportTests(unittest.TestCase):
         self.assertEqual([o['indices'] for o in groups],[[0,1,2,3,4],[5,6],[7]])
         self.assertEqual([(o['part'],o['parts']) for o in groups],[(1,2),(2,2),(1,1)])
 
+    def test_leaf_report_has_current_parent_comparison_and_individual_switches(self):
+        team=self.node('Team','Gleich','A')
+        response,payload=self.payload('oe='+team['id'])
+        self.assertEqual(payload['cards'][0]['children'],[])
+        comparisons=payload['cards'][0]['comparisons']
+        self.assertEqual([c['kind'] for c in comparisons],['parent','total'])
+        self.assertEqual(comparisons[0]['rows'][-1]['mean'],1)
+        self.assertEqual(comparisons[1]['rows'][-1]['mean'],3.4)
+        for marker in [b'id="show-parent"',b'id="show-total"',b'id="overview-children-0"']:
+            self.assertIn(marker,response.data)
+        self.assertIn('Übergeordnete OE: A'.encode(),response.data)
+        self.assertIn('Puls AFA · gesamt'.encode(),response.data)
+
     @unittest.skipUnless(shutil.which('node'),'Optionaler Entwicklungstest benötigt Node.js')
     def test_topic_export_metrics_missing_values_and_legend_visibility(self):
         result=subprocess.run(['node',str(Path(__file__).with_name('check_topic_exports.cjs'))],capture_output=True,text=True)

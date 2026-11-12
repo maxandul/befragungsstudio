@@ -625,11 +625,11 @@ def create_app(instance=None):
             child_rates.append(dict(unit=child['unit'],n=n,total=total,rate=100*n/total if total else None))
         parent=next((x for x in nodes if node and x['id']==node['parent']),None)
         comparisons=[]
-        for label,path in ([(parent['unit'],parent['path'])] if parent else []) + [('Gesamtergebnis',[])]:
+        for kind,label,path in ([('parent','Übergeordnete OE: '+parent['unit'],parent['path'])] if parent else []) + [('total',p['name']+' · gesamt',[])]:
             if not node:
                 continue
             comp,_,_=results(pid,path=path)
-            comparisons.append(dict(label=label,rows=[r for r in comp if r['wave'] in selected and r['n']>=minimum and r['type']!='text']))
+            comparisons.append(dict(kind=kind,label=label,rows=[r for r in comp if r['wave'] in selected and r['n']>=minimum and r['type']!='text']))
         scope=node_id or (dimension+'|'+unit if dimension else '')
         with db() as c:
             notes={r['theme']:r['body'] for r in c.execute('SELECT theme,body FROM report_notes WHERE project=? AND scope=? AND wave=?',(pid,scope,reference_wave))}
@@ -662,7 +662,7 @@ def create_app(instance=None):
         for canonical,rows in ctx['grouped'].items():
             children=[dict(unit=child['unit'],**next(r for r in cr if r['canonical']==canonical and r['wave']==ctx['reference_wave']))
                       for child,cr in ctx['child_results'] if any(r['canonical']==canonical and r['wave']==ctx['reference_wave'] and r['n']>=ctx['minimum'] for r in cr)]
-            comparisons=[dict(label=comp['label'],rows=[r for r in comp['rows'] if r['canonical']==canonical]) for comp in ctx['comparisons']]
+            comparisons=[dict(kind=comp['kind'],label=comp['label'],rows=[r for r in comp['rows'] if r['canonical']==canonical]) for comp in ctx['comparisons']]
             cards.append(dict(label=rows[-1]['label'],wording=rows[-1]['wording'],theme=rows[-1]['theme'] or 'Weitere Fragen',rows=rows,children=children,comparisons=comparisons))
         themes={}
         for index,card in enumerate(cards):

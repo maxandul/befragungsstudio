@@ -5,6 +5,24 @@
   const status = document.getElementById('export-status');
   const sizes = {wide: [1920, 1080], half: [960, 1080], compact: [1200, 900]};
   const charts = new Map();
+  // Die Auswahl der Legende bleibt bei Metrik- und Vergleichswechseln erhalten.
+  const visibility = new Map();
+  function rememberVisibility(key) {
+    const chart=charts.get(key);
+    if (!chart?.isDatasetVisible || !chart.data) return;
+    const state=visibility.get(key) || new Map();
+    chart.data.datasets.forEach((ds,i)=>state.set(ds.id || ds.label,chart.isDatasetVisible(i)));
+    visibility.set(key,state);
+  }
+  function applyVisibility(key,cfg) {
+    const state=visibility.get(key);
+    cfg.data.datasets.forEach(ds=>{if(state?.has(ds.id || ds.label))ds.hidden=!state.get(ds.id || ds.label);});
+    return cfg;
+  }
+  function comparisonVisible(comp) {
+    return document.getElementById('show-comparisons')?.checked !== false &&
+      document.getElementById(`show-${comp.kind || 'total'}`)?.checked !== false;
+  }
   const fmt = (v, digits = 1) => new Intl.NumberFormat('de-CH', {maximumFractionDigits: digits, minimumFractionDigits: digits}).format(v);
   function wrap(text, width) {
     const lines = []; let line = '';
@@ -27,7 +45,7 @@
       const entry = ds.data[i], v = entry && typeof entry === 'object' ? entry.x : entry; if (v == null) return;
       const text = fmt(v, options.percent ? 1 : 2) + (options.percent ? ' %' : '');
       if (chart.config.type === 'line') {ctx.textAlign = 'center'; ctx.fillText(text, point.x, point.y - 22);}
-      else {ctx.textAlign = 'left'; ctx.fillText(text, point.x + 9, point.y);}
+      else {ctx.textAlign = 'left';ctx.fillStyle=options.edge ? '#0070b4' : '#18394f';ctx.fillText(text, options.edge ? chart.chartArea.right+12 : point.x + 9, point.y);}
     }); ctx.restore();
   }};
 
@@ -40,16 +58,16 @@
     const values = scale ? card.rows.map(r => top ? r.top2 : r.mean)
       : Object.values(latest.counts).map(n => 100 * n / latest.n);
     const children = view === 'children';
-    const datasets = [{label: scale ? payload.unit : 'Anteil (%)',
+    const datasets = [{id:'selected',label: scale ? payload.unit : 'Anteil (%)',
         ns:children ? card.children.map(r=>r.n) : card.rows.map(r=>r.n),
         data: children ? card.children.map(r => top ? r.top2 : r.mean) : values,
         borderColor:'#0070b4',backgroundColor:'#0070b4',borderWidth:3,
         pointRadius:exporting ? 7 : 5,pointHoverRadius:7,tension:0,maxBarThickness:30,
         showLine:!children}];
     if (scale && !children && document.getElementById('show-comparisons')?.checked !== false) {
-      (card.comparisons || []).forEach((comp,i) => datasets.push({
+      (card.comparisons || []).filter(comparisonVisible).forEach(comp => datasets.push({id:comp.kind || comp.label,
         label:comp.label + (exporting ? ' · n=' + card.rows.map(row=>comp.rows.find(r=>r.wave===row.wave)?.n ?? '–').join('/') : ''),ns:card.rows.map(row=>comp.rows.find(r=>r.wave===row.wave)?.n),data:card.rows.map(row => {const r=comp.rows.find(r=>r.wave===row.wave);return r ? (top ? r.top2 : r.mean) : null;}),
-        borderColor:['#ed8b23','#647887'][i%2],backgroundColor:['#ed8b23','#647887'][i%2],
+        borderColor:comp.kind==='total' ? '#647887' : '#ed8b23',backgroundColor:comp.kind==='total' ? '#647887' : '#ed8b23',
         borderDash:[7,5],pointRadius:3,spanGaps:false
       }));
     }
@@ -87,22 +105,26 @@
   function overviewConfig(index, view, exporting = false) {
     const overview = payload.overviews[index], cards = overview.indices.map(i => payload.cards[i]);
     const top = metricFor(overview.indices[0]) === 'top2';
-    const keys = view === 'history' ? [...payload.selected].reverse()
-      : [payload.unit, ...new Set(cards.flatMap(c => c.children.map(r => r.unit)))];
-    const rows = keys.map((key, k) => cards.map(card => view === 'history'
-      ? card.rows.find(r => r.wave === key)
-      : k === 0 ? card.rows.find(r => r.wave === overview.reference_wave)
-      : card.children.find(r => r.unit === key && r.wave === overview.reference_wave)));
+    const series = view === 'history' ? [...payload.selected].reverse().map(wave=>({id:'wave-'+wave,label:wave,
+        rows:cards.map(card=>card.rows.find(r=>r.wave===wave))}))
+      : [{id:'selected',label:payload.unit,rows:cards.map(card=>card.rows.find(r=>r.wave===overview.reference_wave))},
+        ...[...new Set(cards.flatMap(c=>c.children.map(r=>r.unit)))].map(unit=>({id:'child-'+unit,label:unit,
+          rows:cards.map(card=>card.children.find(r=>r.unit===unit && r.wave===overview.reference_wave))})),
+        ...[...new Map(cards.flatMap(c=>(c.comparisons || []).filter(comparisonVisible)).map(comp=>[comp.kind || comp.label,comp])).values()]
+          .map(comp=>({id:comp.kind || comp.label,label:comp.label,comparison:true,
+            rows:cards.map(card=>(card.comparisons || []).find(c=>(c.kind || c.label)===(comp.kind || comp.label))?.rows.find(r=>r.wave===overview.reference_wave))}))];
+    const rows=series.map(s=>s.rows);
     const labels = cards.map((card, i) => [
       ...wrap(exporting ? card.wording || card.label : card.label, exporting ? 58 : 34),
       ...(exporting ? wrap('n: ' + rows.map(rs => rs[i]?.n ?? '–').join(' / '), 58) : [])
     ]);
     return {
       type:'scatter', plugins:[whiteBackground, valueLabels],
-      data:{labels,datasets:keys.map((key,k) => ({label:key, ns:rows[k].map(r => r?.n),
+      data:{labels,datasets:series.map((item,k) => ({id:item.id,label:item.label, ns:rows[k].map(r => r?.n),
         data:rows[k].map((r,i) => ({x:r ? (top ? r.top2 : r.mean) : null,y:i})),
-        borderColor:palette[k % palette.length],backgroundColor:palette[k % palette.length],
-        pointStyle:['circle','rectRot','triangle','rect','crossRot','star','cross','dash'][k % 8],
+        borderColor:item.comparison ? (item.id==='parent' ? '#883e96' : '#485865') : palette[k % palette.length],
+        backgroundColor:item.comparison ? (item.id==='parent' ? '#883e96' : '#485865') : palette[k % palette.length],
+        pointStyle:item.comparison ? (item.id==='parent' ? 'rectRot' : 'triangle') : ['circle','rectRot','triangle','rect','crossRot','star','cross','dash'][k % 8],
         pointRadius:exporting ? (k === 0 ? 9 : 7) : (k === 0 ? 6 : 5),showLine:false}))},
       options:{responsive:!exporting,maintainAspectRatio:false,animation:false,
         devicePixelRatio:exporting ? 1 : Math.min(window.devicePixelRatio || 1,2),
@@ -111,8 +133,9 @@
           title:{display:exporting,text:[...wrap(payload.project+' · '+payload.unit,85),...wrap(overview.theme,85)],font:{size:30},color:'#172c3b'},
           subtitle:{display:true,text:[view === 'history' ? 'Zeitvergleich' : 'OE-Vergleich · '+overview.reference_wave,
             top ? 'Zustimmungsanteil (%) · Grenze je Frage konfiguriert' : `Mittelwert · Skala ${overview.minimum}–${overview.maximum}`,
+            'Wert rechts: '+payload.unit,
             ...(exporting ? ['n je Frage in Reihenfolge der Legende · – = kein freigegebenes Ergebnis'] : [])],font:{size:exporting ? 20 : 13}},
-          valueLabels:{fontSize:exporting ? 21 : 13,percent:top},
+          valueLabels:{fontSize:exporting ? 21 : 13,percent:top,edge:true},
           tooltip:{enabled:!exporting,callbacks:{title:items => cards[items[0].dataIndex].wording || cards[items[0].dataIndex].label,
             label:ctx => `${ctx.dataset.label}: ${fmt(ctx.parsed.x,top ? 1 : 2)}${top ? ' %' : ''} · n=${ctx.dataset.ns[ctx.dataIndex]}`}}},
         scales:{x:{min:top ? 0 : overview.minimum,max:top ? 100 : overview.maximum,
@@ -127,8 +150,8 @@
       for (const view of ['history','children']) {
         const key=`overview-${view}-${i}`, canvas=document.getElementById(key);
         if (!canvas) continue;
-        charts.get(key)?.destroy();
-        charts.set(key,new Chart(canvas,overviewConfig(i,view)));
+        rememberVisibility(key);charts.get(key)?.destroy();
+        charts.set(key,new Chart(canvas,applyVisibility(key,overviewConfig(i,view))));
       }
     });
   }
@@ -152,8 +175,9 @@
   function draw(index) {
     const canvas = document.getElementById(`chart-${index}`);
     const metric = metricFor(index);
+    rememberVisibility(index);
     if (charts.has(index)) charts.get(index).destroy();
-    charts.set(index, new Chart(canvas, config(payload.cards[index], metric)));
+    charts.set(index, new Chart(canvas, applyVisibility(index,config(payload.cards[index], metric))));
     const childCanvas=document.getElementById(`children-${index}`);
     if(childCanvas){const key='child-'+index;if(charts.has(key))charts.get(key).destroy();charts.set(key,new Chart(childCanvas,config(payload.cards[index],metric,'screen','children')));}
   }
@@ -249,7 +273,7 @@
       Chart.defaults.font.family = 'Arial, sans-serif';
       payload.cards.forEach((card, i) => {draw(i); document.getElementById(`metric-${i}`)?.addEventListener('change', () => draw(i));});
       drawOverviews();
-      for (const id of ['report-metric','show-comparisons']) document.getElementById(id)?.addEventListener('change',()=>{payload.cards.forEach((card,i)=>draw(i));drawOverviews();});
+      for (const id of ['report-metric','show-comparisons','show-parent','show-total']) document.getElementById(id)?.addEventListener('change',()=>{payload.cards.forEach((card,i)=>draw(i));drawOverviews();});
       document.querySelectorAll('[data-topic]').forEach(button=>button.addEventListener('click',async()=>{
         button.disabled=true;
         try {const i=Number(button.dataset.topic),view=button.dataset.topicView;download(await topicPng(i,view),topicFilename(i,view));status.textContent='Themen-PNG erstellt.';}
