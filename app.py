@@ -680,6 +680,7 @@ def create_app(instance=None):
             if r['type']=='text' and r['wave']==reference_wave and r['n']>=minimum:
                 text_groups.setdefault(r['theme'] or 'Weitere Fragen',[]).append(r)
         include_texts=request.args.get('include_texts')=='1'
+        include_summaries=request.args.get('include_summaries')=='1'
         include_evidence=request.args.get('include_evidence')=='1'
         evidence_options={}
         for theme,items in text_groups.items():
@@ -740,7 +741,7 @@ def create_app(instance=None):
                     dimension=dimension,unit=unit,selected=selected,available=available,focus_wave=focus_wave,
                     nodes=nodes,node=node,node_id=node_id,child_rates=child_rates,child_results=child_results,
                     comparisons=comparisons,reference_wave=reference_wave,notes=notes,scope=scope,
-                    text_groups=text_groups,include_texts=include_texts,afa=afa,
+                    text_groups=text_groups,include_texts=include_texts,include_summaries=include_summaries,afa=afa,
                     include_evidence=include_evidence,evidence_options=evidence_options,evidence=evidence,
                     selected_evidence=selected_evidence,stale_evidence=stale_evidence,note_themes=note_themes)
 
@@ -751,6 +752,11 @@ def create_app(instance=None):
     @app.route('/p/<int:pid>/report')
     def report(pid):
         ctx=report_data(pid)
+        ctx['text_summaries']=approved_summaries(pid,ctx)
+        if ctx['include_summaries'] and not ctx['include_texts']:
+            ctx['text_groups']={theme:[r for r in rows if ctx['text_summaries'].get(r['canonical'])]
+                                for theme,rows in ctx['text_groups'].items()}
+            ctx['text_groups']={theme:rows for theme,rows in ctx['text_groups'].items() if rows}
         cards=[]
         for canonical,rows in ctx['grouped'].items():
             children=[dict(unit=child['unit'],**next(r for r in cr if r['canonical']==canonical and r['wave']==ctx['reference_wave']))
@@ -817,6 +823,9 @@ def create_app(instance=None):
     def charts(pid):
         # PNGs und ZIP entstehen im Browser. Der bisherige Einstieg bleibt erhalten.
         return redirect(url_for('report',pid=pid)+'?'+request.query_string.decode()+'&zip=1')
+
+    from text_routes import register
+    approved_summaries=register(app,db,project,report_data,result_sources)
 
     return app
 

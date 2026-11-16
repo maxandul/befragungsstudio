@@ -90,3 +90,17 @@ Keine Korrektur für endliche Grundmengen oder Mehrfachvergleiche. Keine Signifi
 Methodische Referenzen: [t-Intervall, NIST](https://www.itl.nist.gov/div898/handbook/eda/section3/eda352.htm), [Wilson, NIST](https://itl.nist.gov/div898/handbook/prc/section2/prc241.htm), [SciPy t-Quantile](https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.stdtrit.html).
 
 62 Tests bestanden, einschliesslich externer numerischer Referenzwerte, n=0/1, konstanter Antworten, Zustimmungsanteilen 0/100, abweichender Grenzen, vorhandener Leitungsausschlüsse, Fallzahlschutz, Tooltip, Zeichenrichtung und Exportzustand. PNGs mit AFA-Daten visuell geprüft. Für das Update ist einmal `INSTALL.bat` zum Ergänzen von SciPy nötig; keine Änderung am Datenbankschema.
+
+## Geprüfte Textzusammenfassungen ab 0.1.15
+
+Über die Textauswertung lassen sich bereinigte Texte mit Standardprompt und JSON-
+Rückgabevorlage exportieren. Nach externer Verarbeitung werden die Rückgaben mit
+Quellenprüfung importiert, redaktionell geprüft und ausdrücklich freigegeben.
+«Geprüfte Textzusammenfassungen im Bericht anzeigen» gibt diese sinngemässen
+Themenaussagen bei der zugehörigen Frage aus. Der Rohtextexport bleibt separat wählbar.
+Weder technische Quellenabdeckung noch Freigabe belegen eine Häufigkeit oder
+Repräsentativität; die Darstellung enthält keine automatisch geschätzten Themenanteile.
+Jede Fassung gilt ausschliesslich für den exportierten OE-Umfang und die Bezugswelle.
+Veraltete Datenstände, fehlende Freigaben oder eine unterschrittene Mindestfallzahl
+verhindern die Ausgabe. Originalkennungen und interne Quellenlisten werden nicht
+in den HTML-Bericht eingebettet. Anleitung und Grenzen siehe README 0.1.15.

@@ -6,3 +6,4 @@
 .preview-change{background:#edf5fa;font-weight:700}
 
 .ground-editor[open]{min-width:260px;padding:12px;background:#f7f9fb;border:1px solid var(--line);border-radius:6px}.danger{background:#fff;color:#9a2c24;border-color:#be655d}.danger:hover{background:#fff0ee;color:#7e211b}
+.verbatim{white-space:pre-wrap;overflow-wrap:anywhere}details>summary{cursor:pointer}details .verbatim{background:var(--light);padding:16px;border-left:3px solid var(--blue)}

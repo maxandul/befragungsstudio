@@ -1,4 +1,4 @@
-# Befragungsstudio 0.1.14
+# Befragungsstudio 0.1.15
 
 Erste lokale Umsetzung für Befragungsdaten. Charts mit lokal mitgeliefertem Chart.js 4.4.8; Matplotlib wird nicht benötigt. Python 3.11 oder neuer mit Python
 Launcher unter Windows. Alle Oberflächendateien werden mitgeliefert.
@@ -330,3 +330,53 @@ Die Intervalle beruhen auf einem Modell unabhängiger Beobachtungen, nicht auf e
 **Update:** App beenden, `instance` sichern, Programmdateien aktualisieren und einmal `INSTALL.bat` ausführen. Für die t-Verteilung wird neu SciPy installiert. Danach `START.bat` starten. Kein Neuimport und keine Datenbankänderung nötig.
 
 Validierung: 62 Tests bestanden, darunter numerische Referenzen, Grenzfälle, Ausschlüsse/Mindestfallzahlen, Schalter, Tooltips, Fehlerbalkenrichtung und PNG-Übernahme. Tatsächliche PNGs mit lokalen AFA-Daten gerendert und visuell geprüft; der vollständige Browser-Layouttest bleibt offen.
+
+## Externe Textauswertung ohne API (Version 0.1.15)
+
+Unter **Textauswertung** eine Welle und OE auswählen, Mindestfallzahl prüfen und
+Textfragen markieren. Die Auswahl verwendet die Berichtsregeln einschliesslich
+Fragenausschlüssen, Fehlwerten, vollständigem OE-Pfad und Leitungsausschluss.
+
+1. **Exportprüfung:** Frage- und Antworttexte auf Personenbezüge prüfen und bearbeiten.
+   E-Mail-Adressen und Schweizer Telefonnummern werden als einfache Vorschläge ersetzt.
+   Namen, Funktionen, Gesundheitsangaben, Orte und identifizierende Vorfälle erfordern
+   eine manuelle Prüfung. Die Ersetzung ist keine Garantie vollständiger Anonymität.
+2. **Exportfassung festhalten**, dann das ZIP herunterladen. Es enthält `daten.json`,
+   `standardprompt.txt` und `rueckgabe_vorlage.json`. Nur bereinigte Texte und zufällige
+   Auftrags-/Frage-/Antwortkennungen verlassen die App; keine Rohmetadaten oder
+   Zuordnungstabellen. ZIP entpacken, die JSON-Dateien in die selbst gewählte KI laden
+   und den Standardprompt verwenden. Die App führt keine Netzwerkaufrufe aus.
+3. **Ergebnis importieren:** Die KI soll eine UTF-8-Datei `ergebnis.json` liefern.
+   Die App prüft Formatversion, Auftrag, Quellen pro Frage und vollständige Abdeckung.
+   Jede Antwort muss mindestens einem Thema oder mit Begründung «nicht auswertbar»
+   zugeordnet sein. Ungültige oder unvollständige Importe ändern den Auftrag nicht.
+4. **Inhaltlich prüfen:** Themen und Aussagen neben den Originalen sichten und redigieren.
+   Auch nicht ausgewertete Antworten prüfen. Titel und Aussagen lassen sich bearbeiten.
+   Quellenkorrekturen benötigen in dieser ersten Version einen neuen Auftrag.
+5. **Freigeben:** Unter Ergebnisse & Berichte «Geprüfte Textzusammenfassungen im Bericht
+   anzeigen» aktivieren. Zusammenfassungen erscheinen bei der jeweiligen Textfrage,
+   unabhängig davon, ob vollständige Originaltexte ebenfalls ausgewählt sind.
+   Für einen erneuten HTML-Export ist keine neue KI-Auswertung erforderlich.
+
+Die erste Ausbaustufe speichert **fragebezogene Themenzusammenfassungen für genau
+eine OE und Welle je Auftrag**. Mehrere Fragen sind pro Auftrag möglich. GL und
+Abteilungen benötigen jeweils eigene Aufträge. Eine automatische Wiederverwendung
+codierter Einzelaussagen über verschiedene OEs, ein zweiter GL-Syntheseexport und
+ein wellenübergreifendes Codebuch sind spätere Ausbaustufen.
+
+Geprüfte Fassungen werden nur für den passenden Berichtsumfang ausgegeben und
+unterliegen dessen aktueller Mindestfallzahl. Bei mehreren freigegebenen Aufträgen
+zur gleichen Frage gilt der zuletzt erstellte aktuelle Auftrag. Eine Freigabe kann
+zurückgenommen werden; bis zur erneuten Freigabe wird diese Fassung nicht ausgegeben.
+Änderungen der ausgewählten Antworten, des Fragewortlauts/-labels, der Zuordnung
+oder Ausschlüsse können einen Auftrag veralten lassen. Veraltete Aufträge bleiben
+lesbar, werden aber weder weiterverarbeitet noch im Bericht ausgegeben. Neue Aufträge
+überschreiben keine alten Fassungen; parallele Bearbeitungen sind versionsgeschützt.
+Alle Aufträge, Originale und Rückgaben liegen in der lokalen SQLite-Datenbank und
+werden mit dem Ordner `instance` gesichert. Das ZIP enthält keine lokale Zuordnung.
+Die Format-/Auftragsversion ist derzeit 1; fehlende oder fremde IDs werden abgewiesen.
+
+Validierung: automatisierter vollständiger Export-/Import-/Freigabe-/Berichtsdurchlauf
+mit synthetischen Daten sowie Negativfälle für Quellen, Vollständigkeit, Datenänderungen,
+OE-Abgrenzung, Mindestfallzahl, HTML-Escaping, CSRF und parallele Bearbeitung.
+Ein realer Auswertungsversuch mit AFA-Daten in der vom Anwender gewählten KI steht aus.
