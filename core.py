@@ -8,6 +8,7 @@ from collections import defaultdict
 from datetime import datetime
 
 import pandas as pd
+from confidence import scale_intervals
 
 
 def read_table(data: bytes, filename: str, sheet=0) -> pd.DataFrame:
@@ -283,7 +284,8 @@ def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit=''
                          top2=100*sum(n >= q['top_from'] for n in values)/len(values) if values else None,
                          counts=dict(counts), texts=texts, minimum=q['minimum'], maximum=q['maximum'],
                          top_from=q['top_from'],sort_order=q.get('sort_order',0),text_parent=q.get('text_parent',''),
-                         unanswered=len(participation[wave])-valid_people-invalid))
+                         unanswered=len(participation[wave])-valid_people-invalid,
+                         **scale_intervals(values,q['top_from'])))
     return sorted(rows, key=lambda x: (x['theme'], x['sort_order'],x['label'], x['wave'])), {
         wave: len(ids) for wave, ids in participation.items()}
 

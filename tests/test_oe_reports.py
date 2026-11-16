@@ -240,6 +240,23 @@ class OrganisationReportTests(unittest.TestCase):
         _,overall=self.payload()
         self.assertEqual(overall['cards'][0]['rows'][-1]['n'],5)
 
+    def test_confidence_intervals_follow_filters_and_are_not_exposed_for_small_groups(self):
+        self.add_leadership()
+        _,payload=self.payload('oe='+self.node('Team','Gleich','B')['id'])
+        row=payload['cards'][0]['rows'][-1]
+        self.assertEqual(row['mean_ci95'],[5,5])
+        self.assertAlmostEqual(row['top2_ci95'][0],34.2380227507,places=8)
+        self.assertAlmostEqual(row['top2_ci95'][1],100)
+        _,hidden=self.payload('oe='+self.node('Team','Gleich','B')['id']+'&min_n=3')
+        self.assertEqual(hidden['cards'],[])
+        response,_=self.payload('download=1')
+        self.assertIn(b'id="show-ci" type="checkbox">',response.data) # Standard aus.
+
+    @unittest.skipUnless(shutil.which('node'),'Optionaler Entwicklungstest benötigt Node.js')
+    def test_confidence_chart_toggle_and_exports(self):
+        result=subprocess.run(['node',str(Path(__file__).with_name('check_ci_exports.cjs'))],capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+
     def test_unanswered_counts_include_absent_rows_and_keep_invalid_separate(self):
         with self.db() as c:
             c.execute("DELETE FROM answers WHERE source='q' AND wave='2026' AND feedback='0'")

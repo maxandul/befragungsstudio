@@ -43,13 +43,13 @@ def main():
         print(f'\n--- Start {datetime.now().isoformat(timespec="seconds")} ---')
         print(f'Diagnoseprotokoll: {instance / "start.log"}')
         print('Der erste Start kann beim Laden der Pakete etwas dauern.')
-        for index, name in enumerate(('flask', 'pandas', 'openpyxl', 'waitress'), 1):
-            print(f'[{index}/6] Lade {name} ...')
+        for index, name in enumerate(('flask', 'pandas', 'openpyxl', 'waitress', 'scipy'), 1):
+            print(f'[{index}/7] Lade {name} ...')
             importlib.import_module(name)
-        print('[5/6] Lade Anwendung und oeffne lokale Datenbank ...')
+        print('[6/7] Lade Anwendung und oeffne lokale Datenbank ...')
         from app import create_app
         app = create_app()
-        print(f'[6/6] Belege lokalen Port {args.port} ...')
+        print(f'[7/7] Belege lokalen Port {args.port} ...')
         from waitress import create_server
         server = create_server(app, host='127.0.0.1', port=args.port, threads=4)
         url = f'http://127.0.0.1:{server.effective_port}'
