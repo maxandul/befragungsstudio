@@ -1,4 +1,4 @@
-# Befragungsstudio 0.1.15
+# Befragungsstudio 0.1.16
 
 Erste lokale Umsetzung für Befragungsdaten. Charts mit lokal mitgeliefertem Chart.js 4.4.8; Matplotlib wird nicht benötigt. Python 3.11 oder neuer mit Python
 Launcher unter Windows. Alle Oberflächendateien werden mitgeliefert.
@@ -331,7 +331,7 @@ Die Intervalle beruhen auf einem Modell unabhängiger Beobachtungen, nicht auf e
 
 Validierung: 62 Tests bestanden, darunter numerische Referenzen, Grenzfälle, Ausschlüsse/Mindestfallzahlen, Schalter, Tooltips, Fehlerbalkenrichtung und PNG-Übernahme. Tatsächliche PNGs mit lokalen AFA-Daten gerendert und visuell geprüft; der vollständige Browser-Layouttest bleibt offen.
 
-## Externe Textauswertung ohne API (Version 0.1.15)
+## Frühere OE-Textauswertung ohne API (Version 0.1.15, bestehende Aufträge)
 
 Unter **Textauswertung** eine Welle und OE auswählen, Mindestfallzahl prüfen und
 Textfragen markieren. Die Auswahl verwendet die Berichtsregeln einschliesslich
@@ -380,3 +380,86 @@ Validierung: automatisierter vollständiger Export-/Import-/Freigabe-/Berichtsdu
 mit synthetischen Daten sowie Negativfälle für Quellen, Vollständigkeit, Datenänderungen,
 OE-Abgrenzung, Mindestfallzahl, HTML-Escaping, CSRF und parallele Bearbeitung.
 Ein realer Auswertungsversuch mit AFA-Daten in der vom Anwender gewählten KI steht aus.
+
+
+## Einmalige Textaufbereitung pro Welle (Version 0.1.16)
+
+Neue Aufträge unter **Textauswertung** gelten für eine ganze Welle. Die OE-Auswahl
+im Bericht begrenzt den Wellenauftrag nicht. Alle gewünschten Textfragen markieren
+(standardmässig sind alle ausgewählt) und «Wellenauftrag vorbereiten» wählen.
+Die erste Export-/Importversion bleibt für bereits erstellte OE-Aufträge erhalten.
+
+**Gemeinsame Grundlage:** Formatversion 2 liefert kurze sinngemässe Einzelaussagen
+pro Antwort mit Themenbezeichnung, statt eine fertige OE-Zusammenfassung zu erzeugen.
+Eine Aussage darf nur den Inhalt ihrer eigenen Quellantwort enthalten. Ihre lokale
+Zuordnung zu Teilnahme, Frage und Welle bleibt erhalten. Alle Leitungspersonen bleiben
+in der gemeinsamen Aufbereitung enthalten, weil sie je nach ausgewerteter OE ein-
+oder ausgeschlossen werden müssen. Fragen- und Fehlwertausschlüsse gelten bereits
+für die Vorbereitung. Im späteren Bericht werden zuerst die Quellen nach dem exakten
+OE-Pfad und Leitungsausschluss gefiltert und erst dann die Aussagen gruppiert.
+Dadurch ist keine erneute KI-Auswertung pro Abteilung erforderlich.
+
+**Grosse Datenmengen:** Der Auftrag wird je Frage nach höchstens 50 Antworten und
+normalerweise 24'000 Zeichen Antwortdaten in stabile Teilpakete zerlegt. Die gesamte
+JSON-Eingabe ist auf 28'000 Zeichen pro Paket begrenzt, einschliesslich Metadaten und
+Fragetext. Einzelne aussergewöhnlich lange Antworten werden nicht abgeschnitten;
+wenn sie die Paketgrenze überschreiten, muss ihr Exporttext manuell gekürzt/bereinigt
+werden. Die Originalantwort bleibt lokal erhalten. Jedes Teilpaket hat eigene zufällige
+Kennungen. Die Prüfseiten laden nur ein Teilpaket, niemals sämtliche Textantworten als
+ein einziges grosses Formular. Die Wellenübersicht berechnet keine Diagramme/OE-Vergleiche.
+
+1. Teilpaket öffnen, Frage- und Antworttexte prüfen/bereinigen. Zwischenstände lassen
+   sich speichern und später fortsetzen. Erst nach ausdrücklicher Prüfung auf direkte
+   und indirekte Personenbezüge die Exportfassung festhalten.
+2. Teilpaket einzeln oder alle bereinigten Teile zusammen als ZIP herunterladen.
+   Ungeprüfte Exportteile sind im Sammel-ZIP nicht enthalten. Originalkennungen und
+   Merkmale wie OE, Rolle und Datum verlassen die App nicht. Zufällige Antwort-IDs
+   unterscheiden sich auch zwischen Fragen derselben Teilnahme.
+3. In der gewählten KI mit dem mitgelieferten Standardprompt auswerten. Das Sammel-ZIP
+   enthält je Teil Daten und Rückgabevorlage. Jede Rückgabe bleibt eine eigenständige
+   JSON-Datei. Modellgrenzen können mehrere Arbeitsschritte erforderlich machen;
+   die App garantiert keine Verarbeitung einer ganzen grossen Welle in einem KI-Aufruf.
+4. Eine oder mehrere JSON-Rückgaben gemeinsam importieren (höchstens 100 Dateien pro
+   Upload, zusammen innerhalb der bestehenden 60-MB-Anfragegrenze). Formatversion,
+   Auftrag, Teil, Frage und sämtliche Antwortkennungen werden geprüft. Jede Antwort
+   benötigt Aussagen oder einen begründeten Nichtauswertungsvermerk. Ein fehlerhafter
+   gemeinsamer Upload verändert keine seiner Teilpakete. Bereits identische Rückgaben
+   dürfen gefahrlos erneut hochgeladen werden; Bearbeitungen/Freigaben bleiben erhalten.
+5. Pro Teil die Aussagen neben ihren Originalen inhaltlich prüfen, redigieren und
+   freigeben. Abweichende KI-Rückgaben dürfen vorhandene Prüfungen nicht still ersetzen.
+   Vor der Freigabe ist ein ausdrücklich bestätigtes Ersetzen im Teilpaket möglich.
+6. Erst wenn **alle Teilpakete des Auftrags** freigegeben sind, ist die Auswertung für
+   alle OE-Berichte verfügbar. Der Berichtsschalter für geprüfte Textzusammenfassungen
+   bleibt erforderlich. Mindestfallzahlen und Fragenumfang gelten wie bisher.
+
+**Darstellung:** Themen werden aus den zur ausgewählten OE gehörenden Einzelaussagen
+zusammengesetzt. Nur bis auf Gross-/Kleinschreibung und Leerzeichen identische Aussagen
+werden automatisch gebündelt, keine semantisch ähnlichen Aussagen zusammengezogen.
+Pro Thema stehen zunächst drei Aussagen sichtbar, weitere sind aufklappbar vollständig
+enthalten. Einzelhinweise und Gegensätze bleiben so verfügbar. Es handelt sich um eine
+quellenbasierte Themenübersicht, keine neu generierte erzählerische GL-Gesamtsynthese.
+Eine solche zusätzliche Gesamtsynthese ist weiterhin eine spätere Ausbaustufe.
+
+Unterschiedliche Themenbezeichnungen aus mehreren KI-Teilen lassen sich in der
+Wellenübersicht auf denselben Zielnamen zuordnen. Das verändert nur die Gruppierung,
+nicht die Aussagen oder deren Quellen. Änderungen der Themenliste zwischen Anzeige
+und Speichern werden erkannt. Änderungen an OE-Zuordnungen oder Leitungsrollen
+benötigen keine neue KI-Aufbereitung; sie wirken beim nächsten Bericht über die
+aktuellen Quellenfilter. Änderungen an ausgewählten Originalantworten, Fragen,
+Fragenverknüpfungen, Fehlwerten oder Ausschlüssen können den Wellenauftrag veralten
+lassen. Ein veralteter Auftrag bleibt lesbar, wird aber nicht weiterbearbeitet oder
+in Berichten verwendet. Bei Rücknahme einer Teilfreigabe ist der Wellenauftrag wieder
+unvollständig. Andere bereits geprüfte Teile bleiben gespeichert.
+
+Prüfung: 10'000 synthetische Textantworten ohne Verlust über begrenzte Teilpakete
+verteilt, validiert und für einen ausgewählten Quellumfang gruppiert; zusätzlich
+Auftragsvorbereitung mit über 4'000 Datenbankantworten und begrenzten Prüfseiten.
+Weitere Tests prüfen Wiederverwendung zwischen OEs, eigenen Leitungsausschluss,
+Teilimporte, atomare Sammelimporte, sichere Wiederholung, Quellenverwechslung,
+Themenvereinheitlichung, Zwischenstände und veraltete Daten. Ein realer AFA-Versuch in
+der selbst gewählten KI steht weiterhin aus. Keine neuen Python-Pakete erforderlich.
+
+Bei verknüpften Freitextnachfragen enthält der bearbeitbare Exportfragetext zusätzlich
+den Wortlaut der zugehörigen Skalenfrage aus derselben Welle (ohne individuelle
+Skalenwerte). Fehlt deren Originalwortlaut, wird die Berichtsbezeichnung verwendet.
+Änderungen dieses Kontextes lassen den Wellenauftrag ebenfalls veralten.

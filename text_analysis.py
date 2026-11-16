@@ -28,16 +28,17 @@ def digest(value):
     return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
 
 
-def collect(sources, wave, dimension='', unit='', path=(), canonicals=None, minimum=1):
+def collect(sources, wave, dimension='', unit='', path=(), canonicals=None, minimum=1, exclude_leaders=True):
     path = [tuple(pair) for pair in path]
     records, questions, mappings, aliases, _, exclusions = sources
+    records = [r for r in records if r['wave']==wave]
     # Reuse report validation (conflicting dimensions, linked duplicate questions).
     rows, _ = aggregate(records, questions, mappings, aliases, dimension, unit,
-                        exclusions, path, exclude_leaders=True)
+                        exclusions, path, exclude_leaders=exclude_leaders)
     allowed = {r['canonical'] for r in rows if r['wave']==wave and r['type']=='text' and r['n']>=minimum}
     if canonicals is not None:
         allowed &= set(canonicals)
-    leaders = oe_leaders(records, mappings, aliases, dimension, unit, path)
+    leaders = oe_leaders(records, mappings, aliases, dimension, unit, path) if exclude_leaders else set()
     output = []
     for r in records:
         q = questions[r['source']]

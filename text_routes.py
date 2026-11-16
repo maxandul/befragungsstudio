@@ -41,12 +41,7 @@ def register(app, db, project, report_data, result_sources):
 
     @app.get('/p/<int:pid>/texts')
     def text_analysis(pid):
-        ctx=report_data(pid)
-        with db() as c:
-            jobs=[dict(r) for r in c.execute('SELECT id,wave,state,created,scope,selection FROM text_jobs WHERE project=? ORDER BY created DESC,rowid DESC',(pid,))]
-        for job in jobs:
-            job['unit']=json.loads(job['selection'])['unit'] or 'Gesamtbefragung'
-        return render_template('texts.html',**ctx,jobs=jobs,tab='texts')
+        return wave_home(pid)
 
     @app.post('/p/<int:pid>/texts')
     def text_create(pid):
@@ -158,4 +153,11 @@ def register(app, db, project, report_data, result_sources):
                 if canonical not in output:
                     output[canonical]=q['themen']
         return output
-    return summaries
+    from wave_routes import register as register_wave
+    wave_home,wave_summaries=register_wave(app,db,project,report_data,result_sources)
+
+    def combined_summaries(pid,ctx):
+        legacy=summaries(pid,ctx)
+        legacy.update(wave_summaries(pid,ctx))
+        return legacy
+    return combined_summaries
