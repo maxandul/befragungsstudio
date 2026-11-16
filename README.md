@@ -1,4 +1,4 @@
-# Befragungsstudio 0.1.13
+# Befragungsstudio 0.1.14
 
 Erste lokale Umsetzung für Befragungsdaten. Charts mit lokal mitgeliefertem Chart.js 4.4.8; Matplotlib wird nicht benötigt. Python 3.11 oder neuer mit Python
 Launcher unter Windows. Alle Oberflächendateien werden mitgeliefert.
@@ -318,3 +318,15 @@ Der Ausschluss erfolgt vor Berechnung und Mindestfallzahlprüfung. Er gilt für 
 Für Rücklaufquoten ist bei «Grundmengen» zusätzlich «Davon Leitungspersonen dieser OE (Kadertyp 100)» zu hinterlegen. Gezählt werden die eingeladenen eigenen Leitungspersonen, nicht die tatsächlich eingegangenen Leitungsantworten und nicht unterstellte Leitungen. Der Bericht zieht den bestätigten Anteil von der gespeicherten Grundmenge ab. `0` bedeutet, dass in der erfassten Grundmenge keine eigene Leitung enthalten ist; leer bedeutet unbekannt. Bei Exporten mit Kadertyp-Feld bleibt die Quote ohne bestätigten Leitungsanteil offen. Die bisherige Mitarbeitendenliste mit ausschliesslich OE-Kürzeln erlaubt keine automatische Bestimmung dieses Anteils. Bei einem Puls-Neustart werden diese Angaben nur für die zurückgesetzten Projekte entfernt.
 
 57 Tests bestanden. Neu geprüft sind eigene/unterstellte Leitungen, mehrere direkte Leitungen, Kadertyp 110, Freitext- und Fallzahlschutz, Vergleichswerte sowie ausdrücklich bestätigte Einladungszahlen unabhängig vom Rücklauf der Leitungspersonen. Das Update ergänzt eine Tabelle für Leitungsanteile automatisch; kein Neuimport nötig.
+
+## Optionale 95%-Konfidenzintervalle (Version 0.1.14)
+
+Im Bericht unter den Darstellungseinstellungen «95%-Konfidenzintervalle in den Einzelfragen anzeigen» einschalten. Der Schalter ist zunächst aus und betrifft ausschliesslich «Einzelfragen und Details», nicht die kompakten Themenübersichten. Im Zeitverlauf erhält die ausgewählte OE vertikale Fehlerbalken; die Vergleichslinien bleiben ohne Intervalle. Im aktuellen Einheitenvergleich erhält jede dargestellte Untereinheit horizontale Fehlerbalken. Tooltip und PNG-/ZIP-Export berücksichtigen Kennzahl, Intervallschalter und die sichtbaren Reihen. PNG-Dateien mit Intervallen tragen `_ci95` im Namen und nennen Methode und Modellhinweis.
+
+Mittelwerte: zweiseitiges punktweises 95%-t-Intervall mit n−1 Freiheitsgraden und Stichprobenstandardabweichung. Mindestens zwei gültige Antworten sind nötig. Zustimmungsanteile: zweiseitiges 95%-Wilson-Intervall für die konfigurierte Zustimmungsgrenze. Fehlende oder ungeklärte Antworten bleiben ausgeschlossen. Die bestehenden Leitungsausschlüsse und Mindestfallzahlen gelten unverändert. Rechnerische t-Grenzen ausserhalb der Skala werden nur im Diagramm abgeschnitten; im Tooltip bleiben sie vollständig. Bei identischen Antworten kann das t-Intervall rechnerisch die Breite null haben.
+
+Die Intervalle beruhen auf einem Modell unabhängiger Beobachtungen, nicht auf einer abgesicherten Zufallsauswahl aus der Belegschaft. Sie erfassen keine Verzerrung durch Nichtteilnahme. Bei einer angestrebten Vollerhebung dienen sie als optionale Analysehilfe; die Ergebnisse der Teilnehmenden sind deskriptiv bekannt. Es gibt keine Korrektur für endliche Grundmengen oder Mehrfachvergleiche. Überlappungen sind kein Signifikanztest. Für Zeit- und überlappende OE-Vergleiche wird keine Unabhängigkeit der verglichenen Gruppen behauptet.
+
+**Update:** App beenden, `instance` sichern, Programmdateien aktualisieren und einmal `INSTALL.bat` ausführen. Für die t-Verteilung wird neu SciPy installiert. Danach `START.bat` starten. Kein Neuimport und keine Datenbankänderung nötig.
+
+Validierung: 62 Tests bestanden, darunter numerische Referenzen, Grenzfälle, Ausschlüsse/Mindestfallzahlen, Schalter, Tooltips, Fehlerbalkenrichtung und PNG-Übernahme. Tatsächliche PNGs mit lokalen AFA-Daten gerendert und visuell geprüft; der vollständige Browser-Layouttest bleibt offen.

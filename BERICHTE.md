@@ -78,3 +78,15 @@ Die Leitung der jeweils dargestellten OE wird anhand von Kadertyp `100` und exak
 Die Grundmenge wird nicht anhand der beobachteten Leitungsantworten verändert. Unter Grundmengen kann stattdessen die Anzahl der darin enthaltenen eingeladenen eigenen Leitungspersonen bestätigt werden. Der Bericht zieht diese Zahl ab; unbekannte Anteile lassen die Rücklaufquote offen, wenn das Exportformat Kadertypen führt. Bereits ohne eigene Leitung erfasste Grundmengen werden mit Leitungsanteil `0` bestätigt. Einzelkorrekturen, Verschiebung und Löschung behandeln Grundmenge und Leitungsanteil gemeinsam; die Quelldaten bleiben erhalten.
 
 57 automatisierte Tests bestanden. Die redaktionellen Zusammenfassungen werden nicht automatisch umgeschrieben. Vollständige Browserprüfung weiterhin offen.
+
+## Konfidenzintervalle ab 0.1.14
+
+Die optionalen punktweisen 95%-Intervalle stehen standardmässig ausgeschaltet in «Einzelfragen und Details» zur Verfügung. Mittelwerte verwenden das t-Verfahren (`scipy.special.stdtrit`, Stichprobenvarianz mit n−1), Zustimmungsanteile Wilson mit z = Φ⁻¹(0.975). Beide verwenden ausschliesslich gültige Antworten nach der bestehenden Filterung. Ohne gültige Werte gibt es keine Grenzen; bei n=1 wird kein t-Intervall berechnet. Wilson bleibt auch bei 0 oder 100 Prozent nicht künstlich punktförmig. Bei konstanter Antwort ist das rechnerische t-Intervall punktförmig.
+
+Zeitverläufe zeigen ausschliesslich die Intervalle der ausgewählten OE, Einheitenvergleiche die Intervalle jeder dargestellten Untereinheit. Themenübersichten und Auswahlcharts bekommen keine zusätzlichen Intervalle. Sichtbare Intervalle werden in Einzel-PNGs und im ZIP übernommen; n und Grenzen stehen im Tooltip. Die festen Skalen bleiben erhalten; die Zeichnung wird an den Skalenrändern begrenzt, ohne die berechneten t-Grenzen zu ändern. Die PNG-Beschriftung nennt 95%-KI, Verfahren und einen Hinweis, dass Nichtteilnahme nicht abgebildet wird.
+
+Keine Korrektur für endliche Grundmengen oder Mehrfachvergleiche. Keine Signifikanzbehauptung aus Intervallüberlappungen. Keine Abbildung von Nonresponse-Bias und keine Aussage, dass wiederholte Wellen oder überlappende OE-Gruppen unabhängig seien. Für die angestrebte Vollerhebung ist dies eine optionale modellbasierte Vertiefung.
+
+Methodische Referenzen: [t-Intervall, NIST](https://www.itl.nist.gov/div898/handbook/eda/section3/eda352.htm), [Wilson, NIST](https://itl.nist.gov/div898/handbook/prc/section2/prc241.htm), [SciPy t-Quantile](https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.stdtrit.html).
+
+62 Tests bestanden, einschliesslich externer numerischer Referenzwerte, n=0/1, konstanter Antworten, Zustimmungsanteilen 0/100, abweichender Grenzen, vorhandener Leitungsausschlüsse, Fallzahlschutz, Tooltip, Zeichenrichtung und Exportzustand. PNGs mit AFA-Daten visuell geprüft. Für das Update ist einmal `INSTALL.bat` zum Ergänzen von SciPy nötig; keine Änderung am Datenbankschema.

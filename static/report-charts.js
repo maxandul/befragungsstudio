@@ -26,6 +26,7 @@
   const fmt = (v, digits = 1) => new Intl.NumberFormat('de-CH', {maximumFractionDigits: digits, minimumFractionDigits: digits}).format(v);
   const agreementLabel = row => row.minimum===1 && row.maximum===5 && (row.top_from ?? 4)===4
     ? 'Zustimmung: Antworten 4 und 5' : `Zustimmung: Antworten ab ${row.top_from ?? 4}`;
+  const intervalsEnabled = () => document.getElementById('show-ci')?.checked === true;
   function wrap(text, width) {
     const lines = []; let line = '';
     for (const word of String(text).split(/\s+/)) {
@@ -39,6 +40,25 @@
     const ctx = chart.ctx; ctx.save(); ctx.globalCompositeOperation = 'destination-over';
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, chart.width, chart.height); ctx.restore();
   }};
+  const confidenceIntervals = {id:'confidenceIntervals',afterDatasetsDraw(chart,args,options) {
+    if(!options.enabled || !chart.isDatasetVisible(0))return;
+    const ctx=chart.ctx, area=chart.chartArea, ds=chart.data.datasets[0];
+    const axis=options.horizontal ? chart.scales.x : chart.scales.y;
+    const cap=options.exporting ? 7 : 4;
+    ctx.save();ctx.beginPath();
+    if(options.horizontal)ctx.rect(area.left,area.top-cap,area.right-area.left,area.bottom-area.top+2*cap);
+    else ctx.rect(area.left-cap,area.top,area.right-area.left+2*cap,area.bottom-area.top);
+    ctx.clip();ctx.strokeStyle='#243746';ctx.lineWidth=options.exporting ? 3 : 1.5;
+    chart.getDatasetMeta(0).data.forEach((point,i)=>{
+      const ci=ds.ci95?.[i];
+      if(!ci || !ci.every(Number.isFinite) || ds.data[i]==null)return;
+      const low=axis.getPixelForValue(ci[0]), high=axis.getPixelForValue(ci[1]);
+      ctx.beginPath();
+      if(options.horizontal){ctx.moveTo(low,point.y);ctx.lineTo(high,point.y);ctx.moveTo(low,point.y-cap);ctx.lineTo(low,point.y+cap);ctx.moveTo(high,point.y-cap);ctx.lineTo(high,point.y+cap);}
+      else{ctx.moveTo(point.x,low);ctx.lineTo(point.x,high);ctx.moveTo(point.x-cap,low);ctx.lineTo(point.x+cap,low);ctx.moveTo(point.x-cap,high);ctx.lineTo(point.x+cap,high);}
+      ctx.stroke();
+    });ctx.restore();
+  }};
   const valueLabels = {id: 'valueLabels', afterDatasetsDraw(chart, args, options) {
     if (chart.isDatasetVisible && !chart.isDatasetVisible(0)) return;
     const ctx = chart.ctx, ds = chart.data.datasets[0]; ctx.save(); ctx.fillStyle = '#18394f';
@@ -46,8 +66,9 @@
     chart.getDatasetMeta(0).data.forEach((point, i) => {
       const entry = ds.data[i], v = entry && typeof entry === 'object' ? entry.x : entry; if (v == null) return;
       const text = fmt(v, options.percent ? 1 : 2) + (options.percent ? ' %' : '');
-      if (chart.config.type === 'line') {ctx.textAlign = 'center'; ctx.fillText(text, point.x, point.y - 22);}
-      else {ctx.textAlign = 'left';ctx.fillStyle=options.edge ? '#0070b4' : '#18394f';ctx.fillText(text, options.edge ? chart.chartArea.right+12 : point.x + 9, point.y);}
+      const ci=chart.options.plugins.confidenceIntervals?.enabled ? ds.ci95?.[i] : null;
+      if (chart.config.type === 'line') {ctx.textAlign = 'center';const y=ci ? Math.max(chart.chartArea.top+8,chart.scales.y.getPixelForValue(ci[1])-14) : point.y-22;ctx.fillText(text,point.x,y);}
+      else {ctx.textAlign = 'left';ctx.fillStyle=options.edge ? '#0070b4' : '#18394f';const x=ci ? Math.min(chart.chartArea.right,chart.scales.x.getPixelForValue(ci[1]))+9 : point.x+9;ctx.fillText(text, options.edge ? chart.chartArea.right+12 : x, point.y);}
     }); ctx.restore();
   }};
 
@@ -61,7 +82,9 @@
     const values = scale ? card.rows.map(r => top ? r.top2 : r.mean)
       : Object.values(latest.counts).map(n => 100 * n / latest.n);
     const children = view === 'children';
+    const showCI=scale && intervalsEnabled(), intervalKey=top ? 'top2_ci95' : 'mean_ci95';
     const datasets = [{id:'selected',label: scale ? payload.unit : 'Anteil (%)',
+        ci95:(children ? card.children : card.rows).map(r=>r[intervalKey] || null),
         ns:children ? card.children.map(r=>r.n) : card.rows.map(r=>r.n),
         data: children ? card.children.map(r => top ? r.top2 : r.mean) : values,
         borderColor:'#0070b4',backgroundColor:'#0070b4',borderWidth:3,
@@ -78,7 +101,7 @@
     return {
       type: scale && !children ? 'line' : 'bar',
       data: {labels:chartLabels,datasets},
-      plugins: [whiteBackground, valueLabels],
+      plugins: [whiteBackground, confidenceIntervals, valueLabels],
       options: {
         indexAxis: scale && !children ? 'x' : 'y', responsive: !exporting, maintainAspectRatio: false,
         animation: false, devicePixelRatio: exporting ? 1 : Math.min(window.devicePixelRatio || 1, 2),
@@ -87,10 +110,16 @@
           legend: {display: datasets.length>1,labels:{font:{size:fontSize}}},
           title: {display: exporting, text: [...(exporting ? [payload.project + ' · ' + payload.unit] : []),...wrap(card.wording || card.label, small ? 43 : (exporting ? 82 : 75))], color: '#172c3b',
             font: {family: 'Arial, sans-serif', size: exporting ? (small ? 27 : 32) : 19, weight: 'bold'}, padding: {bottom: exporting ? 30 : 20}},
-          subtitle: {display: exporting || !scale, text: scale ? (top ? agreementLabel(latest)+' · gültige Antworten' : `Mittelwert · Skala ${latest.minimum}–${latest.maximum}`) + (children ? ` · ${latest.wave}` : '')
-            : `${latest.wave} · n=${latest.n}` + (latest.type === 'choice_multiple' ? ' · Mehrfachnennungen möglich' : ''),
+          subtitle: {display: exporting || !scale || showCI, text: wrap((scale ? (top ? agreementLabel(latest)+' · gültige Antworten' : `Mittelwert · Skala ${latest.minimum}–${latest.maximum}`) + (children ? ` · ${latest.wave}` : '')
+            : `${latest.wave} · n=${latest.n}` + (latest.type === 'choice_multiple' ? ' · Mehrfachnennungen möglich' : '')) + (showCI ? ` · 95%-KI (${top ? 'Wilson' : 't'})${children ? ' je Einheit' : ' der ausgewählten OE'}` : ''),small ? 48 : 100).concat(showCI && exporting ? wrap('Modellbasiert; Nichtteilnahme nicht abgebildet.',small ? 48 : 100) : []),
             font: {family: 'Arial, sans-serif', size: fontSize}, color: '#607381', padding: {bottom: 35}},
-          tooltip: {enabled: !exporting,callbacks:{label:ctx=>`${ctx.dataset.label}: ${fmt(scale && !children ? ctx.parsed.y : ctx.parsed.x,top ? 1 : 2)}${top ? ' %' : ''} · n=${ctx.dataset.ns?.[ctx.dataIndex] ?? latest.n}`}}, valueLabels: {fontSize, percent: !scale || top}
+          confidenceIntervals:{enabled:showCI,horizontal:children,exporting},
+          tooltip: {enabled: !exporting,callbacks:{label:ctx=>{
+            const label=`${ctx.dataset.label}: ${fmt(scale && !children ? ctx.parsed.y : ctx.parsed.x,top ? 1 : 2)}${top || !scale ? ' %' : ''} · n=${ctx.dataset.ns?.[ctx.dataIndex] ?? latest.n}`;
+            if(!showCI || ctx.datasetIndex!==0)return label;
+            const ci=ctx.dataset.ci95?.[ctx.dataIndex];
+            return [label,ci ? `95%-KI: ${fmt(ci[0],top ? 1 : 2)}–${fmt(ci[1],top ? 1 : 2)}${top ? ' %' : ''}` : '95%-KI nicht berechenbar'];
+          }}}, valueLabels: {fontSize, percent: !scale || top}
         },
         scales: {
           x: {min: children ? (top ? 0 : latest.minimum) : (scale ? undefined : 0), max: children ? (top ? 100 : latest.maximum) : (scale ? undefined : 100),
@@ -203,7 +232,8 @@
   function filename(index, layout, view = 'history') {
     const metric = metricFor(index);
     const label = payload.cards[index].label.replace(/[^a-zA-Z0-9äöüÄÖÜ_-]+/g, '_').slice(0, 70);
-    return `${String(index + 1).padStart(2, '0')}_${label}_${metric}_${layout}_${view}.png`;
+    const ci=intervalsEnabled() && payload.cards[index].rows[0].type==='scale' ? '_ci95' : '';
+    return `${String(index + 1).padStart(2, '0')}_${label}_${metric}_${layout}_${view}${ci}.png`;
   }
   function download(blob, name) {
     const url = URL.createObjectURL(blob), link = document.createElement('a');
@@ -277,6 +307,10 @@
       payload.cards.forEach((card, i) => {draw(i); document.getElementById(`metric-${i}`)?.addEventListener('change', () => draw(i));});
       drawOverviews();
       for (const id of ['report-metric','show-comparisons','show-parent','show-total']) document.getElementById(id)?.addEventListener('change',()=>{payload.cards.forEach((card,i)=>draw(i));drawOverviews();});
+      document.getElementById('show-ci')?.addEventListener('change',()=>{
+        payload.cards.forEach((card,i)=>draw(i));
+        const note=document.getElementById('ci-note');if(note)note.hidden=!intervalsEnabled();
+      });
       document.querySelectorAll('[data-topic]').forEach(button=>button.addEventListener('click',async()=>{
         button.disabled=true;
         try {const i=Number(button.dataset.topic),view=button.dataset.topicView;download(await topicPng(i,view),topicFilename(i,view));status.textContent='Themen-PNG erstellt.';}
