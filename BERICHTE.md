@@ -104,3 +104,17 @@ Jede Fassung gilt ausschliesslich für den exportierten OE-Umfang und die Bezugs
 Veraltete Datenstände, fehlende Freigaben oder eine unterschrittene Mindestfallzahl
 verhindern die Ausgabe. Originalkennungen und interne Quellenlisten werden nicht
 in den HTML-Bericht eingebettet. Anleitung und Grenzen siehe README 0.1.15.
+
+
+## Wiederverwendung der Wellenaufbereitung ab 0.1.16
+
+Formatversion 2 speichert Einzelaussagen mit genau einer Quellantwort. Eine vollständige
+und freigegebene Wellenaufbereitung gilt für alle OEs. Die App filtert die Quellen mit
+dem aktuellen Berichtspfad, Leitungsausschluss und Mindestfallzahl, bevor sie Themen
+und identische Aussagen gruppiert. Aussagen anderer OEs werden nicht übernommen.
+Die Themenübersicht zeigt je Thema drei Aussagen und weitere aufklappbar, um auch
+umfangreiche Wellen lesbar zu halten. Es wird keine narrative GL-Synthese automatisch
+generiert. Themenbezeichnungen können im Wellenauftrag vereinheitlicht werden.
+Unvollständige oder veraltete Wellenaufträge liefern keine Berichtsinhalte. Bestehende
+OE-Aufträge aus Version 1 bleiben kompatibel; eine aktuelle freigegebene Wellenfassung
+hat pro Frage Vorrang. Einzelheiten zum paketweisen Ablauf und zu KI-Grenzen im README.
