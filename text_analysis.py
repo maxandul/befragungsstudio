@@ -119,9 +119,9 @@ def validate_result(value, exported):
     return dict(version=VERSION,auftrag=value['auftrag'],fragen=normalized)
 
 
-def load_json(raw):
-    if len(raw)>10*1024*1024:
-        raise ValueError('Die Ergebnisdatei darf höchstens 10 MB gross sein.')
+def load_json(raw, max_bytes=10*1024*1024):
+    if len(raw)>max_bytes:
+        raise ValueError(f'Die Ergebnisdatei darf höchstens {max_bytes//(1024*1024)} MB gross sein.')
     def unique(pairs):
         result={}
         for key,value in pairs:

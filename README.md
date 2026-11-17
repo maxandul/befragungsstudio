@@ -1,4 +1,4 @@
-# Befragungsstudio 0.1.19
+# Befragungsstudio 0.1.20
 
 Erste lokale Umsetzung für Befragungsdaten. Charts mit lokal mitgeliefertem Chart.js 4.4.8; Matplotlib wird nicht benötigt. Python 3.11 oder neuer mit Python
 Launcher unter Windows. Alle Oberflächendateien werden mitgeliefert.
@@ -605,3 +605,78 @@ Automatisierte Integrationstests prüfen den aktualisierten Prompt in beiden Dow
 unveränderte Exportdaten und Kennungen sowie die Importierbarkeit des unveränderten
 Rückgabeformats. Die tatsächliche inhaltliche Qualität muss mit der KI der Wahl anhand
 echter Antworten geprüft werden; ein Modellaufruf ist nicht Bestandteil dieser Änderung.
+
+
+## Gesamtauftrag: Kürzen, Verdichten und Kernaussagen vorschlagen (Version 0.1.20)
+
+Der empfohlene Ablauf arbeitet mit einem Gesamtauftrag pro Welle. Im Wellenauftrag
+**«Gesamtauftrag exportieren und verdichtetes Ergebnis importieren»** öffnen.
+
+1. Die Frage- und Antworttexte aller Teilpakete wie bisher auf Personenbezüge prüfen,
+   bereinigen und ihre Exportfassungen festhalten. Ohne vollständige Exportprüfung wird
+   kein angeblich vollständiges Gesamtpaket erzeugt. Der alte Teilpaketweg bleibt erhalten.
+2. Den **Gesamtauftrag** als ZIP herunterladen. Er enthält alle ausgewählten Texte mit
+   Fragekontext in technischen Teilpaketen, ein vollständiges `manifest.json`, den
+   Gesamt-`standardprompt.txt`, den bisherigen `teilprompt.txt` und eine
+   `gesamt_ergebnis_vorlage.json`. Bereits vorhandene Teilergebnisse können als separate
+   Zwischenstände mitgeliefert werden. Es werden keine lokalen OE-/Personenzuordnungen
+   oder unbereinigten Originaltexte beigefügt.
+3. Das ZIP in der KI der Wahl verarbeiten. Der Gesamtprompt fordert zunächst die
+   vollständige paketweise Kürzung und anschliessend eine fragebezogene Verdichtung
+   über **alle** Teile. Gleichbedeutende Aussagen werden Anliegen zugeordnet, Gegensätze
+   und Einzelhinweise erhalten. Kernaussagen werden mit Begründung vorgeschlagen.
+   Bei begrenztem Modellkontext Zwischenergebnisse speichern und die Verarbeitung
+   fortsetzen. Eine unvollständige Welle darf nicht als vollständig ausgegeben werden.
+4. Eine `gesamt_ergebnis.json` importieren. Das äussere Format ist Version 3 mit genau
+   `version`, `auftrag`, `teile`, `anliegen`. `teile` enthält alle inneren Version-2-
+   Rückgaben. Jedes Anliegen enthält `id`, `frage`, `thema`, `aussage`, `art`,
+   `prioritaet`, `begruendung`, `quellen`. Eine Quelle bezeichnet `teil`, `antwort`
+   und `aussage` (Position der Einzelaussage in der Antwortliste, beginnend bei 1).
+   Die Formate und Regeln sind im Gesamtprompt konkret beschrieben.
+5. Die App prüft vor jeder Änderung alle Teile, alle Antwortkennungen und jede
+   Anliegenquelle. Jede auswertbare Einzelaussage muss genau einem Anliegen derselben
+   Frage zugeordnet sein. Nicht auswertbare Antworten benötigen weiterhin einen Grund.
+   Fehlende Teile/Antworten/Zuordnungen, doppelte Quellen und fremde Fragen werden
+   abgewiesen. Es wird nichts teilweise überschrieben. Die Gesamtdatei darf höchstens
+   50 MB gross sein; die bestehende HTTP-Grenze von 60 MB gilt weiterhin.
+6. Die verdichteten Vorschläge in der Gesamtauswertung prüfen. Pro Anliegen werden
+   Begründung, automatisch berechnete Nennungen und bis zu fünf Quellen zum Vergleich
+   gezeigt; weitere Quellen und Bearbeitung stehen unter «Anliegen bearbeiten» bereit.
+   Begründet nicht ausgewertete Antworten sind mit Original und Begründung separat
+   seitenweise prüfbar, damit inhaltliche Auslassungen erkannt werden können.
+   Die Übersicht ist mit 50 Anliegen je Seite begrenzt. Bezeichnungen, Aussagen,
+   Vorschlagsart, Reihenfolge und Begründung können vor der Gesamtfreigabe redigiert
+   werden. Die technische Quellenprüfung ersetzt keine inhaltliche Prüfung.
+7. **«Gesamte Welle für Berichte freigeben»** bestätigt nach inhaltlicher Prüfung die
+   komplette Auswertung gemeinsam. Es ist keine separate Freigabe jedes Teilpakets
+   erforderlich. Die Bestätigung umfasst alle Seiten, nicht nur die angezeigten Anliegen.
+   Bis dahin werden auch einzeln freigegebene Teile einer importierten Gesamtauswertung
+   nicht als vollständig geprüfte Welle ausgegeben. Rücknahme oder spätere Bearbeitung
+   eines Teilpakets setzt die Gesamtfreigabe wieder auf «Prüfung».
+
+**Quantifizierung:** Die KI liefert Quellen, keine geschätzten Zahlen. Die App zählt
+unterschiedliche Textantwortende je Anliegen und Frage höchstens einmal. In der
+Gesamtprüfung ist der Nenner die komplette exportierte Wellenbasis dieser Frage,
+einschliesslich begründet nicht ausgewerteter Textantworten und vor OE-/Leitungsfilterung.
+Im Bericht werden zuerst Quellen und Nuancen nach dem gewählten OE-Pfad sowie eigenem
+Leitungsausschluss gefiltert; Zähler und Nenner beziehen sich dann auf diese Textantwortenden.
+Die Anzeige lautet z.B. «8 von 23 Textantwortenden dieser Frage». Mehrere Anliegen pro
+Person sind möglich. Das sind keine Anteile aller Mitarbeitenden und kein repräsentatives
+Meinungsbild. Ein CSV-Download der Prüftabelle ergänzt JSON um Nennungszahlen und Anteile
+auf der globalen Wellenbasis; UTF-8 mit BOM und Semikolon für Excel. CSV ist eine Prüfansicht,
+kein zweites Importformat. Quellen-/Originalkennungen werden in der CSV nicht ausgegeben.
+
+**Ersetzen und Wiederholen:** Eine identische Gesamtrückgabe kann ohne Überschreiben
+redaktioneller Änderungen erneut hochgeladen werden. Eine abweichende Rückgabe ersetzt
+vorhandene Ergebnisse, Anliegen und Freigaben nur nach ausdrücklicher Bestätigung. Auch
+parallele Änderungen zwischen Anzeige und Speichern werden erkannt. Originalantworten,
+Exportbereinigung und Paketkennungen bleiben erhalten. Veraltete Datenstände blockieren
+Export, Gesamtimport und Freigabe. Bestehende Version-2-Einzelimporte bleiben kompatibel.
+
+Der Gesamtprompt ersetzt die manuelle Erstbündelung durch KI-Vorschläge; die endgültige
+Prüfung bleibt beim Anwender. Die redaktionelle narrative GL-Gesamtsynthese unter
+«Erkenntnisse auf einen Blick» wird weiterhin nicht automatisch erstellt. Es gibt keine
+Modell-API-Aufrufe. Automatisierte Tests prüfen Gesamtexport, Manifest, atomaren Import,
+Vollständigkeit, Quellenabgrenzung, gemeinsame Freigabe, sichere Wiederholung, redaktionelles
+Ersetzen, lokale Häufigkeiten und 10'000 synthetische Antworten. Ein echter KI-Durchlauf
+mit dem neuen Gesamtprompt und die visuelle Browserprüfung stehen noch aus.

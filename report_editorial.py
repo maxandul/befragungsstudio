@@ -89,6 +89,8 @@ def register(app,db,project,job_for,is_current):
         index,concerns=load(jid)
         with db() as c:
             ready=c.execute("SELECT COUNT(*) FROM wave_text_parts WHERE job=? AND state!='approved'",(jid,)).fetchone()[0]==0
+            synthesis_pending=c.execute("SELECT 1 FROM wave_syntheses WHERE job=? AND state='imported'",(jid,)).fetchone() is not None
+            ready=ready or synthesis_pending
         canonical=request.args.get('question','')
         questions={s['canonical']:s['label'] for s in index.values()}
         canonical=canonical or next(iter(questions),'')
@@ -120,10 +122,11 @@ def register(app,db,project,job_for,is_current):
                     if ref not in (json.loads(existing['sources']) if existing else {}) and request.form.get('hash_'+ref)!=index[ref]['hash']:
                         raise ValueError('Eine ausgewählte Aussage wurde geändert. Bitte neu laden.')
                 topic=request.form.get('topic','').strip();body=request.form.get('body','').strip()
+                rationale=request.form.get('rationale',existing.get('rationale','') if existing else '').strip()
                 kind=request.form.get('kind','normal')
                 try:order=int(request.form.get('order','100'))
                 except ValueError:raise ValueError('Die Reihenfolge muss eine ganze Zahl sein.') from None
-                if not topic or len(topic)>160 or not body or len(body)>4000 or kind not in KINDS or not 0<=order<=10000:
+                if not topic or len(topic)>160 or not body or len(body)>4000 or kind not in KINDS or not 0<=order<=10000 or len(rationale)>2000:
                     raise ValueError('Bitte Thema, Formulierung, Darstellung und Reihenfolge prüfen.')
                 sources=json.dumps({ref:index[ref]['hash'] for ref in sorted(refs)})
                 with db() as c:
@@ -131,18 +134,18 @@ def register(app,db,project,job_for,is_current):
                     c.execute('BEGIN IMMEDIATE')
                     parts=[dict(r) for r in c.execute('SELECT * FROM wave_text_parts WHERE job=?',(jid,))]
                     fresh=statement_index(parts)
-                    if any(p['state']!='approved' for p in parts) or any(ref not in fresh or fresh[ref]['hash']!=index[ref]['hash'] for ref in refs):
+                    if (not synthesis_pending and any(p['state']!='approved' for p in parts)) or any(ref not in fresh or fresh[ref]['hash']!=index[ref]['hash'] for ref in refs):
                         raise ValueError('Quellen oder Freigaben wurden inzwischen geändert. Bitte neu laden.')
                     latest=[dict(r) for r in c.execute('SELECT * FROM text_concerns WHERE job=?',(jid,))]
                     used={ref for other in latest if other['id']!=cid and valid_concern(other,index) for ref in json.loads(other['sources'])}
                     if refs & used:raise ValueError('Eine Quelle wurde inzwischen einem anderen Anliegen zugeordnet. Bitte neu laden.')
                     if existing:
-                        cursor=c.execute('UPDATE text_concerns SET topic=?,body=?,kind=?,sort_order=?,sources=?,revision=revision+1 WHERE id=? AND job=? AND revision=?',
-                                         (topic,body,kind,order,sources,cid,jid,existing['revision']))
+                        cursor=c.execute('UPDATE text_concerns SET topic=?,body=?,kind=?,sort_order=?,sources=?,rationale=?,revision=revision+1 WHERE id=? AND job=? AND revision=?',
+                                         (topic,body,kind,order,sources,rationale,cid,jid,existing['revision']))
                         if cursor.rowcount!=1:raise ValueError('Das Anliegen wurde inzwischen geändert. Bitte neu laden.')
                     else:
-                        c.execute('INSERT INTO text_concerns(id,job,canonical,topic,body,kind,sort_order,sources) VALUES(?,?,?,?,?,?,?,?)',
-                                  (secrets.token_hex(16),jid,canonical,topic,body,kind,order,sources))
+                        c.execute('INSERT INTO text_concerns(id,job,canonical,topic,body,kind,sort_order,sources,rationale) VALUES(?,?,?,?,?,?,?,?,?)',
+                                  (secrets.token_hex(16),jid,canonical,topic,body,kind,order,sources,rationale))
                 flash('Anliegen für diese Welle gespeichert. Die Quellen werden pro OE gefiltert.')
             else:raise ValueError('Unbekannte Aktion.')
             return redirect(url_for('text_concerns',pid=pid,jid=jid,question=canonical))
@@ -155,7 +158,7 @@ def register(app,db,project,job_for,is_current):
         occupied={ref:c['id'] for c in concerns if valid_concern(c,index) for ref in json.loads(c['sources'])}
         items=[dict(c,valid=valid_concern(c,index),references=[index[ref] for ref in json.loads(c['sources']) if ref in index])
                for c in concerns if c['canonical']==canonical]
-        options=[{key:c[key] for key in ('id','revision','topic','body','kind','sort_order')} for c in items if c['valid']]
+        options=[{key:c[key] for key in ('id','revision','topic','body','kind','sort_order','rationale')} for c in items if c['valid']]
         try:concern_page=max(1,int(request.args.get('concern_page','1')))
         except ValueError:raise ValueError('Ungültige Anliegenseite.') from None
         concern_pages=max(1,(len(items)+49)//50);concern_page=min(concern_page,concern_pages)
