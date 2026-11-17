@@ -1,4 +1,4 @@
-# Befragungsstudio 0.1.18
+# Befragungsstudio 0.1.19
 
 Erste lokale Umsetzung für Befragungsdaten. Charts mit lokal mitgeliefertem Chart.js 4.4.8; Matplotlib wird nicht benötigt. Python 3.11 oder neuer mit Python
 Launcher unter Windows. Alle Oberflächendateien werden mitgeliefert.
@@ -576,3 +576,32 @@ Tests prüfen alle Antwortgrenzen, Vorrang der Zeichengrenze, vollständige Abde
 Fragentrennung, Export- und Importdurchlauf mit 150 Antworten sowie Migration und
 unveränderte Paketkennungen bestehender Aufträge. Die vorangegangenen Last- und
 Berichtstests bleiben erhalten.
+
+
+## Konkrete Themen und verständliche Aussagen (Version 0.1.19)
+
+Der Standardprompt für die Wellenaufbereitung verlangt jetzt inhaltliche Überschriften:
+Gegenstand plus konkrete Erfahrung, Anliegen oder offene Frage. Ein Etikett wie
+«Strategiekommunikation» reicht nicht; bei entsprechendem Quellinhalt wäre beispielsweise
+«Bezug der Strategie zur eigenen Arbeit unklar» geeignet. Eigenständig verständliche
+Einzelaussagen konkretisieren diese Überschrift. Unterschiedliche Anliegen zur selben
+Sache und positive/abweichende Erfahrungen bleiben getrennt erhalten.
+
+Die Anleitung unterscheidet ausdrücklich zwischen Beobachtung, Frage und Wunsch:
+Verständnisprobleme dürfen nicht als Ablehnung, offene Fragen nicht als Forderung und
+positive Erfahrungen nicht als Verbesserungsbedarf umgedeutet werden. Bezüge kurzer
+Antworten dürfen nur bei eindeutigem Fragekontext aufgelöst werden. Allgemeine Quellen
+bleiben allgemein, statt mit erfundenen Details präziser zu erscheinen. Stilbeispiele
+sind ausdrücklich keine zusätzlichen Auswertungsdaten. Die zulässigen JSON-Felder,
+Quellenkennungen, Formatversion 2 und Grössenbegrenzungen bleiben unverändert.
+
+Der neue Prompt wird bei erneutem Download von Einzel- oder Sammelpaketen mitgeliefert,
+auch bei bereits festgehaltenen Exporten. Dazu ist kein neuer Wellenauftrag nötig:
+Daten, Kennungen und bestehende Ergebnisse werden nicht automatisch verändert. Für
+bereits importierte Ergebnisse gelten weiterhin die ausdrücklichen Prüf-/Ersetzungsregeln.
+Bereits heruntergeladene lokale ZIP-Dateien aktualisieren sich nicht selbst.
+
+Automatisierte Integrationstests prüfen den aktualisierten Prompt in beiden Downloadwegen,
+unveränderte Exportdaten und Kennungen sowie die Importierbarkeit des unveränderten
+Rückgabeformats. Die tatsächliche inhaltliche Qualität muss mit der KI der Wahl anhand
+echter Antworten geprüft werden; ein Modellaufruf ist nicht Bestandteil dieser Änderung.
