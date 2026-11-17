@@ -20,6 +20,8 @@ def register(app,db,project,report_data,result_sources):
           state TEXT NOT NULL DEFAULT 'draft',records TEXT NOT NULL,exported TEXT,result TEXT,
           revision INTEGER NOT NULL DEFAULT 0,UNIQUE(job,position));
         CREATE INDEX IF NOT EXISTS wave_parts_job ON wave_text_parts(job,position);''')
+        if 'batch_size' not in [r[1] for r in c.execute('PRAGMA table_info(wave_text_jobs)')]:
+            c.execute("ALTER TABLE wave_text_jobs ADD COLUMN batch_size TEXT NOT NULL DEFAULT 'small'")
 
     def job_for(pid,jid):
         project(pid)
@@ -72,11 +74,13 @@ def register(app,db,project,report_data,result_sources):
               SUM(p.state='approved') approved,SUM(p.count) answers FROM wave_text_jobs j
               JOIN wave_text_parts p ON p.job=j.id WHERE j.project=? GROUP BY j.id ORDER BY j.rowid DESC''',(pid,))]
             legacy=[dict(r) for r in c.execute('SELECT id,wave,state FROM text_jobs WHERE project=? ORDER BY rowid DESC',(pid,))]
-        return render_template('wave_texts.html',**ctx,questions=list(counts.values()),jobs=jobs,legacy=legacy,tab='texts')
+        return render_template('wave_texts.html',**ctx,questions=list(counts.values()),jobs=jobs,legacy=legacy,batch_sizes=wa.BATCH_SIZES,tab='texts')
 
     @app.post('/p/<int:pid>/wave-texts')
     def wave_text_create(pid):
         ctx=wave_context(pid)
+        batch_size=request.form.get('batch_size','standard')
+        wa.batch_limits(batch_size)
         all_records=wa.contextual_records(result_sources(pid),wave=ctx['reference_wave'],exclude_leaders=False)
         selected=set(request.form.getlist('question'))
         available={r['canonical'] for r in all_records}
@@ -88,9 +92,9 @@ def register(app,db,project,report_data,result_sources):
         draft=ta.make_draft(records)
         qids={canonical:secrets.token_hex(12) for canonical in selected}
         with db() as c:
-            c.execute('INSERT INTO wave_text_jobs(id,project,wave,selection,fingerprint) VALUES(?,?,?,?,?)',
-                      (jid,pid,ctx['reference_wave'],json.dumps(selection),ta.digest(records)))
-            for i,(canonical,items) in enumerate(wa.batches(draft),1):
+            c.execute('INSERT INTO wave_text_jobs(id,project,wave,selection,fingerprint,batch_size) VALUES(?,?,?,?,?,?)',
+                      (jid,pid,ctx['reference_wave'],json.dumps(selection),ta.digest(records),batch_size))
+            for i,(canonical,items) in enumerate(wa.batches(draft,batch_size),1):
                 c.execute('''INSERT INTO wave_text_parts(id,job,position,canonical,question_id,wording,label,count,records)
                   VALUES(?,?,?,?,?,?,?,?,?)''',(secrets.token_hex(16),jid,i,canonical,qids[canonical],
                   items[0]['wording'],items[0]['label'],len(items),json.dumps(items)))
@@ -145,7 +149,7 @@ def register(app,db,project,report_data,result_sources):
             else:raise ValueError('Unbekannte Aktion.')
             return redirect(url_for('wave_text_job',pid=pid,jid=jid))
         return render_template('wave_text_job.html',p=project(pid),job=job,parts=parts,stale=stale,
-                               topics=topics,topics_hash=ta.digest(topics),aliases=aliases,tab='texts')
+                               topics=topics,topics_hash=ta.digest(topics),aliases=aliases,batch_label=wa.BATCH_SIZES[job['batch_size']][0],tab='texts')
 
     @app.route('/p/<int:pid>/wave-texts/<jid>/<bid>',methods=['GET','POST'])
     def wave_text_part(pid,jid,bid):
@@ -165,7 +169,7 @@ def register(app,db,project,report_data,result_sources):
                 values=dict(records=json.dumps(items),wording=wording)
                 if action=='export':
                     if request.form.get('privacy_checked')!='on':raise ValueError('Bitte die Prüfung auf Personenbezüge bestätigen.')
-                    data,_=wa.package(jid,bid,part['question_id'],wording,items)
+                    data,_=wa.package(jid,bid,part['question_id'],wording,items,job['batch_size'])
                     values.update(state='exported',exported=json.dumps(data))
             elif action=='replace' and part['state']=='imported':
                 upload=request.files.get('file')

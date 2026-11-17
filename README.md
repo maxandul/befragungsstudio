@@ -1,4 +1,4 @@
-# Befragungsstudio 0.1.17
+# Befragungsstudio 0.1.18
 
 Erste lokale Umsetzung für Befragungsdaten. Charts mit lokal mitgeliefertem Chart.js 4.4.8; Matplotlib wird nicht benötigt. Python 3.11 oder neuer mit Python
 Launcher unter Windows. Alle Oberflächendateien werden mitgeliefert.
@@ -539,3 +539,40 @@ OE-gebundene Gesamtsynthese, Vorlagen, getrennte Drucktexte und OE-Berichtspaket
 Projektion von 10'000 Einzelaussagen auf einen begrenzten Quellumfang ohne fremde Nuancen.
 Die bestehenden Wellen-/Teilpaket-Lasttests bleiben erhalten. Kein neuer Paketbedarf.
 Eine visuelle Prüfung des Browserdrucks und ein realer AFA-Durchlauf stehen noch aus.
+
+
+## Wählbare Paketgrössen (Version 0.1.18)
+
+Beim Erstellen eines neuen Wellenauftrags kann die Paketgrösse gewählt werden:
+
+| Auswahl | Höchstens Antworten | Richtgrenze Antwortdaten (Zeichen) |
+| --- | ---: | ---: |
+| Klein | 50 | 24'000 |
+| **Standard (Voreinstellung)** | **150** | **60'000** |
+| Gross | 250 | 100'000 |
+
+Die zuerst erreichte Grenze bestimmt die Aufteilung; Fragen werden weiterhin getrennt
+gehalten. Die Zeichenzählung berücksichtigt die JSON-Antworteinträge einschliesslich
+Kennungen. Fragetext und Auftragsmetadaten haben zusätzlich bis zu 4'000 Zeichen Platz
+in der kompakten JSON-Darstellung. Die eingerückten Download-Dateien sind durch die
+Formatierung grösser. Kein Inhalt wird still abgeschnitten. Eine aussergewöhnlich lange
+Einzelantwort muss bei Bedarf vor der Freigabe manuell bereinigt/gekürzt werden.
+
+Die gewählte Grösse wird mit dem Auftrag gespeichert und beim Festhalten der Exporttexte
+auch auf Antwortzahl und Textumfang geprüft. Änderungen bei der Bereinigung können daher
+nicht unbemerkt über die gewählte Exportgrenze hinauswachsen. Die KI-Rückgabe wird wie
+bisher auf vollständige Quellenabdeckung geprüft; grössere Pakete garantieren nicht,
+dass die gewählte KI sämtliche Ausgaben in einem Schritt liefert. Zunächst ein grösseres
+Paket auf vollständige Rückgabe prüfen und bei Bedarf «Klein» verwenden.
+
+**Bestehende Aufträge behalten ihre Teilpakete, Kennungen und Fortschritte unverändert.**
+Sie werden beim Update als «Klein» eingestuft. Für weniger Pakete einen neuen Auftrag
+mit «Standard» oder «Gross» erstellen; es erfolgt keine automatische Neupartitionierung
+oder Übertragung bereits zurückgegebener Ergebnisse auf neue Kennungen. JSON-Formatversion 2
+bleibt unverändert. Neue Aufträge ohne explizite Grössenauswahl verwenden «Standard».
+Keine neuen Python-Pakete erforderlich; die Datenbankergänzung erfolgt beim App-Start.
+
+Tests prüfen alle Antwortgrenzen, Vorrang der Zeichengrenze, vollständige Abdeckung,
+Fragentrennung, Export- und Importdurchlauf mit 150 Antworten sowie Migration und
+unveränderte Paketkennungen bestehender Aufträge. Die vorangegangenen Last- und
+Berichtstests bleiben erhalten.
