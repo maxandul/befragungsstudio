@@ -100,7 +100,7 @@ def register(app,db,project,report_data,result_sources):
                 c.execute('''INSERT INTO wave_text_parts(id,job,position,canonical,question_id,wording,label,count,records)
                   VALUES(?,?,?,?,?,?,?,?,?)''',(secrets.token_hex(16),jid,i,canonical,qids[canonical],
                   items[0]['wording'],items[0]['label'],len(items),json.dumps(items)))
-        return redirect(url_for('wave_text_job',pid=pid,jid=jid))
+        return redirect(url_for('synthesis_review' if request.form.get('workflow')=='fast' else 'wave_text_job',pid=pid,jid=jid))
 
     @app.route('/p/<int:pid>/wave-texts/<jid>',methods=['GET','POST'])
     def wave_text_job(pid,jid):

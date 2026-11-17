@@ -42,7 +42,7 @@ class SynthesisTests(unittest.TestCase):
             return dict(row) if row else None
 
     def upload(self,url,value,**kw):
-        return self.post(url+'/synthesis',action='import',revision=str(self.synth()['revision'] if self.synth() else 0),
+        return self.post(url+'/synthesis',action=kw.pop('action','import'),revision=str(self.synth()['revision'] if self.synth() else 0),
                          file=(io.BytesIO(json.dumps(value).encode()),'gesamt_ergebnis.json'),**kw)
 
     def approve(self,url):
@@ -171,6 +171,75 @@ class SynthesisTests(unittest.TestCase):
         self.assertIn('Geprüfter Vorschlag',self.client.get('/p/1/report?'+self.query+'&profile=gl').text)
 
 
+    def test_new_wave_opens_fast_workflow(self):
+        response=self.post('/p/1/wave-texts?'+self.query,question=['q','t'],workflow='fast')
+        self.assertEqual(response.status_code,302)
+        self.assertTrue(response.location.endswith('/synthesis'))
+        html=self.client.get(response.location).text
+        self.assertIn('Gesamtpaket mit Prompt herunterladen',html)
+        self.assertIn('Importieren und für alle Berichte verwenden',html)
+        self.assertNotIn('müssen alle Exporttexte',html)
+
+    def test_fast_export_import_ready_without_individual_reviews(self):
+        job,url=self.make_wave()
+        response=self.post(url+'/overall-download')
+        self.assertEqual(response.status_code,200)
+        self.assertTrue(all(p['state']=='exported' for p in self.parts()))
+        with zipfile.ZipFile(io.BytesIO(response.data)) as z:
+            manifest=json.loads(z.read('manifest.json'));results=[];concerns={}
+            for item in manifest['teile']:
+                data=json.loads(z.read(item['datei']))
+                for a in data['antworten']:
+                    self.assertNotIn('mail@example.org',a['text'])
+                self.assertNotIn('feedback',data)
+                result=dict(version=2,auftrag=job['id'],teil=data['teil'],frage=data['frage']['id'],antworten=[])
+                c=concerns.setdefault(result['frage'],dict(id='C'+str(len(concerns)),frage=result['frage'],
+                    thema='Konkrete Arbeitsabläufe',aussage='Gemeinsames Anliegen',art='key',prioritaet=10,
+                    begruendung='Wiederkehrender Inhalt',quellen=[]))
+                for a in data['antworten']:
+                    result['antworten'].append(dict(id=a['id'],aussagen=[dict(thema=c['thema'],aussage='Gemeinsames Anliegen')],grund=''))
+                    c['quellen'].append(dict(teil=result['teil'],antwort=a['id'],aussage=1))
+                results.append(result)
+        value=dict(version=3,auftrag=job['id'],teile=results,anliegen=list(concerns.values()))
+        bad=copy.deepcopy(value);bad['teile'].pop()
+        self.assertEqual(self.upload(url,bad,action='import_use').status_code,400)
+        self.assertIsNone(self.synth())
+        self.assertEqual(self.upload(url,value,action='import_use').status_code,302)
+        self.assertEqual(self.synth()['state'],'approved')
+        self.assertTrue(all(p['state']=='approved' for p in self.parts()))
+        html=self.client.get(url+'/synthesis').text
+        self.assertIn('Bereit für Berichte',html)
+        self.assertIn('/p/1/results?focus_wave=2026',html)
+        report=self.client.get('/p/1/report?focus_wave=2026&profile=gl&min_n=1').text
+        self.assertIn('Gemeinsames Anliegen',report)
+        before=self.parts();self.post(url+'/overall-download')
+        self.assertEqual(before,self.parts())
+
+    def test_fast_export_preserves_edited_text_and_is_atomic_on_package_error(self):
+        _,url=self.make_wave()
+        first=self.parts()[0];items=json.loads(first['records'])
+        self.export_part(first)
+        response=self.post(url+'/overall-download')
+        with zipfile.ZipFile(io.BytesIO(response.data)) as z:
+            data=json.loads(z.read('Teil_001/daten.json'))
+            self.assertEqual(data['antworten'][0]['text'],'Bereinigter Text')
+        with self.db() as c:c.execute("UPDATE wave_text_parts SET state='draft',exported=NULL")
+        parts=self.parts();last=parts[-1];items=json.loads(last['records'])
+        items[0]['export_text']='x'*400000
+        with self.db() as c:c.execute('UPDATE wave_text_parts SET records=? WHERE id=?',(json.dumps(items),last['id']))
+        before=self.parts()
+        self.assertEqual(self.post(url+'/overall-download').status_code,400)
+        self.assertEqual(before,self.parts())
+
+    def test_same_result_can_be_activated_without_overwriting_editorial_changes(self):
+        _,url,value=self.overall();self.upload(url,value)
+        with self.db() as c:c.execute("UPDATE text_concerns SET body='Redaktionelle Formulierung'")
+        self.assertEqual(self.upload(url,value,action='import_use').status_code,302)
+        self.assertEqual(self.synth()['state'],'approved')
+        html=self.client.get('/p/1/report?focus_wave=2026&profile=gl&min_n=1').text
+        self.assertIn('Redaktionelle Formulierung',html)
+
+
 class SynthesisScaleTests(unittest.TestCase):
     def test_ten_thousand_answers_cross_batch_concerns_and_single_person_counting(self):
         parts=[];results=[];sources=[]
@@ -192,6 +261,9 @@ class SynthesisScaleTests(unittest.TestCase):
         eligible={('2026',str(i),'q') for i in range(80)}
         grouped=project_concerns(index,concerns,eligible,{})
         self.assertEqual(grouped['q'][0]['statements'][0]['count'],80)
+
+
+
 
 
 if __name__=='__main__':unittest.main()
