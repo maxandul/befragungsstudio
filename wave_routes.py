@@ -244,13 +244,12 @@ def register(app,db,project,report_data,result_sources):
         output={};claimed=set()
         for job in jobs:
             if not is_current(pid,job):continue
-            with db() as c:
-                parts=[(json.loads(p['records']),json.loads(p['result']),p['canonical'])
-                       for p in c.execute('SELECT records,result,canonical FROM wave_text_parts WHERE job=? ORDER BY position',(job['id'],))]
-            grouped=wa.group_statements(parts,eligible,json.loads(job['aliases']))
+            grouped=project_job(job['id'],eligible,json.loads(job['aliases']))
             for canonical in json.loads(job['selection'])['canonicals']:
                 if canonical not in claimed:
                     claimed.add(canonical)
                     output[canonical]=grouped.get(canonical,[])
         return output
+    from report_editorial import register as register_editorial
+    project_job=register_editorial(app,db,project,job_for,is_current)
     return home,summaries

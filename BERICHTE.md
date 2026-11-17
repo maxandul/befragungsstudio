@@ -118,3 +118,22 @@ generiert. Themenbezeichnungen können im Wellenauftrag vereinheitlicht werden.
 Unvollständige oder veraltete Wellenaufträge liefern keine Berichtsinhalte. Bestehende
 OE-Aufträge aus Version 1 bleiben kompatibel; eine aktuelle freigegebene Wellenfassung
 hat pro Frage Vorrang. Einzelheiten zum paketweisen Ablauf und zu KI-Grenzen im README.
+
+
+## Vorlagen, gemeinsame Anliegen und Pakete ab 0.1.17
+
+Geprüfte Einzelaussagen können pro Welle und Frage zu redaktionell bestätigten gemeinsamen
+Anliegen gebündelt werden. Die Quelle bleibt für jede Aussage erhalten. Nur passende
+Quellen und ihre Nuancen werden für die gewählte OE ausgegeben. Die Darstellung unterscheidet
+Kernaussage, abweichende Sichtweise, besonderen Hinweis und weiteres Anliegen. Die GL-Vorlage
+zeigt die ersten drei Kategorien direkt im Themenabschnitt und weitere Anliegen aufklappbar.
+Die OE-Vorlage erhält alle Anliegen; grosse Themenlisten sind vollständig aufklappbar.
+Es gibt keine pauschale Top-3-Auswahl mehr. Die GL-Gesamtsynthese nutzt die vorhandene,
+OE- und wellengebundene Redaktion «Erkenntnisse auf einen Blick».
+
+Druckansichten enthalten unabhängig vom Aufklappzustand entweder die Hauptaussagen oder
+sämtliche passenden Textvertiefungen. Vollständige Originalantworten sind separat freizugeben
+und erscheinen nur im vollständigen Textanhang. Die Browserfunktion kann als PDF speichern;
+ein serverseitiger PDF-Export wird damit nicht eingeführt. Bis zu 50 OEs des gewählten
+Organisationszweigs können als getrennte Offline-HTML-Berichte in einem ZIP erzeugt werden.
+Details und Grenzen der redaktionellen Quellenprüfung siehe README 0.1.17.

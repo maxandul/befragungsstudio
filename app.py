@@ -679,8 +679,13 @@ def create_app(instance=None):
         for r in rows:
             if r['type']=='text' and r['wave']==reference_wave and r['n']>=minimum:
                 text_groups.setdefault(r['theme'] or 'Weitere Fragen',[]).append(r)
+        profile=request.args.get('profile','oe')
+        print_mode=request.args.get('print_mode','full' if profile=='oe' and 'profile' in request.args else 'compact')
+        if profile not in ('gl','oe') or print_mode not in ('compact','full'):
+            raise ValueError('Bitte eine vorhandene Berichtsvorlage und Druckansicht wählen.')
         include_texts=request.args.get('include_texts')=='1'
-        include_summaries=request.args.get('include_summaries')=='1'
+        include_summaries=request.args.get('include_summaries')=='1' or (
+            'profile' in request.args and 'text_options_set' not in request.args and 'include_summaries' not in request.args)
         include_evidence=request.args.get('include_evidence')=='1'
         evidence_options={}
         for theme,items in text_groups.items():
@@ -740,8 +745,10 @@ def create_app(instance=None):
         return dict(p=p,grouped=grouped,rates=rates,minimum=minimum,hidden=hidden,
                     dimension=dimension,unit=unit,selected=selected,available=available,focus_wave=focus_wave,
                     nodes=nodes,node=node,node_id=node_id,child_rates=child_rates,child_results=child_results,
+                    batch_nodes=[n for n in nodes if not node or n['path'][:len(node['path'])]==node['path']],
                     comparisons=comparisons,reference_wave=reference_wave,notes=notes,scope=scope,
                     text_groups=text_groups,include_texts=include_texts,include_summaries=include_summaries,afa=afa,
+                    profile=profile,print_mode=print_mode,explicit_profile='profile' in request.args,
                     include_evidence=include_evidence,evidence_options=evidence_options,evidence=evidence,
                     selected_evidence=selected_evidence,stale_evidence=stale_evidence,note_themes=note_themes)
 
@@ -753,6 +760,8 @@ def create_app(instance=None):
     def report(pid):
         ctx=report_data(pid)
         ctx['text_summaries']=approved_summaries(pid,ctx)
+        from report_views import prepare_text_views
+        ctx['text_views']=prepare_text_views(ctx['text_summaries'],ctx['profile'])
         if ctx['include_summaries'] and not ctx['include_texts']:
             ctx['text_groups']={theme:[r for r in rows if ctx['text_summaries'].get(r['canonical'])]
                                 for theme,rows in ctx['text_groups'].items()}
@@ -786,6 +795,35 @@ def create_app(instance=None):
             return send_file(io.BytesIO(html.encode()),mimetype='text/html',as_attachment=True,
                              download_name=f'Pulsbericht_{pid}.html')
         return html
+
+    @app.post('/p/<int:pid>/reports.zip')
+    def report_package(pid):
+        import re
+        import zipfile
+        from urllib.parse import urlencode
+        ctx=report_data(pid)
+        selected=list(dict.fromkeys(request.form.getlist('report_oe')))
+        path=ctx['node']['path'] if ctx['node'] else []
+        allowed={n['id']:n for n in ctx['nodes'] if not path or n['path'][:len(path)]==path}
+        if not selected or len(selected)>50 or any(node not in allowed for node in selected):
+            raise ValueError('Bitte eine bis höchstens 50 OEs aus dem gewählten Organisationszweig auswählen.')
+        params=request.args.to_dict(flat=False)
+        for key in ('download','zip','oe','dimension','unit'):params.pop(key,None)
+        params['download']=['1']
+        base_url=request.url_root
+        stream=io.BytesIO()
+        with zipfile.ZipFile(stream,'w',zipfile.ZIP_DEFLATED) as archive:
+            for i,node_id in enumerate(selected,1):
+                params['oe']=[node_id]
+                with app.test_request_context('/p/'+str(pid)+'/report?'+urlencode(params,doseq=True),base_url=base_url):
+                    response=report(pid)
+                    response.direct_passthrough=False
+                    html=response.get_data()
+                    response.close()
+                stem=re.sub(r'[^\w .-]','_',allowed[node_id]['unit'])[:70].strip(' .') or 'OE'
+                archive.writestr(f'{i:02d}_{stem}.html',html)
+        stream.seek(0)
+        return send_file(stream,mimetype='application/zip',as_attachment=True,download_name=f'Berichtspaket_{pid}.zip')
 
     @app.post('/p/<int:pid>/report/themes')
     def report_themes(pid):
