@@ -50,6 +50,8 @@ def register(app,db,project,report_data,result_sources):
                          (*values.values(),part['id'],part['revision']))
         if cursor.rowcount!=1:
             raise ValueError('Dieses Teilpaket wurde inzwischen geändert. Bitte neu laden.')
+        if values.get('state',part['state'])!='approved' or ('result' in values and values['result']!=part['result']):
+            c.execute("UPDATE wave_syntheses SET state='imported',revision=revision+1 WHERE job=?",(part['job'],))
 
     def wave_context(pid):
         # Do not calculate charts or all OE comparisons just to prepare text packages.
@@ -238,6 +240,7 @@ def register(app,db,project,report_data,result_sources):
         if not ctx.get('include_summaries'):return {}
         with db() as c:
             jobs=[dict(r) for r in c.execute('''SELECT j.* FROM wave_text_jobs j WHERE j.project=? AND j.wave=?
+              AND NOT EXISTS(SELECT 1 FROM wave_syntheses s WHERE s.job=j.id AND s.state!='approved')
               AND EXISTS(SELECT 1 FROM wave_text_parts p WHERE p.job=j.id)
               AND NOT EXISTS(SELECT 1 FROM wave_text_parts p WHERE p.job=j.id AND p.state!='approved')
               ORDER BY j.rowid DESC''',(pid,ctx['reference_wave']))]
@@ -249,6 +252,11 @@ def register(app,db,project,report_data,result_sources):
         for job in jobs:
             if not is_current(pid,job):continue
             grouped=project_job(job['id'],eligible,json.loads(job['aliases']))
+            denominators={r['canonical']:r['n'] for items in ctx['text_groups'].values() for r in items}
+            for canonical,topics in grouped.items():
+                for topic in topics:
+                    for entry in topic['statements']:
+                        entry['denominator']=denominators.get(canonical,0)
             for canonical in json.loads(job['selection'])['canonicals']:
                 if canonical not in claimed:
                     claimed.add(canonical)
@@ -256,4 +264,6 @@ def register(app,db,project,report_data,result_sources):
         return output
     from report_editorial import register as register_editorial
     project_job=register_editorial(app,db,project,job_for,is_current)
+    from synthesis_routes import register as register_synthesis
+    register_synthesis(app,db,project,job_for,is_current)
     return home,summaries

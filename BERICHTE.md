@@ -137,3 +137,20 @@ und erscheinen nur im vollständigen Textanhang. Die Browserfunktion kann als PD
 ein serverseitiger PDF-Export wird damit nicht eingeführt. Bis zu 50 OEs des gewählten
 Organisationszweigs können als getrennte Offline-HTML-Berichte in einem ZIP erzeugt werden.
 Details und Grenzen der redaktionellen Quellenprüfung siehe README 0.1.17.
+
+
+## Gesamtimport und berechnete Nennungen ab 0.1.20
+
+Ein Gesamtauftrag liefert nach paketweiser Aufbereitung eine gemeinsame JSON-Rückgabe
+mit Einzelaussagen, gebündelten Anliegen, vorgeschlagenen Kernaussagen und deren Begründung.
+Die technische Prüfung verlangt alle Teile und Antworten sowie eine vollständige,
+eindeutige Quellenzuordnung. Vorschläge können gemeinsam redaktionell geprüft und für
+alle OE-Berichte freigegeben werden. Die narrative GL-Gesamtsynthese bleibt separat.
+
+Die App berechnet je Anliegen die Zahl unterschiedlicher Textantwortender. Im Bericht
+werden Quellen zuerst nach OE und eigener Leitung gefiltert. Die Anzeige «x von n
+Textantwortenden dieser Frage» verwendet dann die passende Fragebasis, auch bei mehreren
+Einzelaussagen derselben Person. Mehrere Anliegen pro Person sind möglich; die Zahlen
+beschreiben Textantwortende, nicht alle Mitarbeitenden. Der globale CSV-Prüfexport nennt
+zusätzlich Anteile und bezieht sich ausdrücklich auf die Wellenbasis vor OE-Filtern.
+Details, Format, sichere Wiederholung und Grenzen siehe README 0.1.20.
