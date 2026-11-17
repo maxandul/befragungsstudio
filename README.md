@@ -1,4 +1,4 @@
-# Befragungsstudio 0.1.16
+# Befragungsstudio 0.1.17
 
 Erste lokale Umsetzung für Befragungsdaten. Charts mit lokal mitgeliefertem Chart.js 4.4.8; Matplotlib wird nicht benötigt. Python 3.11 oder neuer mit Python
 Launcher unter Windows. Alle Oberflächendateien werden mitgeliefert.
@@ -463,3 +463,79 @@ Bei verknüpften Freitextnachfragen enthält der bearbeitbare Exportfragetext zu
 den Wortlaut der zugehörigen Skalenfrage aus derselben Welle (ohne individuelle
 Skalenwerte). Fehlt deren Originalwortlaut, wird die Berichtsbezeichnung verwendet.
 Änderungen dieses Kontextes lassen den Wellenauftrag ebenfalls veralten.
+
+
+## Berichtsvorlagen und gemeinsame Anliegen (Version 0.1.17)
+
+Unter **Textauswertung → Wellenauftrag → Anliegen bündeln und Kernaussagen auswählen**
+lassen sich geprüfte Einzelaussagen frageweise zu gemeinsamen Anliegen zusammenführen.
+Voraussetzung ist ein aktueller, vollständig freigegebener Wellenauftrag. Pro Seite
+werden höchstens 50 Einzelaussagen sowie 50 gespeicherte Anliegen bearbeitet. Suche
+und Frageauswahl helfen bei grossen Wellen. Eine gespeicherte Bündelung kann auf weiteren
+Seiten um Quellen ergänzt werden (mit aktiviertem JavaScript); vorhandene Anliegen
+lassen sich auch ohne JavaScript bearbeiten oder auflösen.
+
+Jedes Anliegen erhält Thema, kurze neutrale Formulierung, Reihenfolge und Darstellung:
+Kernaussage, abweichende Sichtweise, besonderer Hinweis oder weiteres Anliegen.
+Die Redaktion bestätigt ausdrücklich, dass **jede einzelne verknüpfte Quelle die gesamte
+Formulierung stützt**. Die App prüft die Zuordnung und unveränderte Quellen technisch,
+kann diese inhaltliche Voraussetzung aber nicht automatisch beurteilen. Verschiedene
+Anliegen oder Gegensätze dürfen nicht in eine allgemeine Formulierung eingeebnet werden.
+Alle ursprünglichen Einzelaussagen bleiben als Nuancen erhalten. Die gemeinsame Redaktion
+gilt für die Welle; es ist kein erneuter KI-Lauf pro OE nötig und es gibt keine API-Aufrufe.
+
+Eine Einzelaussage kann höchstens einem aktuellen Anliegen derselben Textfrage zugeordnet
+sein. Änderungen an zugehörigen Einzelaussagen lassen die betroffene Bündelung ungültig
+werden. Dann werden stattdessen die aktuellen Einzelaussagen ausgegeben. Die Redaktion
+zeigt «Quellen verändert» und erlaubt Auflösen/Neuprüfen. Das Auflösen einer Bündelung
+löscht keine Quell- oder Einzelaussagen. Gleichlautende Aussagen werden weiterhin nur
+nach Gross-/Kleinschreibung und Leerzeichen automatisch gebündelt, semantische Bündelungen
+benötigen die beschriebene Prüfung. Quellen und Nuancen werden vor der Berichtsausgabe
+nach dem exakten OE-Pfad und Leitungsausschluss gefiltert. Unpassende Quellen gelangen
+auch nicht in die aufklappbaren Vertiefungen oder Drucktexte.
+
+Unter **Ergebnisse & Berichte** stehen zwei Vorlagen bereit:
+
+- **GL kompakt:** Markierte Kernaussagen, abweichende Sichtweisen und besondere Hinweise
+  erscheinen direkt im Themenabschnitt. Weitere Anliegen sind vollständig aufklappbar.
+  Ohne redaktionelle Auswahl steht ein entsprechender Hinweis statt einer automatisch
+  geratenen Top-Auswahl. Einzelcharts bleiben als Vertiefung erreichbar.
+- **OE ausführlich:** Alle passenden Anliegen erscheinen bei der jeweiligen Frage.
+  Bei mehr als acht Anliegen innerhalb eines Themas wird dessen vollständige Liste
+  aufklappbar dargestellt. Es gibt keine pauschale Auswahl der ersten drei Aussagen.
+  Nuancen der Quellen bleiben ebenfalls aufklappbar. Die Detailfragen öffnen initial.
+
+Berichtsvorlage und Datenfilter sind voneinander unabhängig. Die Kennzahlen und deren
+Grundlagen ändern sich durch die Vorlage nicht. Die Auswahl «Geprüfte Textzusammenfassungen»
+steuert die Ausgabe; bei einem direkten Aufruf mit einer Vorlage ist sie voreingestellt,
+über das Berichtsformular kann sie ausdrücklich ausgeschaltet werden. Originaltexte
+bleiben ein separater Opt-in. Alte Berichtlinks ohne Vorlagenauswahl bleiben kompatibel.
+
+Die **GL-Gesamtsynthese** wird redaktionell im bestehenden Feld «Erkenntnisse auf einen Blick»
+verfasst, beispielsweise fünf bis sieben Erkenntnisse aus Skalen und Freitexten. Es gibt
+keine automatisch erzeugte Gesamterzählung. Der Text bleibt an die ausgewählte OE und
+Welle gebunden und wird nicht in unterstellte OE-Berichte kopiert. Die Formulierung
+muss am jeweiligen Datenstand geprüft werden; bestehende freie Berichtstexte werden
+bei Datenänderungen nicht automatisch umgeschrieben.
+
+**Druck/PDF:** «Kompakt ohne Textvertiefungen» enthält die Hauptaussagen der gewählten
+Vorlage; «Mit vollständigem Textanhang» enthält zusätzlich weitere Anliegen und sämtliche
+passenden Nuancen. Originalantworten kommen nur bei ausdrücklicher Auswahl und in der
+vollständigen Druckansicht dazu. Der Browserdruck (bei Bedarf «Als PDF speichern») nutzt
+separate fest gerenderte Textblöcke ausserhalb der interaktiven Aufklappfelder. Die
+Textausgabe hängt deshalb nicht von deren Öffnungszustand ab. Das ist kein zusätzlicher
+serverseitiger PDF-Export. Diagramm-/PNG-Exporte enthalten weiterhin keine Berichtstexte.
+
+**Berichtspakete:** Im Berichtsformular «Berichtspaket für mehrere OEs erstellen» öffnen,
+eine bis höchstens 50 OEs des aktuellen Organisationszweigs markieren und das ZIP laden.
+Es enthält eigenständige Offline-HTML-Berichte mit der aktuellen Wellen-, Vorlagen-,
+Text- und Druckauswahl. Jede OE wird einzeln gefiltert. Die Dateinamen haben eindeutige
+Nummern, sodass gleich benannte OEs keine Dateien überschreiben. Originaltexte und
+Quellenkennungen werden ohne ausdrücklichen Rohtext-Opt-in nicht eingebettet.
+
+Validierung mit synthetischen Daten: vollständige Redaktion, Bündeln/Ergänzen/Auflösen,
+Quellenänderungen, verbotene Doppel-/Fremdzuordnungen, unveränderte quantitative Ergebnisse,
+OE-gebundene Gesamtsynthese, Vorlagen, getrennte Drucktexte und OE-Berichtspakete. Zusätzlich
+Projektion von 10'000 Einzelaussagen auf einen begrenzten Quellumfang ohne fremde Nuancen.
+Die bestehenden Wellen-/Teilpaket-Lasttests bleiben erhalten. Kein neuer Paketbedarf.
+Eine visuelle Prüfung des Browserdrucks und ein realer AFA-Durchlauf stehen noch aus.
