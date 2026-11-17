@@ -62,8 +62,13 @@ class ReportEditorialTests(unittest.TestCase):
         self.assertEqual(self.create(second_url,index,normal,kind='single',body='Besonderer Einzelhinweis').status_code,302)
         compact=self.client.get('/p/1/report?'+self.query+'&profile=gl&print_mode=compact').text
         printed=''.join(re.findall(r'<div class="qual-print">(.*?)</div>',compact,re.S))
-        self.assertIn('Gemeinsames Anliegen',printed)
-        self.assertIn('Besonderer Einzelhinweis',printed)
+        self.assertNotIn('Gemeinsames Anliegen',printed)  # Only one supporting person in this OE.
+        self.assertNotIn('Besonderer Einzelhinweis',printed)
+        self.assertIn('Besonderer Einzelhinweis',compact)  # Retained behind the detail disclosure.
+        global_html=self.client.get('/p/1/report?focus_wave=2026&min_n=1&profile=gl&print_mode=compact').text
+        global_print=''.join(re.findall(r'<div class="qual-print">(.*?)</div>',global_html,re.S))
+        self.assertIn('Gemeinsames Anliegen',global_print)
+        self.assertNotIn('Besonderer Einzelhinweis',global_print)
         self.assertNotIn('Aussage person-a',printed)  # Nuance not in compact print.
         full=self.client.get('/p/1/report?'+self.query+'&profile=gl&print_mode=full').text
         printed=''.join(re.findall(r'<div class="qual-print">(.*?)</div>',full,re.S))
