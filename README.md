@@ -1,4 +1,4 @@
-# Befragungsstudio 0.1.20
+# Befragungsstudio 0.1.21
 
 Erste lokale Umsetzung für Befragungsdaten. Charts mit lokal mitgeliefertem Chart.js 4.4.8; Matplotlib wird nicht benötigt. Python 3.11 oder neuer mit Python
 Launcher unter Windows. Alle Oberflächendateien werden mitgeliefert.
@@ -496,10 +496,13 @@ auch nicht in die aufklappbaren Vertiefungen oder Drucktexte.
 
 Unter **Ergebnisse & Berichte** stehen zwei Vorlagen bereit:
 
-- **GL kompakt:** Markierte Kernaussagen, abweichende Sichtweisen und besondere Hinweise
-  erscheinen direkt im Themenabschnitt. Weitere Anliegen sind vollständig aufklappbar.
-  Ohne redaktionelle Auswahl steht ein entsprechender Hinweis statt einer automatisch
-  geratenen Top-Auswahl. Einzelcharts bleiben als Vertiefung erreichbar.
+- **GL kompakt:** Nach den Übersichts-Charts erscheinen pro Textfrage höchstens drei
+  wiederkehrende Anliegen mit jeweils mindestens zwei Textantwortenden. Massgebend ist
+  die tatsächlich passende Zahl verschiedener Personen nach OE- und Leitungsfilter;
+  KI-Etiketten allein befördern keine Einzelhinweise in die Übersicht. Die Häufigkeit
+  ist keine Bewertung der Wichtigkeit. Alle Anliegen, abweichenden Sichtweisen und
+  Einzelhinweise bleiben gemeinsam aufklappbar. Kompakter Druck nutzt dieselbe Auswahl;
+  der vollständige Druck enthält weiterhin alle Anliegen.
 - **OE ausführlich:** Alle passenden Anliegen erscheinen bei der jeweiligen Frage.
   Bei mehr als acht Anliegen innerhalb eines Themas wird dessen vollständige Liste
   aufklappbar dargestellt. Es gibt keine pauschale Auswahl der ersten drei Aussagen.
@@ -680,3 +683,27 @@ Modell-API-Aufrufe. Automatisierte Tests prüfen Gesamtexport, Manifest, atomare
 Vollständigkeit, Quellenabgrenzung, gemeinsame Freigabe, sichere Wiederholung, redaktionelles
 Ersetzen, lokale Häufigkeiten und 10'000 synthetische Antworten. Ein echter KI-Durchlauf
 mit dem neuen Gesamtprompt und die visuelle Browserprüfung stehen noch aus.
+
+
+## Überschaubare GL-Berichte und Quellenprüfung (Version 0.1.21)
+
+Die GL-Übersicht zeigt pro Frage maximal drei Anliegen nach Häufigkeit, auch über
+verschiedene Themen hinweg. Identische Formulierungen werden dort einmal angezeigt,
+ohne möglicherweise überlappende Personenzahlen zu addieren. Lange Aussagen werden
+nur in der Übersicht auf maximal 300 Zeichen gekürzt; der vollständige Text bleibt
+in der Vertiefung. Wiederholte Überschriften entfallen. OE-Berichte behalten alle
+passenden Anliegen.
+
+Unter «Berichtsinhalte prüfen» stehen die gespeicherten Anliegen zuerst, sortiert
+nach Zahl verschiedener Textantwortender. Einzelaussagen und neue Bündelungen sind
+eine optionale, zunächst geschlossene Quellenprüfung. Ausgegraute Quellen sind bereits
+einem Anliegen zugeordnet; ein Link führt zur zugehörigen Bündelung. Die redaktionelle
+Reihenfolge (z. B. 10) ist eine Sortierzahl, kein Gewicht oder Prozentwert.
+
+Bestehende Gesamtimporte, Freigaben und gespeicherte Anliegen bleiben verwendbar.
+Kein neuer KI-Auftrag oder Neuimport erforderlich. Die narrative Gesamtsynthese unter
+«Erkenntnisse auf einen Blick» bleibt redaktionell.
+
+Validierung: 106 Tests, darunter 100 Einzelhinweise, Häufigkeit über Themen hinweg,
+Deduplizierung ohne Addition, OE-Ausgabe, Diagrammreihenfolge, geschlossene Vertiefung
+und dieselbe Auswahl im kompakten Druck.

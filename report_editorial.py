@@ -158,6 +158,10 @@ def register(app,db,project,job_for,is_current):
         occupied={ref:c['id'] for c in concerns if valid_concern(c,index) for ref in json.loads(c['sources'])}
         items=[dict(c,valid=valid_concern(c,index),references=[index[ref] for ref in json.loads(c['sources']) if ref in index])
                for c in concerns if c['canonical']==canonical]
+        for item in items:
+            item['person_count']=len({tuple(ref['key'][:2]) for ref in item['references']})
+        items.sort(key=lambda c:(-c['person_count'],c['sort_order'],c['body'].casefold()))
+        concern_locations={c['id']:i//50+1 for i,c in enumerate(items)}
         options=[{key:c[key] for key in ('id','revision','topic','body','kind','sort_order','rationale')} for c in items if c['valid']]
         try:concern_page=max(1,int(request.args.get('concern_page','1')))
         except ValueError:raise ValueError('Ungültige Anliegenseite.') from None
@@ -166,7 +170,8 @@ def register(app,db,project,job_for,is_current):
         items=items[(concern_page-1)*50:concern_page*50]
         return render_template('concerns.html',p=project(pid),job=job,questions=questions,canonical=canonical,
             rows=rows[(page-1)*50:page*50],page=page,pages=pages,total=len(rows),search=request.args.get('search',''),
-            concerns=items,concern_options=options,concern_total=concern_total,concern_page=concern_page,concern_pages=concern_pages,
+            concerns=items,concern_options=options,concern_locations=concern_locations,
+            unassigned=sum(s['canonical']==canonical and ref not in occupied for ref,s in index.items()),concern_total=concern_total,concern_page=concern_page,concern_pages=concern_pages,
             occupied=occupied,kinds=KINDS,stale=stale,ready=ready,tab='texts')
 
     def project_job(jid,eligible,aliases):
