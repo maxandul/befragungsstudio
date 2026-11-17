@@ -32,7 +32,7 @@ class WaveTextTests(legacy.TextAnalysisTests):
     def make_wave(self):
         with patch.object(wa,'MAX_ANSWERS',2):
             # The OE in the query must not limit a wave job.
-            r=self.post('/p/1/wave-texts?'+self.query,question=['q','t'])
+            r=self.post('/p/1/wave-texts?'+self.query,question=['q','t'],batch_size='small')
         self.assertEqual(r.status_code,302)
         job=self.wave_job();self.assertEqual(job['wave'],'2026')
         parts=self.parts();self.assertEqual(len(parts),4)
@@ -187,7 +187,7 @@ class WaveTextTests(legacy.TextAnalysisTests):
             raw=json.dumps({'Amt':'AFA','Bereich':'A','Question':'Frage'})
             c.executemany('INSERT INTO answers VALUES(1,?,?,?,?,?,?)',[
                 ('2026','load-'+str(i),'q','Inhalt '+('Text '*100),'2026-10-01',raw) for i in range(4000)])
-        r=self.post('/p/1/wave-texts?focus_wave=2026',question='q')
+        r=self.post('/p/1/wave-texts?focus_wave=2026',question='q',batch_size='small')
         self.assertEqual(r.status_code,302)
         parts=self.parts()
         self.assertEqual(sum(p['count'] for p in parts),4003)
