@@ -1,4 +1,4 @@
-# Befragungsstudio 0.1.21
+# Befragungsstudio 0.1.22
 
 Erste lokale Umsetzung für Befragungsdaten. Charts mit lokal mitgeliefertem Chart.js 4.4.8; Matplotlib wird nicht benötigt. Python 3.11 oder neuer mit Python
 Launcher unter Windows. Alle Oberflächendateien werden mitgeliefert.
@@ -612,7 +612,7 @@ echter Antworten geprüft werden; ein Modellaufruf ist nicht Bestandteil dieser 
 
 ## Gesamtauftrag: Kürzen, Verdichten und Kernaussagen vorschlagen (Version 0.1.20)
 
-Der empfohlene Ablauf arbeitet mit einem Gesamtauftrag pro Welle. Im Wellenauftrag
+Der folgende Ablauf beschreibt die frühere Prüfung mit separater Freigabe. Seit 0.1.22 gilt der Schnellablauf am Ende dieses Dokuments. Dieser arbeitet mit einem Gesamtauftrag pro Welle. Im Wellenauftrag
 **«Gesamtauftrag exportieren und verdichtetes Ergebnis importieren»** öffnen.
 
 1. Die Frage- und Antworttexte aller Teilpakete wie bisher auf Personenbezüge prüfen,
@@ -707,3 +707,37 @@ Kein neuer KI-Auftrag oder Neuimport erforderlich. Die narrative Gesamtsynthese 
 Validierung: 106 Tests, darunter 100 Einzelhinweise, Häufigkeit über Themen hinweg,
 Deduplizierung ohne Addition, OE-Ausgabe, Diagrammreihenfolge, geschlossene Vertiefung
 und dieselbe Auswahl im kompakten Druck.
+
+
+## Schnellablauf für neue Wellen (Version 0.1.22)
+
+1. Unter Textauswertung die Welle auswählen und «Gesamtauftrag vorbereiten». Alle
+   Textfragen sind vorausgewählt; Fragen und Paketgrösse lassen sich optional ändern.
+2. «Gesamtpaket mit Prompt herunterladen». Die App bereitet alle übrigen Teilpakete
+   gemeinsam vor. Einzeln gespeicherte Bereinigungen bleiben erhalten. Das ZIP mit
+   Standardprompt wird manuell der gewählten KI übergeben. Die technische Aufteilung
+   dient der Verarbeitung grosser Wellen, verlangt aber keine Einzelbestätigungen.
+3. Die vollständige gesamt_ergebnis.json mit «Importieren und für alle Berichte
+   verwenden» laden. Erst nach vollständiger technischer Validierung wird die gesamte
+   Welle atomar für Berichte aktiviert. Keine weitere Gesamt- oder Teilfreigabe nötig.
+4. «Berichte erstellen» öffnen. Die gleiche Grundlage wird für GL- und OE-Berichte
+   lokal gefiltert und gezählt. Eine narrative Gesamtsynthese bleibt optional.
+
+Exportprüfung (Personenbezüge) und Importredaktion (Bündelung, Wortlaut, Quellen und
+verworfene Antworten) sind bei Bedarf erreichbar. «Nur importieren» erlaubt weiterhin
+eine Prüfung vor der Aktivierung. Aktivierung bezeichnet die Verwendung in Berichten,
+keine behauptete manuelle Inhaltsprüfung. Ein identischer erneuter Import erhält
+Redaktion und bestehende Freigaben; er kann eine zunächst nur importierte Fassung
+aktivieren. Abweichende Ersatzimporte benötigen weiterhin ausdrückliche Bestätigung.
+Veraltete Daten und unvollständige Rückgaben werden weiterhin abgewiesen.
+
+Datenschutz: Exportiert werden Zufallskennungen, Fragetext und Exportantworten. OE- und
+Personenmetadaten bleiben lokal. Automatisch entfernt werden E-Mail-Adressen und
+erkennbare Telefonnummern. Das ist keine vollständige Freitextanonymisierung: Namen,
+Ereignisse und indirekte Personenbezüge können verbleiben und lassen sich optional
+vor dem Download bereinigen. Keine automatische Übertragung an eine KI.
+
+Validierung: 110 Tests erfolgreich. Der Schnellablauf wird ohne Einzelbestätigungen
+vom Gesamt-Download bis zur Berichtsausgabe geprüft, einschliesslich fehlerhafter
+Gesamtrückgaben, atomarem Export, beibehaltener Bereinigung und Aktivierung identischer
+Rückgaben bei erhaltener Redaktion.
