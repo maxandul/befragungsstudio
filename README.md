@@ -1,4 +1,4 @@
-# Befragungsstudio 0.1.22
+# Befragungsstudio 0.1.23
 
 Erste lokale Umsetzung für Befragungsdaten. Charts mit lokal mitgeliefertem Chart.js 4.4.8; Matplotlib wird nicht benötigt. Python 3.11 oder neuer mit Python
 Launcher unter Windows. Alle Oberflächendateien werden mitgeliefert.
@@ -741,3 +741,13 @@ Validierung: 110 Tests erfolgreich. Der Schnellablauf wird ohne Einzelbestätigu
 vom Gesamt-Download bis zur Berichtsausgabe geprüft, einschliesslich fehlerhafter
 Gesamtrückgaben, atomarem Export, beibehaltener Bereinigung und Aktivierung identischer
 Rückgaben bei erhaltener Redaktion.
+
+
+## Nächste Schritte im Bericht (Version 0.1.23)
+
+Unter «Ergebnisse & Berichte» → «Berichtstexte und Gesamtsynthese» steht das freie
+Textfeld «Nächste Schritte» für Massnahmen, Zuständigkeiten und Termine bereit.
+Der gespeicherte Inhalt gilt für die ausgewählte OE und Welle. Er erscheint am
+Berichtsende vor den Berechnungshinweisen, mit einem Link im Inhaltsverzeichnis.
+Vorschau, eigenständiger HTML-Export, Berichtspakete und Druck/PDF verwenden
+denselben Abschnitt. Ohne Text wird er ausgeblendet. Keine Datenmigration nötig.
