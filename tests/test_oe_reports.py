@@ -125,7 +125,7 @@ class OrganisationReportTests(unittest.TestCase):
         self.assertNotIn('← Zur App'.encode(),download.data)
         self.assertNotIn('BEFRAGUNGSSTUDIO · AUSWERTUNG'.encode(),download.data)
         self.assertNotIn(b'G\xc3\xbcltige Antworten:',download.data)
-        self.assertIn(b'Antworten mit 4 oder 5',download.data)
+        self.assertIn(b'Werte 4 und 5',download.data)
 
     def test_ground_count_can_be_corrected_and_deleted_without_touching_answers(self):
         identity=dict(original_wave='2026',original_dimension='',original_unit='',original_total='5')
@@ -267,11 +267,35 @@ class OrganisationReportTests(unittest.TestCase):
         self.assertEqual((row['n'],row['abstentions'],row['missing']),(1,1,2))
         self.assertIn('Enthaltungen:',response.text)
         self.assertNotIn('Ohne auswertbare Antwort:',response.text)
-        self.assertIn('die der jeweils ausgewerteten Organisationseinheit vorstehen',response.text)
+        self.assertIn('Die vorstehende Führungskraft ist aus ihrer eigenen OE ausgeschlossen',response.text)
 
     @unittest.skipUnless(shutil.which('node'),'Optionaler Entwicklungstest benötigt Node.js')
     def test_print_chart_snapshots_and_restore(self):
         result=subprocess.run(['node',str(Path(__file__).with_name('check_print.cjs'))],capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+
+    def test_root_selection_has_no_self_comparison_and_reading_notes_first(self):
+        root=self.node('Amt','AFA')
+        response,payload=self.payload('oe='+root['id'])
+        self.assertEqual(payload['cards'][0]['comparisons'],[])
+        self.assertNotIn('id="show-total"',response.text)
+        self.assertLess(response.text.index('<summary>So lesen Sie'),response.text.index('id="participation"'))
+        self.assertNotIn('<strong>Rücklauf:</strong>',response.text)
+        self.assertNotIn('Vollständige Textantworten sind ausgeblendet.',response.text)
+        self.assertEqual(payload['unit'],'AFA')
+        with self.db() as c:c.execute("INSERT INTO report_notes VALUES(1,'','2026','Nächste Schritte','Bisherige Redaktion')")
+        response,_=self.payload('oe='+root['id'])
+        self.assertIn('Bisherige Redaktion',response.text)
+        _,area=self.payload('oe='+self.node('Bereich','A')['id'])
+        self.assertEqual([x['kind'] for x in area['cards'][0]['comparisons']],['parent'])
+        self.assertEqual(area['cards'][0]['comparisons'][0]['label'],'Übergeordnete OE: AFA')
+        form=self.client.get('/p/1/results?focus_wave=2026').text
+        self.assertNotIn('>Gesamtbefragung</option>',form)
+        self.assertIn('>Kompakt</option>',form)
+
+    @unittest.skipUnless(shutil.which('node'),'Optionaler Entwicklungstest benötigt Node.js')
+    def test_sorted_choices_and_child_reference_lines(self):
+        result=subprocess.run(['node',str(Path(__file__).with_name('check_chart_cleanup.cjs'))],capture_output=True,text=True)
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
 
     def test_unanswered_counts_include_absent_rows_and_keep_invalid_separate(self):
@@ -346,7 +370,7 @@ class OrganisationReportTests(unittest.TestCase):
         for marker in [b'id="show-parent"',b'id="show-total"',b'id="overview-children-0"']:
             self.assertIn(marker,response.data)
         self.assertIn('Übergeordnete OE: A'.encode(),response.data)
-        self.assertIn('Puls AFA · gesamt'.encode(),response.data)
+        self.assertEqual(comparisons[1]['label'],'AFA')
 
     @unittest.skipUnless(shutil.which('node'),'Optionaler Entwicklungstest benötigt Node.js')
     def test_topic_export_metrics_missing_values_and_legend_visibility(self):

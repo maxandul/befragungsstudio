@@ -1,4 +1,4 @@
-# Befragungsstudio 0.1.24
+# Befragungsstudio 0.1.25
 
 Erste lokale Umsetzung für Befragungsdaten. Charts mit lokal mitgeliefertem Chart.js 4.4.8; Matplotlib wird nicht benötigt. Python 3.11 oder neuer mit Python
 Launcher unter Windows. Alle Oberflächendateien werden mitgeliefert.
@@ -775,3 +775,25 @@ Skalen-Detailcharts weg und behält Auswahlfragen bei; Diagramme werden in feste
 Bilder ausgegeben. Nach dem Druck werden Aufklappzustände und Chartgrössen wiederhergestellt.
 Die festgelegte kompakte/vollständige Textauswahl bleibt unabhängig vom Bildschirmzustand.
 Der Druckknopf ist erst nach der Chartinitialisierung aktiv.
+
+
+## Schlankere Berichte und Vergleiche (Version 0.1.25)
+
+Die Standardvorlage heisst «Kompakt» und eignet sich auch für Bereiche und andere OEs.
+Lesehinweise stehen gemeinsam am Anfang; technische Statuszeilen und wiederholte
+Hinweise zwischen Diagrammen und Textantworten entfallen. Die ausgeschlossenen
+vorstehenden Führungskräfte werden kurz erklärt.
+
+Bei einer einzigen obersten OE entfällt die zusätzliche Auswahl «Gesamtbefragung»;
+alte Links bleiben nutzbar und zeigen den Namen dieser OE. Bestehende Berichtstexte
+der früheren Gesamtansicht bleiben auch bei Auswahl der obersten OE erhalten. Die
+oberste OE vergleicht sich nicht mit sich selbst; identische übergeordnete und
+Gesamt-Vergleichspfade werden nur einmal angeboten. Bei mehreren obersten OEs bleibt
+«Alle Organisationseinheiten» als gemeinsame Auswahl erforderlich.
+
+Anliegen in der vollständigen Textvertiefung sind frageweise über alle Themen hinweg
+nach Zahl Textantwortender absteigend geordnet. Auswahlcharts ordnen Optionen ebenfalls
+nach Häufigkeit. Die Vergleichsschalter haben mehr Abstand. Detaillegenden zeigen
+Linien; auch bei direktunterstellten Einheiten werden eingeschaltete Vergleichsgruppen
+als Referenzlinien angezeigt. Jeder OE-Wert wird weiterhin mit dem Ausschluss seiner
+eigenen Leitung berechnet; übergeordnete Werte enthalten unterstellte Leitungen.

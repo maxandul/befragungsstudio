@@ -208,7 +208,7 @@ class WaveTextTests(legacy.TextAnalysisTests):
         data=dict(action='aliases',revision=str(job['revision']),topics_hash=ta.digest(topics),topic_0='Abläufe',topic_1='Abläufe')
         self.assertEqual(self.post(url,**data).status_code,302)
         html=self.client.get('/p/1/report?'+self.query+'&include_summaries=1').text
-        self.assertIn('<h4>Abläufe</h4>',html)
+        self.assertIn('Abläufe',self.client.get('/p/1/report?'+self.query+'&profile=oe&include_summaries=1').text)
         self.assertNotIn('Aussage person-b',html)
         data.update(revision=str(self.wave_job()['revision']),topics_hash='old')
         self.assertEqual(self.post(url,**data).status_code,400)

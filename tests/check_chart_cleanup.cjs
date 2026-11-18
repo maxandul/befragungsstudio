@@ -1,0 +1,26 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync(require('node:path').join(__dirname,'../static/report-charts.js'),'utf8');
+const toggles={},sandbox={payload:{unit:'Bereich'},window:{devicePixelRatio:1},document:{getElementById:id=>toggles[id]},Intl};
+vm.createContext(sandbox);
+vm.runInContext(source.slice(source.indexOf('  function comparisonVisible'),source.indexOf('  function metricFor'))+'\nthis.makeConfig=config;',sandbox);
+const row={wave:'2026',type:'scale',n:10,mean:4,top2:80,minimum:1,maximum:5,counts:{}};
+const card={label:'Frage',rows:[row],children:[{...row,unit:'A'},{...row,unit:'B'}],comparisons:[{kind:'parent',label:'Amt',rows:[{...row,mean:3.5}]}]};
+const children=sandbox.makeConfig(card,'mean','screen','children');
+assert.equal(children.data.datasets.length,2);
+assert.equal(children.data.datasets[1].type,'line');assert.equal(children.data.datasets[1].indexAxis,'y');
+assert.deepEqual(Array.from(children.data.datasets[1].data),[3.5,3.5]);
+assert.equal(children.options.plugins.legend.labels.pointStyle,'line');
+assert.equal(children.data.datasets[1].borderWidth,1.5);
+toggles['show-parent']={checked:false};assert.equal(sandbox.makeConfig(card,'mean','screen','children').data.datasets.length,1);
+const choices={label:'Auswahl',rows:[{...row,type:'choice_multiple',counts:{Selten:1,Häufig:7,Mittel:3}}]};
+const cfg=sandbox.makeConfig(choices,'mean');
+assert.deepEqual(Array.from(cfg.data.labels,x=>x.join(' ')),['Häufig','Mittel','Selten']);
+assert.deepEqual(Array.from(cfg.data.datasets[0].data),[70,30,10]);
+console.log('Sorted choice charts, thin legends and child comparison references passed.');
+
+const lines=[];let visible=true;
+const plugin=children.plugins.find(p=>p.id==='comparisonLines');
+const chart={data:children.data,isDatasetVisible:()=>visible,chartArea:{top:5,bottom:105,left:0,right:100},scales:{x:{getPixelForValue:v=>v*10}},ctx:{save(){},restore(){},setLineDash(){},beginPath(){},moveTo(x,y){lines.push([x,y]);},lineTo(x,y){lines.push([x,y]);},stroke(){}}};
+plugin.afterDatasetsDraw(chart,null,children.options.plugins.comparisonLines);
+assert.deepEqual(lines,[[35,5],[35,105]]);
+visible=false;plugin.afterDatasetsDraw(chart,null,children.options.plugins.comparisonLines);assert.equal(lines.length,2);
