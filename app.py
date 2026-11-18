@@ -738,8 +738,8 @@ def create_app(instance=None):
         selected_evidence={theme:[option for token,option in options.items() if token in evidence.get(theme,[])]
                            for theme,options in evidence_options.items()}
         stale_evidence={theme:len(set(tokens)-set(evidence_options.get(theme,{}))) for theme,tokens in evidence.items()}
-        note_themes=['Erkenntnisse auf einen Blick']+list(dict.fromkeys(
-            [group[0]['theme'] or 'Weitere Fragen' for group in grouped.values()]+list(text_groups)))
+        note_themes=list(dict.fromkeys(['Erkenntnisse auf einen Blick']+
+            [group[0]['theme'] or 'Weitere Fragen' for group in grouped.values()]+list(text_groups)+['Nächste Schritte']))
         records,_,_,_,_,_=result_sources(pid)
         afa=any(r['raw'].get('Survey ID')=='2330' for r in records)
         return dict(p=p,grouped=grouped,rates=rates,minimum=minimum,hidden=hidden,
