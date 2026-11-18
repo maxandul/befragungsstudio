@@ -35,7 +35,7 @@ const path = require('node:path');
     Map,Promise,requestAnimationFrame:fn=>fn(),setTimeout:()=>0,
     URL:{createObjectURL:blob=>{downloads.push(blob);return 'blob:test';},revokeObjectURL(){}}};
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/report-charts.js'),'utf8'),sandbox);
-  assert.match(elements['export-status'].textContent,/1 Charts bereit/);
+  assert.equal(elements['export-status'].textContent,'');
   for (const layout of ['wide','half','compact']) await events[layout]();
   assert.deepEqual(await Promise.all(downloads.map(blob=>blob.text())),[
     'PNG:1920x1080','PNG:960x1080','PNG:1200x900'

@@ -369,7 +369,7 @@
       }));
       document.getElementById('all-charts').addEventListener('click', exportAll);
       const printButton=document.getElementById('report-print');if(printButton)printButton.disabled=false;
-      status.textContent = `${payload.cards.length} Charts bereit. Darstellung und Export funktionieren offline.`;
+      status.textContent = '';
       if (document.body.dataset.autoZip === 'true') await exportAll();
     } catch (error) {status.textContent = 'Charts konnten nicht geladen werden: ' + error.message;}
   }

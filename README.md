@@ -1,4 +1,4 @@
-# Befragungsstudio 0.1.25
+# Befragungsstudio 0.1.26
 
 Erste lokale Umsetzung für Befragungsdaten. Charts mit lokal mitgeliefertem Chart.js 4.4.8; Matplotlib wird nicht benötigt. Python 3.11 oder neuer mit Python
 Launcher unter Windows. Alle Oberflächendateien werden mitgeliefert.
@@ -797,3 +797,14 @@ nach Häufigkeit. Die Vergleichsschalter haben mehr Abstand. Detaillegenden zeig
 Linien; auch bei direktunterstellten Einheiten werden eingeschaltete Vergleichsgruppen
 als Referenzlinien angezeigt. Jeder OE-Wert wird weiterhin mit dem Ausschluss seiner
 eigenen Leitung berechnet; übergeordnete Werte enthalten unterstellte Leitungen.
+
+
+## Geschlossene Lesehinweise und Textblöcke (Version 0.1.26)
+
+«So liest du die Ergebnisse» und die Zusammenfassungen der Textantworten sind
+standardmässig geschlossen. Die Lesehinweise nennen die tatsächlich gewählte
+Mindestanzahl (standardmässig n = 5). Der doppelte Leitungshinweis bei Teilnahme
+und Rücklauf sowie die Einheit-/Mindestfallzahlbox entfallen. Nach dem Laden
+der Diagramme wird keine Bereitschaftsmeldung mehr angezeigt; Exportfortschritt
+und Fehlermeldungen bleiben sichtbar. Die Druckauswahl bleibt unabhängig von den
+geöffneten Aufklappfeldern.
