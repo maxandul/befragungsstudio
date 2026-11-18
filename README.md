@@ -1,4 +1,4 @@
-# Befragungsstudio 0.1.23
+# Befragungsstudio 0.1.24
 
 Erste lokale Umsetzung für Befragungsdaten. Charts mit lokal mitgeliefertem Chart.js 4.4.8; Matplotlib wird nicht benötigt. Python 3.11 oder neuer mit Python
 Launcher unter Windows. Alle Oberflächendateien werden mitgeliefert.
@@ -751,3 +751,27 @@ Der gespeicherte Inhalt gilt für die ausgewählte OE und Welle. Er erscheint am
 Berichtsende vor den Berechnungshinweisen, mit einem Link im Inhaltsverzeichnis.
 Vorschau, eigenständiger HTML-Export, Berichtspakete und Druck/PDF verwenden
 denselben Abschnitt. Ohne Text wird er ausgeblendet. Keine Datenmigration nötig.
+
+
+## Verständliche Methodik, Enthaltungen und PDF (Version 0.1.24)
+
+Im Abschnitt Teilnahme und Rücklauf wird der Ausschluss der jeweils vorstehenden
+Führungskräfte sichtbar erklärt, einschliesslich der Regel für unterstellte Einheiten.
+«So lesen Sie die Ergebnisse» erklärt Mittelwerte, Zustimmung, Rücklauf, Vergleiche
+und Unsicherheitsbereiche mit Alltagsbeispielen. Technische Formeln bleiben vertiefbar.
+
+Enthaltungen sind ausschliesslich tatsächlich gespeicherte, nicht leere Antwortcodes
+aus der Fragenverwaltung (z. B. «Keine Antwort»). Nicht vorhandene Fragezeilen und
+leere Felder zählen nicht als Enthaltungen. Dadurch werden Personen ohne die nur an
+Führungskräfte gestellte Frage nicht aus der Gesamtteilnahme heraus als Enthaltungen
+ermittelt. Die bestehende Diagnosezahl `unanswered` bleibt intern kompatibel, wird
+im Bericht aber nicht mehr als Enthaltungszahl verwendet. Nicht zuordenbare Antworten
+werden weiterhin separat ausgewiesen.
+
+PDF über Browserdruck: A4 mit Druckrändern, kleinere Schrift, einspaltige Details und
+Seitenumbrüche zwischen Themen/Detailfragen. Vor dem Druck werden die für die Druckvorlage passenden Details
+und die verständliche Methodik geöffnet; die kompakte GL-Fassung lässt wiederholte
+Skalen-Detailcharts weg und behält Auswahlfragen bei; Diagramme werden in fester Druckgrösse als
+Bilder ausgegeben. Nach dem Druck werden Aufklappzustände und Chartgrössen wiederhergestellt.
+Die festgelegte kompakte/vollständige Textauswahl bleibt unabhängig vom Bildschirmzustand.
+Der Druckknopf ist erst nach der Chartinitialisierung aktiv.

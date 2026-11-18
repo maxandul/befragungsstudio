@@ -1,0 +1,27 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync(require('node:path').join(__dirname,'../static/report-charts.js'),'utf8');
+const events={},details=[{open:false},{open:true}],images=[],sizes=[];
+for(const detail of details){detail.classList={add(){},remove(){},contains(){return false;}};detail.querySelector=()=>null;}
+const parent={classList:{add(){},remove(){}},appendChild(img){img.parentElement=this;images.push(img);}};
+const chart={canvas:{closest(){return null;},getAttribute(){return 'Zeitvergleich';},toDataURL(){return 'data:image/png;base64,chart';},parentElement:parent},resize(...size){sizes.push(size);},update(){}};
+const sandbox={window:{addEventListener(name,fn){events[name]=fn;}},charts:new Map([['overview-history-0',chart]]),document:{body:{dataset:{profile:'oe',printMode:'full'}},querySelectorAll(){return details;},createElement(){return {remove(){this.removed=true;}};}}};
+vm.createContext(sandbox);
+vm.runInContext(source.slice(source.indexOf('  let printDetails='),source.indexOf('  async function start()')),sandbox);
+events.beforeprint();
+assert.equal(details[0].open,true);assert.equal(details[1].open,true);
+assert.equal(images.length,1);assert.equal(images[0].alt,'Zeitvergleich');assert.match(images[0].src,/^data:image/);
+assert.deepEqual(sizes[0],[700,510]);
+events.beforeprint();assert.equal(images.length,1);
+events.afterprint();assert.equal(details[0].open,false);assert.equal(details[1].open,true);
+assert.equal(images[0].removed,true);assert.deepEqual(sizes.at(-1),[]);
+events.beforeprint();assert.equal(images.length,2);events.afterprint();
+console.log('Print preparation, image snapshots and state restoration passed.');
+sandbox.document.body.dataset={profile:'gl',printMode:'compact'};
+details[1].querySelector=()=>({});
+let skippedResizes=0;
+sandbox.charts.set('scale-detail',{canvas:{closest(){return {};}} ,resize(){skippedResizes++;},update(){}});
+const before=images.length;
+events.beforeprint();assert.equal(details[0].open,false);assert.equal(details[1].open,true);
+assert.equal(images.length,before+1);assert.equal(skippedResizes,0);
+events.afterprint();assert.equal(details[0].open,false);assert.equal(details[1].open,true);
+console.log('Compact GL retains overview/choice details and skips repeated scale charts.');

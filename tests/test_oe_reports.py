@@ -257,6 +257,23 @@ class OrganisationReportTests(unittest.TestCase):
         result=subprocess.run(['node',str(Path(__file__).with_name('check_ci_exports.cjs'))],capture_output=True,text=True)
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
 
+    def test_abstentions_only_explicit_answers_to_the_actual_question(self):
+        with self.db() as c:
+            c.execute("DELETE FROM answers WHERE source='q' AND wave='2026' AND feedback IN ('0','1')")
+            c.execute("UPDATE answers SET answer='Keine Antwort' WHERE source='q' AND wave='2026' AND feedback='2'")
+            c.execute("UPDATE answers SET answer='' WHERE source='q' AND wave='2026' AND feedback='3'")
+        response,payload=self.payload('min_n=1')
+        row=payload['cards'][0]['rows'][-1]
+        self.assertEqual((row['n'],row['abstentions'],row['missing']),(1,1,2))
+        self.assertIn('Enthaltungen:',response.text)
+        self.assertNotIn('Ohne auswertbare Antwort:',response.text)
+        self.assertIn('die der jeweils ausgewerteten Organisationseinheit vorstehen',response.text)
+
+    @unittest.skipUnless(shutil.which('node'),'Optionaler Entwicklungstest benötigt Node.js')
+    def test_print_chart_snapshots_and_restore(self):
+        result=subprocess.run(['node',str(Path(__file__).with_name('check_print.cjs'))],capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+
     def test_unanswered_counts_include_absent_rows_and_keep_invalid_separate(self):
         with self.db() as c:
             c.execute("DELETE FROM answers WHERE source='q' AND wave='2026' AND feedback='0'")
@@ -265,8 +282,9 @@ class OrganisationReportTests(unittest.TestCase):
         response,payload=self.payload()
         row=payload['cards'][0]['rows'][-1]
         self.assertEqual((row['n'],row['unanswered'],row['missing'],row['invalid']),(2,2,1,1))
-        self.assertIn(b'Ohne auswertbare Antwort:',response.data)
-        self.assertIn(b'Ungekl',response.data)
+        self.assertIn(b'Enthaltungen:',response.data)
+        self.assertEqual(row['abstentions'],0)
+        self.assertIn(b'Nicht zuordenbare Antworten',response.data)
 
     def test_related_text_follows_parent_theme_inside_question_details(self):
         from html.parser import HTMLParser

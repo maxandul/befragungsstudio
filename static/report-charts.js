@@ -300,6 +300,34 @@
     } catch (error) {status.textContent = 'Export fehlgeschlagen: ' + error.message;}
     finally {busy = false; button.disabled = false;}
   }
+  let printDetails=[],printImages=[];
+  function finishPrint() {
+    printImages.forEach(img=>{img.parentElement?.classList.remove('print-chart-ready');img.remove();});printImages=[];
+    printDetails.forEach(([detail,open])=>{detail.open=open;detail.classList.remove('print-hide');});printDetails=[];
+    charts.forEach(chart=>{chart.resize();chart.update('none');});
+  }
+  function preparePrint() {
+    if(printDetails.length || printImages.length)return;
+    const full=document.body.dataset.profile==='oe' || document.body.dataset.printMode==='full';
+    document.querySelectorAll('.question-details,.methodology').forEach(detail=>{
+      printDetails.push([detail,detail.open]);
+      const isMethod=detail.classList.contains('methodology');
+      const hasChoice=detail.querySelector('article:not([data-question-type="scale"])');
+      detail.open=isMethod || full || Boolean(hasChoice);
+      if(!detail.open)detail.classList.add('print-hide');
+    });
+    charts.forEach((chart,key)=>{
+      const canvas=chart.canvas;if(!canvas)return;
+      if(!full && canvas.closest('article[data-question-type="scale"]'))return;
+      const height=String(key).startsWith('overview-') ? 510 : 416;
+      chart.resize(700,height);chart.update('none');
+      const img=document.createElement('img');img.className='print-chart-image';
+      img.alt=canvas.getAttribute('aria-label') || 'Diagramm';img.src=canvas.toDataURL('image/png');
+      canvas.parentElement.appendChild(img);canvas.parentElement.classList.add('print-chart-ready');printImages.push(img);
+    });
+  }
+  window.addEventListener?.('beforeprint',preparePrint);
+  window.addEventListener?.('afterprint',finishPrint);
   async function start() {
     try {
       if (typeof Chart === 'undefined') throw new Error('Die eingebettete Chartbibliothek wurde nicht geladen.');
@@ -326,6 +354,7 @@
         finally {button.disabled = false;}
       }));
       document.getElementById('all-charts').addEventListener('click', exportAll);
+      const printButton=document.getElementById('report-print');if(printButton)printButton.disabled=false;
       status.textContent = `${payload.cards.length} Charts bereit. Darstellung und Export funktionieren offline.`;
       if (document.body.dataset.autoZip === 'true') await exportAll();
     } catch (error) {status.textContent = 'Charts konnten nicht geladen werden: ' + error.message;}
