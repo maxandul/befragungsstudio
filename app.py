@@ -679,7 +679,7 @@ def create_app(instance=None):
         for r in rows:
             if r['type']=='text' and r['wave']==reference_wave and r['n']>=minimum:
                 text_groups.setdefault(r['theme'] or 'Weitere Fragen',[]).append(r)
-        profile=request.args.get('profile','oe')
+        profile=request.args.get('profile','gl')
         print_mode=request.args.get('print_mode','full' if profile=='oe' and 'profile' in request.args else 'compact')
         if profile not in ('gl','oe') or print_mode not in ('compact','full'):
             raise ValueError('Bitte eine vorhandene Berichtsvorlage und Druckansicht wählen.')
@@ -724,15 +724,27 @@ def create_app(instance=None):
             child_rates.append(dict(unit=child['unit'],n=n,total=total,rate=100*n/total if total else None,leader_basis_missing=child_ground.get('leader_basis_missing',False)))
         parent=next((x for x in nodes if node and x['id']==node['parent']),None)
         comparisons=[]
-        for kind,label,path in ([('parent','Übergeordnete OE: '+parent['unit'],parent['path'])] if parent else []) + [('total',p['name']+' · gesamt',[])]:
-            if not node:
-                continue
+        single_root=roots[0] if len(roots)==1 else None
+        candidates=([('parent','Übergeordnete OE: '+parent['unit'],parent['path'])] if parent else [])
+        total_path=single_root['path'] if single_root else []
+        if node and node['path']!=total_path and not any(path==total_path for _,_,path in candidates):
+            candidates.append(('total',(single_root['unit'] if single_root else 'Alle Organisationseinheiten'),total_path))
+        for kind,label,path in candidates:
             comp,_,_=results(pid,path=path)
             comparisons.append(dict(kind=kind,label=label,rows=[r for r in comp if r['wave'] in selected and r['n']>=minimum and r['type']!='text']))
+        display_unit=unit or (single_root['unit'] if single_root else 'Alle Organisationseinheiten')
         scope=node_id or (dimension+'|'+unit if dimension else '')
+        root_scope=bool(single_root and ((not node and not dimension) or (node and node['id']==single_root['id'])))
+        if root_scope:scope=single_root['id']
         with db() as c:
-            notes={r['theme']:r['body'] for r in c.execute('SELECT theme,body FROM report_notes WHERE project=? AND scope=? AND wave=?',(pid,scope,reference_wave))}
+            # The former overall view and the sole top OE share the same editorial scope.
+            notes={r['theme']:r['body'] for r in c.execute('SELECT theme,body FROM report_notes WHERE project=? AND scope=? AND wave=?',(pid,'' if root_scope else scope,reference_wave))}
+            own_notes={r['theme']:r['body'] for r in c.execute('SELECT theme,body FROM report_notes WHERE project=? AND scope=? AND wave=?',(pid,scope,reference_wave))}
+            notes.update(own_notes)
             evidence={}
+            if root_scope:
+                for row in c.execute('SELECT theme,token FROM report_evidence WHERE project=? AND scope=? AND wave=?',(pid,'',reference_wave)):
+                    if row['theme'] not in own_notes:evidence.setdefault(row['theme'],[]).append(row['token'])
             for row in c.execute('SELECT theme,token FROM report_evidence WHERE project=? AND scope=? AND wave=?',(pid,scope,reference_wave)):
                 evidence.setdefault(row['theme'],[]).append(row['token'])
         selected_evidence={theme:[option for token,option in options.items() if token in evidence.get(theme,[])]
@@ -744,7 +756,7 @@ def create_app(instance=None):
         afa=any(r['raw'].get('Survey ID')=='2330' for r in records)
         return dict(p=p,grouped=grouped,rates=rates,minimum=minimum,hidden=hidden,
                     dimension=dimension,unit=unit,selected=selected,available=available,focus_wave=focus_wave,
-                    nodes=nodes,node=node,node_id=node_id,child_rates=child_rates,child_results=child_results,
+                    nodes=nodes,node=node,node_id=node_id,display_unit=display_unit,single_root=single_root,child_rates=child_rates,child_results=child_results,
                     batch_nodes=[n for n in nodes if not node or n['path'][:len(node['path'])]==node['path']],
                     comparisons=comparisons,reference_wave=reference_wave,notes=notes,scope=scope,
                     text_groups=text_groups,include_texts=include_texts,include_summaries=include_summaries,afa=afa,
@@ -763,6 +775,8 @@ def create_app(instance=None):
         from report_views import prepare_text_views, gl_highlights
         ctx['text_views']=prepare_text_views(ctx['text_summaries'],ctx['profile'])
         ctx['gl_highlights']=gl_highlights(ctx['text_views'])
+        from report_views import ranking
+        ctx['all_concerns']={key:sorted([s for t in topics for s in t['all']],key=ranking) for key,topics in ctx['text_views'].items()}
         if ctx['include_summaries'] and not ctx['include_texts']:
             ctx['text_groups']={theme:[r for r in rows if ctx['text_summaries'].get(r['canonical'])]
                                 for theme,rows in ctx['text_groups'].items()}
@@ -784,7 +798,7 @@ def create_app(instance=None):
         overviews=topic_overviews(cards,ctx['reference_wave'])
         chart_library=(ROOT/'static/vendor/chart.umd.js').read_text(encoding='utf-8')
         chart_renderer=(ROOT/'static/report-charts.js').read_text(encoding='utf-8')
-        payload=dict(project=ctx['p']['name'],unit=ctx['unit'] or 'Gesamtbefragung',
+        payload=dict(project=ctx['p']['name'],unit=ctx['display_unit'],
                      focus_wave=ctx['focus_wave'],cards=cards,overviews=overviews,
                      selected=ctx['selected'],reference_wave=ctx['reference_wave'])
         html=render_template('report.html',**ctx,cards=cards,chart_library=chart_library,

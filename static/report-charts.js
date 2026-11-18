@@ -59,6 +59,17 @@
       ctx.stroke();
     });ctx.restore();
   }};
+  const comparisonLines={id:'comparisonLines',afterDatasetsDraw(chart,args,options){
+    if(!options.enabled)return;
+    chart.data.datasets.forEach((ds,i)=>{
+      if(i===0 || !chart.isDatasetVisible(i))return;
+      const value=ds.data.find(Number.isFinite);if(value===undefined)return;
+      const x=chart.scales.x.getPixelForValue(value),area=chart.chartArea;
+      if(x<area.left || x>area.right)return;
+      const ctx=chart.ctx;ctx.save();ctx.strokeStyle=ds.borderColor;ctx.lineWidth=1.5;
+      ctx.setLineDash(ds.borderDash || []);ctx.beginPath();ctx.moveTo(x,area.top);ctx.lineTo(x,area.bottom);ctx.stroke();ctx.restore();
+    });
+  }};
   const valueLabels = {id: 'valueLabels', afterDatasetsDraw(chart, args, options) {
     if (chart.isDatasetVisible && !chart.isDatasetVisible(0)) return;
     const ctx = chart.ctx, ds = chart.data.datasets[0]; ctx.save(); ctx.fillStyle = '#18394f';
@@ -77,10 +88,11 @@
     const small = layout === 'half', exporting = layout !== 'screen', top = metric === 'top2';
     const manyOptions=!scale && Object.keys(latest.counts).length>10;
     const fontSize = exporting ? (manyOptions ? (small ? 14 : 18) : (small ? 22 : 25)) : 14;
+    const options=Object.entries(latest.counts || {}).sort((a,b)=>b[1]-a[1] || a[0].localeCompare(b[0],'de'));
     const labels = scale ? card.rows.map(r => wrap(`${r.wave} · n=${r.n}`, small ? 17 : 29))
-      : Object.keys(latest.counts).map(s => wrap(s, manyOptions ? (small ? 37 : 60) : (small ? 22 : (exporting ? 38 : 35))));
+      : options.map(([s]) => wrap(s, manyOptions ? (small ? 37 : 60) : (small ? 22 : (exporting ? 38 : 35))));
     const values = scale ? card.rows.map(r => top ? r.top2 : r.mean)
-      : Object.values(latest.counts).map(n => 100 * n / latest.n);
+      : options.map(([,n]) => 100 * n / latest.n);
     const children = view === 'children';
     const showCI=scale && intervalsEnabled(), intervalKey=top ? 'top2_ci95' : 'mean_ci95';
     const datasets = [{id:'selected',label: scale ? payload.unit : 'Anteil (%)',
@@ -90,30 +102,33 @@
         borderColor:'#0070b4',backgroundColor:'#0070b4',borderWidth:3,
         pointRadius:exporting ? 7 : 5,pointHoverRadius:7,tension:0,maxBarThickness:30,
         showLine:!children}];
-    if (scale && !children && document.getElementById('show-comparisons')?.checked !== false) {
+    if (scale && document.getElementById('show-comparisons')?.checked !== false) {
       (card.comparisons || []).filter(comparisonVisible).forEach(comp => datasets.push({id:comp.kind || comp.label,
-        label:comp.label + (exporting ? ' · n=' + card.rows.map(row=>comp.rows.find(r=>r.wave===row.wave)?.n ?? '–').join('/') : ''),ns:card.rows.map(row=>comp.rows.find(r=>r.wave===row.wave)?.n),data:card.rows.map(row => {const r=comp.rows.find(r=>r.wave===row.wave);return r ? (top ? r.top2 : r.mean) : null;}),
+        label:comp.label + (exporting ? ' · n=' + (children ? [latest] : card.rows).map(row=>comp.rows.find(r=>r.wave===row.wave)?.n ?? '–').join('/') : ''),
+        ns:(children ? card.children : card.rows).map(row=>comp.rows.find(r=>r.wave===(children ? latest.wave : row.wave))?.n),
+        data:(children ? card.children : card.rows).map(row=>{const r=comp.rows.find(r=>r.wave===(children ? latest.wave : row.wave));return r ? (top ? r.top2 : r.mean) : null;}),
+        type:'line',indexAxis:children ? 'y' : 'x',showLine:!children,
         borderColor:comp.kind==='total' ? '#647887' : '#ed8b23',backgroundColor:comp.kind==='total' ? '#647887' : '#ed8b23',
-        borderDash:[7,5],pointRadius:3,spanGaps:false
+        borderWidth:1.5,borderDash:[7,5],pointStyle:'line',pointRadius:children ? 0 : 3,spanGaps:false
       }));
     }
     const chartLabels=children ? card.children.map(r=>wrap(`${r.unit} · n=${r.n}`,small?22:35)) : labels;
     return {
       type: scale && !children ? 'line' : 'bar',
       data: {labels:chartLabels,datasets},
-      plugins: [whiteBackground, confidenceIntervals, valueLabels],
+      plugins: [whiteBackground, confidenceIntervals, comparisonLines, valueLabels],
       options: {
         indexAxis: scale && !children ? 'x' : 'y', responsive: !exporting, maintainAspectRatio: false,
         animation: false, devicePixelRatio: exporting ? 1 : Math.min(window.devicePixelRatio || 1, 2),
         layout: {padding: {top: 12, left: 12, right: exporting ? 115 : 85, bottom: 10}},
         plugins: {
-          legend: {display: datasets.length>1,labels:{font:{size:fontSize}}},
+          legend: {display: datasets.length>1,labels:{usePointStyle:true,pointStyle:'line',pointStyleWidth:28,boxHeight:2,padding:18,font:{size:fontSize}}},
           title: {display: exporting, text: [...(exporting ? [payload.project + ' · ' + payload.unit] : []),...wrap(card.wording || card.label, small ? 43 : (exporting ? 82 : 75))], color: '#172c3b',
             font: {family: 'Arial, sans-serif', size: exporting ? (small ? 27 : 32) : 19, weight: 'bold'}, padding: {bottom: exporting ? 30 : 20}},
           subtitle: {display: exporting || !scale || showCI, text: wrap((scale ? (top ? agreementLabel(latest)+' · gültige Antworten' : `Mittelwert · Skala ${latest.minimum}–${latest.maximum}`) + (children ? ` · ${latest.wave}` : '')
             : `${latest.wave} · n=${latest.n}` + (latest.type === 'choice_multiple' ? ' · Mehrfachnennungen möglich' : '')) + (showCI ? ` · 95%-KI (${top ? 'Wilson' : 't'})${children ? ' je Einheit' : ' der ausgewählten OE'}` : ''),small ? 48 : 100).concat(showCI && exporting ? wrap('Modellbasiert; Nichtteilnahme nicht abgebildet.',small ? 48 : 100) : []),
             font: {family: 'Arial, sans-serif', size: fontSize}, color: '#607381', padding: {bottom: 35}},
-          confidenceIntervals:{enabled:showCI,horizontal:children,exporting},
+          confidenceIntervals:{enabled:showCI,horizontal:children,exporting},comparisonLines:{enabled:children},
           tooltip: {enabled: !exporting,callbacks:{label:ctx=>{
             const label=`${ctx.dataset.label}: ${fmt(scale && !children ? ctx.parsed.y : ctx.parsed.x,top ? 1 : 2)}${top || !scale ? ' %' : ''} · n=${ctx.dataset.ns?.[ctx.dataIndex] ?? latest.n}`;
             if(!showCI || ctx.datasetIndex!==0)return label;
@@ -164,8 +179,7 @@
         plugins:{legend:{position:'bottom',labels:{font:{size:exporting ? 21 : 13},usePointStyle:true}},
           title:{display:exporting,text:[...wrap(payload.project+' · '+payload.unit,85),...wrap(overview.theme,85)],font:{size:30},color:'#172c3b'},
           subtitle:{display:true,text:[view === 'history' ? 'Zeitvergleich' : 'OE-Vergleich · '+overview.reference_wave,
-            top ? 'Zustimmungsanteil (%) · Grenze je Frage konfiguriert' : `Mittelwert · Skala ${overview.minimum}–${overview.maximum}`,
-            'Wert rechts: '+payload.unit,
+            top ? 'Zustimmung (%)' : `Mittelwert · Skala ${overview.minimum}–${overview.maximum}`,
             ...(exporting ? ['n je Frage in Reihenfolge der Legende · – = kein freigegebenes Ergebnis'] : [])],font:{size:exporting ? 20 : 13}},
           valueLabels:{fontSize:exporting ? 21 : 13,percent:top,edge:true},
           tooltip:{enabled:!exporting,callbacks:{title:items => cards[items[0].dataIndex].wording || cards[items[0].dataIndex].label,
