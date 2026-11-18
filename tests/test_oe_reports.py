@@ -267,7 +267,7 @@ class OrganisationReportTests(unittest.TestCase):
         self.assertEqual((row['n'],row['abstentions'],row['missing']),(1,1,2))
         self.assertIn('Enthaltungen:',response.text)
         self.assertNotIn('Ohne auswertbare Antwort:',response.text)
-        self.assertIn('Die vorstehende Führungskraft ist aus ihrer eigenen OE ausgeschlossen',response.text)
+        self.assertIn('Die vorstehende Führungskraft wird aus ihrer eigenen OE ausgeschlossen',response.text)
 
     @unittest.skipUnless(shutil.which('node'),'Optionaler Entwicklungstest benötigt Node.js')
     def test_print_chart_snapshots_and_restore(self):
@@ -279,7 +279,7 @@ class OrganisationReportTests(unittest.TestCase):
         response,payload=self.payload('oe='+root['id'])
         self.assertEqual(payload['cards'][0]['comparisons'],[])
         self.assertNotIn('id="show-total"',response.text)
-        self.assertLess(response.text.index('<summary>So lesen Sie'),response.text.index('id="participation"'))
+        self.assertLess(response.text.index('<summary>So liest du'),response.text.index('id="participation"'))
         self.assertNotIn('<strong>Rücklauf:</strong>',response.text)
         self.assertNotIn('Vollständige Textantworten sind ausgeblendet.',response.text)
         self.assertEqual(payload['unit'],'AFA')
