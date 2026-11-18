@@ -243,10 +243,12 @@ def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit=''
         r, q = next(iter(answers.values()))
         values, counts, missing, invalid, texts = [], defaultdict(int), 0, 0, []
         valid_people = 0
+        abstentions = 0
         for r, source_q in answers.values():
             value = r['answer'].strip()
             if not value or value in source_q['missing'].splitlines():
                 missing += 1
+                if value: abstentions += 1
                 continue
             if q['type'] == 'scale':
                 n = number(value)
@@ -279,7 +281,7 @@ def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit=''
                 counts[value] += 1
             valid_people += 1
         rows.append(dict(wave=wave, canonical=canonical, label=q['label'], type=q['type'],
-                         theme=q['theme'], wording=str(r['raw'].get('Question','')).strip() or q['label'], n=valid_people, missing=missing, invalid=invalid,
+                         theme=q['theme'], wording=str(r['raw'].get('Question','')).strip() or q['label'], n=valid_people, missing=missing, abstentions=abstentions, invalid=invalid,
                          mean=sum(values)/len(values) if values else None,
                          top2=100*sum(n >= q['top_from'] for n in values)/len(values) if values else None,
                          counts=dict(counts), texts=texts, minimum=q['minimum'], maximum=q['maximum'],
