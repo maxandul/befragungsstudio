@@ -141,6 +141,7 @@ def register(app, db, project, report_data, result_sources):
             jobs=[dict(r) for r in c.execute("SELECT * FROM text_jobs WHERE project=? AND scope=? AND wave=? AND state='approved' ORDER BY rowid DESC",
                                            (pid,ctx['scope'],ctx['reference_wave']))]
         output={}
+        denominators={row['canonical']:row['n'] for items in ctx['text_groups'].values() for row in items}
         for job in jobs:
             if not current(pid,job):
                 continue
@@ -154,7 +155,7 @@ def register(app, db, project, report_data, result_sources):
                         people={tuple(by_id[ref]['key'][:2]) for ref in topic['quellen']}
                         attribution=disclosure.summarise(people,bundled=True) if disclosure else {}
                         if attribution is not None:
-                            output[canonical].append(dict(topic,people=people,**attribution))
+                            output[canonical].append(dict(topic,people=people,denominator=denominators.get(canonical,0),**attribution))
         return output
     from wave_routes import register as register_wave
     wave_home,wave_summaries=register_wave(app,db,project,report_data,result_sources)

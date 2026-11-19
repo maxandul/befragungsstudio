@@ -18,7 +18,7 @@ blockquote{margin:16px 0;padding:12px 20px;border-left:4px solid #0070b4;backgro
 @media print{body{background:white}.report-section,.report-header,.report-nav,.overview-chart,.chart-container{box-shadow:none}.downloads{display:none}.chart-container{height:420px}article{break-inside:avoid}}
 
 .text-summary>summary{font-weight:bold;font-size:1.15em;cursor:pointer;color:#00407c}.status:empty{display:none}
-.gl-highlights>li{margin:12px 0;padding:10px 14px;background:#fff;border-left:3px solid #0070b4}.gl-text-details{border-top:1px solid #c9dfed;padding-top:12px}.gl-text-details>summary{font-weight:bold}.qual-print{display:none;overflow-wrap:anywhere}.qual-screen li p{white-space:pre-line;margin:6px 0}.qual-screen details{margin:12px 0}.qual-screen summary{cursor:pointer;color:#00407c}.qual-screen ul{padding-left:22px}.qual-nuances{font-size:15px}.concern-origin{color:#526b7c}.qual-screen details.concern-origin{margin:4px 0}.qual-topic{border:1px solid #c9dfed;border-radius:8px;padding:12px}
+.qual-print{display:none;overflow-wrap:anywhere}.qual-screen li p{white-space:pre-line;margin:6px 0}.qual-screen details{margin:12px 0}.qual-screen summary{cursor:pointer;color:#00407c}.qual-screen ul{padding-left:22px}.qual-nuances{font-size:15px}.concern-origin{color:#526b7c}.qual-screen details.concern-origin{margin:4px 0}.qual-topic{border:1px solid #c9dfed;border-radius:8px;padding:12px}
 @media print{.qual-screen{display:none!important}.qual-print{display:block!important;break-inside:auto;border-top:1px solid #ccd5dd;padding-top:12px}.qual-print p,.qual-print li{white-space:pre-line}.qual-print h3,.qual-print h4{break-after:avoid}.report-controls,.report-nav{display:none!important}}
 @page{size:A4 portrait;margin:14mm 12mm 16mm}
 .print-chart-image{display:none}
@@ -44,9 +44,7 @@ blockquote{margin:16px 0;padding:12px 20px;border-left:4px solid #0070b4;backgro
 }
 </style></head>
 {% macro concern_origin(s,printed=false) %}
-{% if s.pooled %}
-<p class="concern-origin"><small>Herkunft auf Berichtsebene ({{display_unit}})</small></p>
-{% elif s.origins %}
+{% if s.origins %}
 {% if s.origins|length>3 and not printed %}
 <details class="concern-origin"><summary><small>Genannt in {{s.origins|length}} OEs</small></summary><small>{{s.origins|join(', ')}}</small></details>
 {% else %}
@@ -54,30 +52,29 @@ blockquote{margin:16px 0;padding:12px 20px;border-left:4px solid #0070b4;backgro
 {% endif %}
 {% endif %}
 {% endmacro %}
+{% macro person_count(count, denominator) -%}
+{% if count %}<small>{{count}}{% if denominator %} von {{denominator}}{% endif %} Textantwortende{{'n' if denominator else ''}}</small>{% endif %}
+{%- endmacro %}
 {% macro concern_entry(s, printed=false) %}
 <li><p>{% if s.kind_label %}<strong>{{s.kind_label}}:</strong> {% endif %}{{s.text}}</p>
-{% if not s.pooled and s.count is defined and s.denominator %}<p><small>{{s.count}} von {{s.denominator}} Textantwortenden dieser Frage</small></p>{% endif %}
+{% if not s.pooled and s.count is defined %}<p>{{person_count(s.count,s.denominator)}}</p>{% endif %}
 {{concern_origin(s,printed)}}
-{% if s.details %}
-{% if not printed %}<details class="qual-nuances"><summary>Nuancen der zugehörigen Aussagen</summary>{% endif %}
-<ul>{% for text in s.details %}<li>{{text}}</li>{% endfor %}</ul>
+{% if s.details and (not printed or print_mode=='full') %}
+{% if not printed %}<details class="qual-nuances"><summary>Nuancen</summary>{% endif %}
+<ul>{% for nuance in s.details %}<li>{{nuance.text}}<br>{{person_count(nuance.count,s.denominator)}}</li>{% endfor %}</ul>
 {% if not printed %}</details>{% endif %}
 {% endif %}
 </li>
 {% endmacro %}
-{% macro concern_highlight(s, printed=false) %}
-<li><p>{{s.display_text}}</p>
-{% if not s.pooled %}<small>{{s.count}} von {{s.denominator}} Textantwortenden dieser Frage</small>{% endif %}
-{{concern_origin(s,printed)}}</li>
-{% endmacro %}
 {% macro concern_topics(views, printed=false) %}
 {% for t in views %}
-{% set entries=t.all if printed and print_mode=='full' or profile=='gl' else t.main %}
+{% set entries=t.main if printed and print_mode=='compact' else t.all %}
 {% if entries %}
-{% if t.collapse and not printed %}<details class="qual-topic"><summary>{{t.title if t.show_title else "Aussagen"}} · {{entries|length}}{% if t.count %} · {{t.count}} Textantwortende{% endif %}</summary>
-{% elif t.show_title %}<h4>{{t.title}}{% if t.count %} <small>· {{t.count}} Textantwortende</small>{% endif %}</h4>{% endif %}
+{% set title=t.title ~ ' aus ' ~ display_unit if t.pooled else t.title %}
+{% if printed %}<h4>{{title}}{% if t.count %} · {{person_count(t.count,t.denominator)}}{% endif %}</h4>
+{% else %}<details class="qual-topic"><summary>{{title}}{% if t.count %} · {{person_count(t.count,t.denominator)}}{% endif %}</summary>{% endif %}
 <ul>{% for s in entries %}{{concern_entry(s,printed)}}{% endfor %}</ul>
-{% if t.collapse and not printed %}</details>{% endif %}
+{% if not printed %}</details>{% endif %}
 {% endif %}
 {% endfor %}
 {% endmacro %}
@@ -85,13 +82,8 @@ blockquote{margin:16px 0;padding:12px 20px;border-left:4px solid #0070b4;backgro
 {% macro text_detail(r,show_summary=true,show_raw=true) %}
 {% set views=text_views.get(r.canonical,[]) %}
 {% if show_summary and include_summaries and views %}<details class="overview qual-screen text-summary" aria-label="Geprüfte Textzusammenfassung"><summary>Textantworten · {{r.label|replace(' Freitext','')}}</summary>
-{% if profile=='gl' %}
-{% set highlights=gl_highlights.get(r.canonical,[]) %}
-{% if highlights %}<ul class="gl-highlights">{% for s in highlights %}{{concern_highlight(s)}}{% endfor %}</ul>{% else %}<p>Keine mehrfach genannten Anliegen für eine verdichtete Auswahl. Einzelhinweise stehen in der Vertiefung.</p>{% endif %}
-<details class="gl-text-details"><summary>Alle Anliegen und Einzelaussagen anzeigen</summary>{{concern_topics(views)}}</details>
-{% else %}
 {{concern_topics(views)}}
-{% endif %}</details>{% endif %}
+</details>{% endif %}
 {% if show_raw and include_texts and r.report_texts %}<div class="qual-screen"><details class="text-answers"><summary><span class="disclosure-label">Textantworten · {{r.label}}</span> <span class="answer-count">{{r.report_texts|length}} Beiträge · {{r.wave}}</span></summary>{% if r.wording!=r.label %}<p class="text-question">{{r.wording}}</p>{% endif %}{% for group in r.text_origins|default([]) %}
 <details class="text-answer-oe"><summary>{{group.label}} <span class="answer-count">{{group.texts|length}} Beiträge</span></summary>{{original_answers(group.texts)}}</details>
 {% else %}{{original_answers(r.report_texts)}}{% endfor %}</details></div>{% endif %}
@@ -99,10 +91,8 @@ blockquote{margin:16px 0;padding:12px 20px;border-left:4px solid #0070b4;backgro
 {% macro text_print(r) %}
 {% set views=text_views.get(r.canonical,[]) %}
 {% if include_summaries and views %}<div class="qual-print"><h3>{{r.label}} · qualitative Ergänzungen</h3><p><small>Welle {{r.wave}}</small></p>
-{% if profile=='gl' and print_mode=='compact' %}{% set highlights=gl_highlights.get(r.canonical,[]) %}{% if highlights %}<ul>{% for s in highlights %}{{concern_highlight(s,true)}}{% endfor %}</ul>{% else %}<p>Keine mehrfach genannten Anliegen für eine verdichtete Auswahl. Einzelhinweise sind in der vollständigen Druckansicht enthalten.</p>{% endif %}
-{% else %}
 {{concern_topics(views,true)}}
-{% endif %}</div>{% endif %}
+</div>{% endif %}
 {% if include_texts and print_mode=='full' and r.report_texts %}<div class="qual-print"><h3>{{r.label}} · vollständige Originalantworten</h3>{% for group in r.text_origins|default([]) %}<h4>{{group.label}}</h4><ol>{% for text in group.texts %}<li>{{text}}</li>{% endfor %}</ol>
 {% else %}<ol>{% for text in r.report_texts %}<li>{{text}}</li>{% endfor %}</ol>{% endfor %}</div>{% endif %}
 {% endmacro %}
@@ -120,7 +110,7 @@ blockquote{margin:16px 0;padding:12px 20px;border-left:4px solid #0070b4;backgro
 <p><strong>Wer ist einbezogen?</strong> Die vorstehende Führungskraft wird aus ihrer eigenen OE ausgeschlossen. Führungskräfte unterstellter Einheiten bleiben im übergeordneten Ergebnis enthalten. Das gilt für Zahlen, Textantworten und Rücklauf.</p>
 
 <p><strong>Diagramme lesen:</strong> Jede Zeile der Themenübersicht zeigt eine Frage. Farben und Symbole unterscheiden Wellen und Einheiten. Mit einem Klick auf einen Eintrag in der Legende lässt sich die entsprechende Gruppe aus- und einblenden. Die Anzahl gültiger Antworten (n) und der vollständige Fragetext stehen in den Tooltips (Datenpunkte mit der Maus berührer) und in den Einzelfragen. Leere Stellen bedeuten: nicht erhoben, keine gültige Antwort oder zu wenige Antworten für die Ausgabe.</p>
-<p><strong>Textantworten:</strong> Die sinngemäss zusammengefassten Anliegen sind nach Zahl unterschiedlicher Textantwortender geordnet. Die kompakte Übersicht zeigt bis zu drei mehrfach genannte Anliegen je Frage. Das beschreibt Häufigkeit, nicht Wichtigkeit. Die Zahlen beziehen sich auf die Textantwortenden dieser Frage, nicht auf alle Mitarbeitenden der OE. Eine Person kann mehrere Anliegen nennen. Einzelaussagen stehen in der Vertiefung am Schluss.</p>
+<p><strong>Textantworten:</strong> Die sinngemäss zusammengefassten Anliegen sind nach Zahl unterschiedlicher Textantwortender geordnet. Klappe ein Thema auf, um seine Anliegen zu lesen. Unter einem Anliegen kannst du die zugehörigen Nuancen öffnen. Das beschreibt Häufigkeit, nicht Wichtigkeit. Die Zahlen beziehen sich auf die Textantwortenden dieser Frage, nicht auf alle Mitarbeitenden der OE. Eine Person kann mehrere Anliegen nennen. Einzelaussagen stehen in der Vertiefung am Schluss.</p>
 {% if include_summaries or include_texts or include_evidence %}<p>Für die Herkunft von Textantworten zählt die Teilnahme an der Welle. Hinweise aus kleinen Einheiten können als gemeinsam gestütztes Anliegen auf Berichtsebene einfliessen.</p>{% endif %}
 <p><strong>Vergleiche:</strong> Unterschiede zwischen Wellen oder OEs geben Hinweise für die Diskussion. Sie belegen allein noch keine gesicherte Veränderung oder deren Ursache. Bei Mehrfachauswahl kann eine Person mehrere Optionen nennen; die Anteile können deshalb zusammen mehr als 100 % ergeben.</p>
 <p><strong>Optionale Unsicherheitsbereiche:</strong> Die Linien an den Werten zeigen, wie genau ein Wert rechnerisch bestimmt ist, wenn man die Antworten als Stichprobe betrachtet. Wenige oder sehr unterschiedliche Antworten führen meist zu einem breiteren Bereich und damit zu grösserer Unsicherheit. Die Bereiche allein sind kein Test, ob Unterschiede statistisch gesichert sind. Sie helfen aber bei der Einschätzung, wie belastbar ein Unterschied ist: Überschneiden sich die Bereiche zweier Werte nicht, spricht viel dafür, dass ein tatsächlicher Unterschied besteht. Überschneiden sie sich stark, kann der Unterschied auch zufällig entstanden sein und sollte nicht überinterpretiert werden.</p>

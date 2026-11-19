@@ -1,19 +1,12 @@
 """Presentation only: source filters and numerical calculations remain unchanged."""
 import re
 
-KINDS={'key':'Kernaussage','difference':'Abweichende Sichtweise','single':'Besonderer Hinweis','normal':''}
+KINDS={'key':'','difference':'Abweichende Sichtweise','single':'Besonderer Hinweis','normal':''}
 GL_MAX_HIGHLIGHTS=3
-GL_EXCERPT_CHARS=300
 
 
 def normalized(text):
     return ' '.join(re.findall(r'\w+',text.casefold()))
-
-
-def excerpt(text):
-    if len(text)<=GL_EXCERPT_CHARS:return text
-    cut=text[:GL_EXCERPT_CHARS-1].rsplit(' ',1)[0].rstrip(' ,;:')
-    return cut+'…'
 
 
 def ranking(entry):
@@ -24,37 +17,45 @@ def ranking(entry):
 def prepare_text_views(summaries,profile):
     output={}
     for canonical,topics in summaries.items():
-        prepared=[];flat=[];singles=[]
+        prepared=[];flat=[];singles=[];pooled_entries=[]
         for topic in topics:
             entries=topic.get('statements')
             if entries is None:
                 entries=[dict(text=topic['aussage'],kind='normal',order=100,details=[],
                               origins=topic.get('origins',[]),people=topic.get('people',set()),
-                              pooled=topic.get('pooled',False))] if topic.get('aussage') else []
+                              denominator=topic.get('denominator',0),pooled=topic.get('pooled',False))] if topic.get('aussage') else []
             bundled=[]
             for entry in entries:
                 e=dict(entry,kind=entry.get('kind','normal'),kind_label=KINDS.get(entry.get('kind','normal'),''),
-                       details=entry.get('details',[]),display_text=excerpt(entry['text']))
+                       details=entry.get('details',[]))
                 if 'people' in e:
                     e.setdefault('count',len(e['people']))
                 if e.get('count')==1 or ('people' in e and not e.get('reviewed',True)):
                     singles.append(e)
+                elif e.get('pooled'):
+                    pooled_entries.append(e)
                 else:
                     bundled.append(e)
             if bundled:
                 bundled.sort(key=ranking)
                 people=set().union(*(e.get('people',set()) for e in bundled))
-                pooled=any(e.get('pooled') for e in bundled)
-                show_title=not pooled and len(topic['titel'])<=80 and (len(bundled)>1 or 'people' not in bundled[0]
-                           and normalized(topic['titel'])!=normalized(bundled[0]['text']))
-                prepared.append(dict(title=topic['titel'],all=bundled,show_title=show_title,
-                                     count=None if pooled else len(people),
-                                     rank_count=len(people)))
+                duplicate_title=len(bundled)==1 and normalized(topic['titel'])==normalized(bundled[0]['text'])
+                prepared.append(dict(title='Anliegen' if duplicate_title else topic['titel'],all=bundled,
+                                     count=len(people) or None,rank_count=len(people),
+                                     denominator=bundled[0].get('denominator',0)))
                 flat.extend(bundled)
+        if pooled_entries:
+            pooled_entries.sort(key=ranking)
+            people=set().union(*(e['people'] for e in pooled_entries))
+            prepared.append(dict(title='Zusammengefasste Anliegen',all=pooled_entries,
+                                 pooled=True,rank_count=len(people)))
+            flat.extend(pooled_entries)
         prepared.sort(key=lambda topic: (-topic['rank_count'],topic['title'].casefold()))
         if singles:
             singles.sort(key=ranking)
-            prepared.append(dict(title='Einzelaussagen',all=singles,show_title=True,singles=True))
+            people=set().union(*(e.get('people',set()) for e in singles))
+            prepared.append(dict(title='Einzelaussagen',all=singles,singles=True,
+                                 count=len(people) or None,denominator=singles[0].get('denominator',0)))
         selected=set();seen=set()
         if profile=='gl':
             for e in sorted(flat,key=ranking):
@@ -67,15 +68,9 @@ def prepare_text_views(summaries,profile):
         for t in prepared:
             entries=t['all']
             main=entries if profile=='oe' else [e for e in entries if id(e) in selected]
-            remaining=[] if profile=='oe' else [e for e in entries if id(e) not in selected]
-            result.append(dict(t,main=main,remaining=remaining,collapse=profile=='oe' and len(entries)>8))
+            result.append(dict(t,main=main))
         output[canonical]=result
     return output
-
-
-def gl_highlights(views):
-    return {canonical:sorted([e for topic in topics for e in topic['main']],key=ranking)
-            for canonical,topics in views.items()}
 
 
 def group_original_texts(texts_by_path, visible_children):
