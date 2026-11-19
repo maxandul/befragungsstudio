@@ -211,7 +211,7 @@ def oe_leaders(records, mappings=(), aliases=(), dimension='', unit='', path=())
 
 
 def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit='', exclusions=(), path=(), exclude_leaders=False, text_group_depth=0):
-    from organisation import LEVELS
+    from organisation import oe_path
 
     exclusions=set(exclusions)
     by_question = defaultdict(dict)
@@ -282,8 +282,7 @@ def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit=''
                 texts.append(value)
                 if text_group_depth:
                     dims = dim_cache[(wave, r['feedback'])]
-                    full_path = tuple((d, dims[d]) for d, _ in LEVELS if dims.get(d))
-                    texts_by_path[full_path[:text_group_depth]].append(value)
+                    texts_by_path[oe_path(dims)[:text_group_depth]].append(value)
             else:
                 counts[value] += 1
             valid_people += 1

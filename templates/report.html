@@ -18,7 +18,7 @@ blockquote{margin:16px 0;padding:12px 20px;border-left:4px solid #0070b4;backgro
 @media print{body{background:white}.report-section,.report-header,.report-nav,.overview-chart,.chart-container{box-shadow:none}.downloads{display:none}.chart-container{height:420px}article{break-inside:avoid}}
 
 .text-summary>summary{font-weight:bold;font-size:1.15em;cursor:pointer;color:#00407c}.status:empty{display:none}
-.gl-highlights>li{margin:12px 0;padding:10px 14px;background:#fff;border-left:3px solid #0070b4}.gl-text-details{border-top:1px solid #c9dfed;padding-top:12px}.gl-text-details>summary{font-weight:bold}.qual-print{display:none;overflow-wrap:anywhere}.qual-screen li p{white-space:pre-line;margin:6px 0}.qual-screen details{margin:12px 0}.qual-screen summary{cursor:pointer;color:#00407c}.qual-screen ul{padding-left:22px}.qual-nuances{font-size:15px}.qual-topic{border:1px solid #c9dfed;border-radius:8px;padding:12px}
+.gl-highlights>li{margin:12px 0;padding:10px 14px;background:#fff;border-left:3px solid #0070b4}.gl-text-details{border-top:1px solid #c9dfed;padding-top:12px}.gl-text-details>summary{font-weight:bold}.qual-print{display:none;overflow-wrap:anywhere}.qual-screen li p{white-space:pre-line;margin:6px 0}.qual-screen details{margin:12px 0}.qual-screen summary{cursor:pointer;color:#00407c}.qual-screen ul{padding-left:22px}.qual-nuances{font-size:15px}.concern-origin{color:#526b7c}.qual-screen details.concern-origin{margin:4px 0}.qual-topic{border:1px solid #c9dfed;border-radius:8px;padding:12px}
 @media print{.qual-screen{display:none!important}.qual-print{display:block!important;break-inside:auto;border-top:1px solid #ccd5dd;padding-top:12px}.qual-print p,.qual-print li{white-space:pre-line}.qual-print h3,.qual-print h4{break-after:avoid}.report-controls,.report-nav{display:none!important}}
 @page{size:A4 portrait;margin:14mm 12mm 16mm}
 .print-chart-image{display:none}
@@ -43,14 +43,23 @@ blockquote{margin:16px 0;padding:12px 20px;border-left:4px solid #0070b4;backgro
  .methodology details{display:none}.hint{padding:3mm}.report-header .hint{background:#fff}
 }
 </style></head>
-{% macro concern_entry(s,nuances=true) %}<li><p>{% if s.kind_label %}<strong>{{s.kind_label}}:</strong> {% endif %}{{s.text}}</p>{% if s.count is defined and s.denominator %}<p><small>{{s.count}} von {{s.denominator}} Textantwortenden dieser Frage</small></p>{% endif %}{% if nuances and s.details %}<details class="qual-nuances"><summary>Nuancen der zugehörigen Aussagen</summary><ul>{% for text in s.details %}<li>{{text}}</li>{% endfor %}</ul></details>{% endif %}</li>{% endmacro %}
+{% macro concern_origin(s,printed=false) %}
+{% if s.origins %}
+{% if s.origins|length>3 and not printed %}
+<details class="concern-origin"><summary><small>Genannt in {{s.origins|length}} OEs</small></summary><small>{{s.origins|join(', ')}}</small></details>
+{% else %}
+<p class="concern-origin"><small>Genannt in {{s.origins[:-1]|join(', ') ~ ' und ' if s.origins|length>1 else ''}}{{s.origins[-1]}}</small></p>
+{% endif %}
+{% endif %}
+{% endmacro %}
+{% macro concern_entry(s,nuances=true) %}<li><p>{% if s.kind_label %}<strong>{{s.kind_label}}:</strong> {% endif %}{{s.text}}</p>{% if s.count is defined and s.denominator %}<p><small>{{s.count}} von {{s.denominator}} Textantwortenden dieser Frage</small></p>{% endif %}{{concern_origin(s)}}{% if nuances and s.details %}<details class="qual-nuances"><summary>Nuancen der zugehörigen Aussagen</summary><ul>{% for text in s.details %}<li>{{text}}</li>{% endfor %}</ul></details>{% endif %}</li>{% endmacro %}
 {% macro original_answers(texts) %}<ol class="text-answer-list">{% for text in texts %}<li><p>{{text}}</p></li>{% endfor %}</ol>{% endmacro %}
 {% macro text_detail(r,show_summary=true,show_raw=true) %}
 {% set views=text_views.get(r.canonical,[]) %}
 {% if show_summary and include_summaries and views %}<details class="overview qual-screen text-summary" aria-label="Geprüfte Textzusammenfassung"><summary>Textantworten · {{r.label|replace(' Freitext','')}}</summary>
 {% if profile=='gl' %}
 {% set highlights=gl_highlights.get(r.canonical,[]) %}
-{% if highlights %}<ul class="gl-highlights">{% for s in highlights %}<li><p>{{s.display_text}}</p><small>{{s.count}} von {{s.denominator}} Textantwortenden dieser Frage</small></li>{% endfor %}</ul>{% else %}<p>Keine mehrfach genannten Anliegen für eine verdichtete Auswahl. Einzelhinweise stehen in der Vertiefung.</p>{% endif %}
+{% if highlights %}<ul class="gl-highlights">{% for s in highlights %}<li><p>{{s.display_text}}</p><small>{{s.count}} von {{s.denominator}} Textantwortenden dieser Frage</small>{{concern_origin(s)}}</li>{% endfor %}</ul>{% else %}<p>Keine mehrfach genannten Anliegen für eine verdichtete Auswahl. Einzelhinweise stehen in der Vertiefung.</p>{% endif %}
 <details class="gl-text-details"><summary>Alle Anliegen, abweichenden Sichtweisen und Einzelhinweise anzeigen</summary><ul>{% for s in all_concerns.get(r.canonical,[]) %}{{concern_entry(s)}}{% endfor %}</ul></details>
 {% else %}
 {% for t in views %}{% if t.main %}{% if t.collapse %}<details class="qual-topic"><summary>{{t.title}} · {{t.main|length}} Anliegen vollständig anzeigen</summary><ul>{% for s in t.main %}{{concern_entry(s)}}{% endfor %}</ul></details>{% else %}{% if t.show_title %}<h4>{{t.title}}</h4>{% endif %}<ul>{% for s in t.main %}{{concern_entry(s)}}{% endfor %}</ul>{% endif %}{% endif %}{% endfor %}
@@ -62,9 +71,9 @@ blockquote{margin:16px 0;padding:12px 20px;border-left:4px solid #0070b4;backgro
 {% macro text_print(r) %}
 {% set views=text_views.get(r.canonical,[]) %}
 {% if include_summaries and views %}<div class="qual-print"><h3>{{r.label}} · qualitative Ergänzungen</h3><p><small>Welle {{r.wave}}</small></p>
-{% if profile=='gl' and print_mode=='compact' %}{% set highlights=gl_highlights.get(r.canonical,[]) %}{% if highlights %}<ul>{% for s in highlights %}<li>{{s.display_text}}<br><small>{{s.count}} von {{s.denominator}} Textantwortenden dieser Frage</small></li>{% endfor %}</ul>{% else %}<p>Keine mehrfach genannten Anliegen für eine verdichtete Auswahl. Einzelhinweise sind in der vollständigen Druckansicht enthalten.</p>{% endif %}
+{% if profile=='gl' and print_mode=='compact' %}{% set highlights=gl_highlights.get(r.canonical,[]) %}{% if highlights %}<ul>{% for s in highlights %}<li>{{s.display_text}}<br><small>{{s.count}} von {{s.denominator}} Textantwortenden dieser Frage</small>{{concern_origin(s,true)}}</li>{% endfor %}</ul>{% else %}<p>Keine mehrfach genannten Anliegen für eine verdichtete Auswahl. Einzelhinweise sind in der vollständigen Druckansicht enthalten.</p>{% endif %}
 {% else %}
-{% for t in views %}{% set entries=t.all if print_mode=='full' else t.main %}{% if entries %}{% if t.show_title %}<h4>{{t.title}}</h4>{% endif %}<ul>{% for s in entries %}<li><p>{% if s.kind_label %}<strong>{{s.kind_label}}:</strong> {% endif %}{{s.text}}</p>{% if s.count is defined and s.denominator %}<p><small>{{s.count}} von {{s.denominator}} Textantwortenden dieser Frage</small></p>{% endif %}{% if print_mode=='full' and s.details %}<ul>{% for text in s.details %}<li>{{text}}</li>{% endfor %}</ul>{% endif %}</li>{% endfor %}</ul>{% endif %}{% endfor %}
+{% for t in views %}{% set entries=t.all if print_mode=='full' else t.main %}{% if entries %}{% if t.show_title %}<h4>{{t.title}}</h4>{% endif %}<ul>{% for s in entries %}<li><p>{% if s.kind_label %}<strong>{{s.kind_label}}:</strong> {% endif %}{{s.text}}</p>{% if s.count is defined and s.denominator %}<p><small>{{s.count}} von {{s.denominator}} Textantwortenden dieser Frage</small></p>{% endif %}{{concern_origin(s,true)}}{% if print_mode=='full' and s.details %}<ul>{% for text in s.details %}<li>{{text}}</li>{% endfor %}</ul>{% endif %}</li>{% endfor %}</ul>{% endif %}{% endfor %}
 {% endif %}</div>{% endif %}
 {% if include_texts and print_mode=='full' %}<div class="qual-print"><h3>{{r.label}} · vollständige Originalantworten</h3>{% for group in r.text_origins|default([]) %}<h4>{{group.label}}</h4><ol>{% for text in group.texts %}<li>{{text}}</li>{% endfor %}</ol>
 {% else %}<ol>{% for text in r.texts %}<li>{{text}}</li>{% endfor %}</ol>{% endfor %}</div>{% endif %}

@@ -28,7 +28,7 @@ def prepare_text_views(summaries,profile):
         for topic in topics:
             entries=topic.get('statements')
             if entries is None:
-                entries=[dict(text=topic['aussage'],kind='normal',order=100,details=[])] if topic.get('aussage') else []
+                entries=[dict(text=topic['aussage'],kind='normal',order=100,details=[],origins=topic.get('origins',[]))] if topic.get('aussage') else []
             entries=[dict(e,kind=e.get('kind','normal'),kind_label=KINDS.get(e.get('kind','normal'),''),
                           details=e.get('details',[]),display_text=excerpt(e['text'])) for e in entries]
             if entries:
@@ -71,3 +71,13 @@ def group_original_texts(texts_by_path, visible_children):
     if groups and remaining:
         groups.append(dict(label='Ohne OE-Angabe', texts=[text for texts in remaining for text in texts]))
     return groups
+
+
+def concern_origins(people, source_oes):
+    if len(people) < 2 or not source_oes:
+        return []
+    labels = {source_oes.get(person) for person in people}
+    # Omit the attribution if identifying the other sources would single out an unnamed group.
+    if None in labels:
+        return []
+    return sorted(labels, key=str.casefold)
