@@ -55,6 +55,38 @@ class ReportEditorialTests(unittest.TestCase):
         html=self.client.get('/p/1/report?'+self.query+'&profile=oe').text
         self.assertNotIn('Gemeinsames Anliegen',html)
 
+    def test_reviewed_origins_follow_report_level_and_disclosure_controls(self):
+        with self.db() as c:
+            c.execute("INSERT INTO mappings(project,wave,dimension,source) VALUES(1,'*','Team','Team')")
+            rows=c.execute("SELECT wave,feedback,source,raw FROM answers WHERE feedback IN ('person-a','leader-a')").fetchall()
+            for wave_id,feedback,source,raw in rows:
+                dims=dict(json.loads(raw),Team='Nord')
+                c.execute("UPDATE answers SET raw=? WHERE wave=? AND feedback=? AND source=?",
+                          (json.dumps(dims),wave_id,feedback,source))
+        _,url,index=self.ready()
+        people={'person-a','person-b','leader-a'}
+        for canonical,kind in [('q','key'),('t','single')]:
+            refs=[ref for ref,entry in index.items() if entry['canonical']==canonical and entry['key'][1] in people]
+            self.assertEqual(self.create(url.replace('question=q','question='+canonical),index,refs,
+                                         kind=kind,body='Geprüft '+canonical).status_code,302)
+
+        root='/p/1/report?focus_wave=2026&profile=gl'
+        html=self.client.get(root).text
+        printed=''.join(re.findall(r'<div class="qual-print">(.*?)</div>',html,re.S))
+        self.assertIn('Genannt in A und B',printed)
+        single=re.search(r'<li><p><strong>Besonderer Hinweis:</strong> Geprüft t.*?</li>',html,re.S)
+        self.assertIsNotNone(single)
+        self.assertNotIn('Genannt in',single[0])
+        self.assertNotIn('Genannt in Nord',html)
+        area=self.client.get('/p/1/report?'+self.query+'&profile=oe&download=1').text
+        self.assertIn('Genannt in Nord',area)
+        self.assertNotIn('Genannt in A und B',area)
+        for suffix in ('&include_children=0','&min_n=2'):
+            filtered=self.client.get(root+suffix).text
+            self.assertIn('Geprüft q',filtered)
+            self.assertNotIn('Genannt in',filtered)
+        self.assertNotIn('Genannt in',self.client.get(root+'&include_summaries=0').text)
+
     def test_profiles_and_deterministic_print_content(self):
         _,url,index=self.ready();self.create(url,index)
         normal=[ref for ref,s in index.items() if s['canonical']=='t' and s['key'][1]=='person-a']

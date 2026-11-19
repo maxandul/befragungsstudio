@@ -3,6 +3,7 @@ import json
 import secrets
 from collections import defaultdict
 from flask import abort, flash, g, redirect, render_template, request, url_for
+from report_views import concern_origins
 from text_analysis import digest
 from wave_analysis import normalized
 
@@ -30,7 +31,7 @@ def valid_concern(concern,index):
     return bool(refs) and all(ref in index and index[ref]['hash']==h and index[ref]['canonical']==concern['canonical'] for ref,h in refs.items())
 
 
-def project_concerns(index,concerns,eligible,aliases):
+def project_concerns(index,concerns,eligible,aliases,source_oes=None):
     """A reviewed sentence must be supported by EACH source; never concatenate narratives."""
     grouped=defaultdict(dict);assigned=set()
     def add(canonical,topic,entry):
@@ -43,8 +44,10 @@ def project_concerns(index,concerns,eligible,aliases):
         if not visible:continue
         topic=aliases.get(c['topic'],c['topic'])
         details=sorted({v['text'] for v in visible if normalized(v['text'])!=normalized(c['body'])})
+        people={tuple(v['key'][:2]) for v in visible}
+        origins=concern_origins(people,source_oes) if c['kind']!='single' else []
         add(c['canonical'],topic,dict(text=c['body'],kind=c['kind'],order=c['sort_order'],reviewed=True,
-            details=details,count=len({tuple(v['key'][:2]) for v in visible})))
+            details=details,count=len(people),origins=origins))
     ungrouped={}
     for ref,s in index.items():
         if ref in assigned or tuple(s['key']) not in eligible:continue
@@ -174,7 +177,7 @@ def register(app,db,project,job_for,is_current):
             unassigned=sum(s['canonical']==canonical and ref not in occupied for ref,s in index.items()),concern_total=concern_total,concern_page=concern_page,concern_pages=concern_pages,
             occupied=occupied,kinds=KINDS,stale=stale,ready=ready,tab='texts')
 
-    def project_job(jid,eligible,aliases):
+    def project_job(jid,eligible,aliases,source_oes=None):
         index,concerns=load(jid)
-        return project_concerns(index,concerns,eligible,aliases)
+        return project_concerns(index,concerns,eligible,aliases,source_oes)
     return project_job

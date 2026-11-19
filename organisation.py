@@ -24,5 +24,10 @@ def tree(entries, observed=()):
     return sorted(nodes.values(), key=lambda n: n['path'])
 
 
+def oe_path(dimensions):
+    return tuple((dimension, dimensions[dimension])
+                 for dimension, _ in LEVELS if dimensions.get(dimension))
+
+
 def matches(dims, path):
     return all(dims.get(dimension) == value for dimension, value in path)
