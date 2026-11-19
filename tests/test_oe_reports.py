@@ -4,6 +4,7 @@ import re
 import sqlite3
 import tempfile
 import unittest
+import zipfile
 import shutil
 import subprocess
 from pathlib import Path
@@ -71,6 +72,50 @@ class OrganisationReportTests(unittest.TestCase):
         self.assertEqual(payload['cards'][0]['comparisons'][0]['rows'][-1]['mean'],3.4)
         self.assertEqual(payload['cards'][0]['wording'],'Vollständiger Fragewortlaut')
 
+    def test_disable_direct_oes_in_preview_and_exports(self):
+        oe=self.node('Bereich','A')['id']
+        query=f'oe={oe}&include_texts=1&include_children=0&print_mode=full'
+        preview,payload=self.payload(query)
+        _,default=self.payload(f'oe={oe}')
+        self.assertTrue(default['cards'][0]['children'])
+        self.assertEqual(payload['cards'][0]['rows'],default['cards'][0]['rows'])
+        self.assertEqual(payload['cards'][0]['comparisons'],default['cards'][0]['comparisons'])
+        self.assertEqual(payload['cards'][0]['children'],[])
+        download,_=self.payload(query+'&download=1')
+        batch=self.client.post('/p/1/reports.zip?focus_wave=2026&'+query,
+                               data=dict(csrf=self.csrf,report_oe=oe))
+        self.assertEqual(batch.status_code,200)
+        with zipfile.ZipFile(io.BytesIO(batch.data)) as archive:
+            packaged=archive.read(archive.namelist()[0])
+        for html in (preview.data,download.data,packaged):
+            self.assertNotIn(b'Direktunterstellte Einheiten',html)
+            self.assertNotIn(b'class="text-answer-oe"',html)
+            self.assertIn(b'Vertraulicher Text 0',html)
+        settings=self.client.get('/p/1/results?'+query)
+        self.assertIn(b'<option value="0" selected>Weglassen</option>',settings.data)
+
+    def test_text_origin_uses_wave_participation_and_keeps_originals(self):
+        with self.db() as c:
+            # A reaches the participation threshold with only one original answer.
+            c.execute("UPDATE answers SET answer='' WHERE wave='2026' AND source='txt' AND feedback='1'")
+        report,_=self.payload('include_texts=1&print_mode=full')
+        groups=dict(re.findall(rb'<details class="text-answer-oe"><summary>([^<]+) <.*?</summary>(.*?)</details>',
+                               report.data,re.S))
+        self.assertEqual(set(groups),{b'A',b'B'})
+        self.assertIn(b'Vertraulicher Text 0',groups[b'A'])
+        self.assertNotIn(b'Vertraulicher Text 0',groups[b'B'])
+        self.assertIn(b'Vertraulicher Text 2',groups[b'B'])
+        self.assertIn(b'<h4>A</h4><ol><li>Vertraulicher Text 0</li>',report.data)
+
+        # A alone would be identifiable as the remaining origin at min_n=3.
+        report,payload=self.payload('include_texts=1&min_n=3')
+        self.assertNotIn(b'class="text-answer-oe"',report.data)
+        self.assertIn(b'Vertraulicher Text 0',report.data)
+        self.assertEqual([row['unit'] for row in payload['cards'][0]['children']],['B'])
+        participation=report.data.split(b'id="participation"',1)[1].split(b'</section>',1)[0]
+        self.assertNotIn(b'<td>A</td>',participation)
+        self.assertIn(b'<td>B</td>',participation)
+
     def test_texts_opt_in_notes_are_scoped_and_escaped(self):
         response,_=self.payload()
         self.assertNotIn(b'Vertraulicher Text',response.data)
@@ -125,7 +170,7 @@ class OrganisationReportTests(unittest.TestCase):
         self.assertNotIn('← Zur App'.encode(),download.data)
         self.assertNotIn('BEFRAGUNGSSTUDIO · AUSWERTUNG'.encode(),download.data)
         self.assertNotIn(b'G\xc3\xbcltige Antworten:',download.data)
-        self.assertIn(b'Werte 4 und 5',download.data)
+        self.assertIn(b'Werte 4 (trifft zu) und 5 (trifft voll zu)',download.data)
 
     def test_ground_count_can_be_corrected_and_deleted_without_touching_answers(self):
         identity=dict(original_wave='2026',original_dimension='',original_unit='',original_total='5')

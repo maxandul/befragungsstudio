@@ -57,3 +57,17 @@ def prepare_text_views(summaries,profile):
 def gl_highlights(views):
     return {canonical:sorted([e for topic in topics for e in topic['main']],key=ranking)
             for canonical,topics in views.items()}
+
+
+def group_original_texts(texts_by_path, visible_children):
+    """Group original answers from the selected report scope by direct OE."""
+    named = {tuple(child['path']): child['unit'] for child in visible_children}
+    remaining = [texts for path, texts in texts_by_path.items() if path not in named]
+    # A single remaining origin could be identified by excluding the named OEs.
+    if len(remaining) == 1:
+        return []
+    groups = [dict(label=label, texts=texts_by_path[path])
+              for path, label in named.items() if path in texts_by_path]
+    if groups and remaining:
+        groups.append(dict(label='Ohne OE-Angabe', texts=[text for texts in remaining for text in texts]))
+    return groups
