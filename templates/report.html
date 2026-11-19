@@ -103,7 +103,7 @@ blockquote{margin:16px 0;padding:12px 20px;border-left:4px solid #0070b4;backgro
 <noscript>Für interaktive Charts und PNG-Downloads aktiviere JavaScript. Die Angaben zu Teilnahme und gültigen Antworten bleiben lesbar.</noscript>
 
 <details class="methodology"><summary>So liest du die Ergebnisse</summary>
-<p><strong>Mindestanzahl:</strong> Ein Ergebnis wird erst angezeigt, wenn mindestens {{minimum}} Personen die jeweilige Frage beantwortet haben (n ≥ {{minimum}}). Kleinere Gruppen bleiben zum Schutz der Anonymität ausgeblendet.</p>
+<p><strong>Mindestanzahl:</strong> Ein Ergebnis wird erst angezeigt, wenn mindestens {{minimum}} Personen die jeweilige Frage beantwortet haben (n ≥ {{minimum}}). Bei direktunterstellten Einheiten mit weniger als {{minimum}} Teilnehmenden zeigt die Rücklauftabelle «n &lt; {{minimum}}» an. Ihre Teilnahmen zählen zum Rücklauf der übergeordneten Einheit.</p>
 <p><strong>Mittelwert:</strong> Der Durchschnitt der Zahlenantworten. Ein höherer Wert bedeutet mehr Zustimmung. Die Anzahl «n» zeigt dir, wie viele Personen eine Antwort gegeben haben.</p>
 <p><strong>Zustimmung:</strong> Der Anteil positiver Antworten – auf der Skala von 1 bis 5 die Werte 4 (trifft zu) und 5 (trifft voll zu). Beispiel: 8 von 10 Antworten sind positiv, die Zustimmung beträgt 80 %. Enthaltungen werden dabei nicht mitgerechnet.</p>
 <p><strong>Enthaltungen:</strong> Gezählt werden Antwortoptionen wie «Keine Antwort» oder «Kann ich noch nicht beurteilen».</p>
@@ -117,7 +117,15 @@ blockquote{margin:16px 0;padding:12px 20px;border-left:4px solid #0070b4;backgro
 <details><summary>Technische Berechnung der Unsicherheitsbereiche</summary><p>Für Mittelwerte werden punktweise 95%-t-Intervalle mit Stichprobenstandardabweichung und n−1 Freiheitsgraden berechnet; für Zustimmungsanteile Wilson-Intervalle. Mittelwertintervalle benötigen mindestens zwei gültige Antworten. Die Berechnung setzt unabhängige Beobachtungen voraus, verwendet keine Korrektur für endliche Grundmengen und berücksichtigt keine Mehrfachvergleiche. Wiederholte Teilnahmen und überlappende OEs können voneinander abhängig sein. Ausserhalb der Skala liegende Grenzen werden im Diagramm abgeschnitten und beim Berühren der Datenpunkte vollständig angezeigt.</p></details></details>
 <section class="report-section" id="participation"><h2>Teilnahme und Rücklauf</h2><div class="table-wrap"><table><tr><th>Welle</th><th>Feedbacks</th><th>Eingeladen</th><th>Rücklauf</th></tr>
 {% for r in rates %}<tr><td>{{r.wave}}</td><td>{{r.n}}</td><td>{{r.total if r.total is not none else ('Leitungsanteil der Grundmenge fehlt' if r.leader_basis_missing else 'Nicht hinterlegt')}}</td><td>{{'%.1f %%'|format(r.rate) if r.rate is not none else '–'}}{% if r.warning %} · Grundmenge prüfen{% endif %}</td></tr>{% endfor %}</table></div>
-{% if child_rates %}<h3>Direktunterstellte Einheiten · {{reference_wave}}</h3><div class="table-wrap"><table><tr><th>Einheit</th><th>Teilnehmende</th><th>Eingeladen</th><th>Rücklauf</th></tr>{% for r in child_rates %}<tr><td>{{r.unit}}</td><td>{{r.n}}</td><td>{{r.total if r.total is not none else ('Leitungsanteil der Grundmenge fehlt' if r.leader_basis_missing else 'Nicht hinterlegt')}}</td><td>{{'%.1f %%'|format(r.rate) if r.rate is not none else '–'}}</td></tr>{% endfor %}</table></div>{% endif %}
+{% if child_rates %}
+<h3>Direktunterstellte Einheiten · {{reference_wave}}</h3>
+<div class="table-wrap"><table>
+<tr><th>Einheit</th><th>Teilnehmende</th><th>Eingeladen</th><th>Rücklauf</th></tr>
+{% for r in child_rates %}
+<tr><td>{{r.unit}}</td><td>{{r.n if r.n is not none else '–'}}</td><td>{{r.total if r.total is not none else ('Leitungsanteil der Grundmenge fehlt' if r.leader_basis_missing else 'Nicht hinterlegt')}}</td><td>{% if r.n is none %}n &lt; {{minimum}}{% else %}{{'%.1f %%'|format(r.rate) if r.rate is not none else '–'}}{% endif %}</td></tr>
+{% endfor %}
+</table></div>
+{% endif %}
 </section>{% if notes.get('Erkenntnisse auf einen Blick') %}<section class="report-section" id="key-findings"><h2>Erkenntnisse auf einen Blick</h2><p style="white-space:pre-line">{{notes['Erkenntnisse auf einen Blick']}}</p></section>{% endif %}
 <div class="downloads report-controls"><label for="report-metric">Darstellung für alle Themen</label><select id="report-metric"><option value="mean">Mittelwerte</option><option value="top2">Zustimmungsanteile</option></select><label><input id="show-ci" type="checkbox"> Unsicherheitsbereiche (95%-Konfidenzintervalle) in den Einzelfragen anzeigen</label>{% if comparisons %}<fieldset><legend>Vergleich mit übergeordneten Ergebnissen</legend>{% for comp in comparisons %}<label><input id="show-{{comp.kind}}" type="checkbox" {{'checked' if comp.kind=='parent' or comparisons|length==1}}> {{comp.label}}</label>{% endfor %}<p><small>Gilt für den aktuellen OE-Vergleich und die Zeitverläufe der Einzelfragen. Einzelne Reihen lassen sich zusätzlich über die Legende schalten.</small></p></fieldset>{% endif %}</div>
 <nav class="report-nav" aria-label="Berichtsinhalt"><h2>Im Bericht</h2><div class="nav-links"><a href="#participation">Teilnahme und Rücklauf</a>{% if notes.get('Erkenntnisse auf einen Blick') %}<a href="#key-findings">Erkenntnisse auf einen Blick</a>{% endif %}{% for theme in themes %}<a href="#theme-{{loop.index}}">{{theme}}</a>{% endfor %}{% if notes.get('Nächste Schritte') %}<a href="#next-steps">Nächste Schritte</a>{% endif %}</div></nav>
@@ -127,7 +135,7 @@ blockquote{margin:16px 0;padding:12px 20px;border-left:4px solid #0070b4;backgro
 
 <h4>Entwicklung der ausgewählten OE ({{display_unit}})</h4><div class="overview-chart" style="height:{{180+overview.indices|length*100}}px"><canvas id="overview-history-{{oi}}" role="img" aria-label="{{theme}}: Zeitvergleich"></canvas></div>
 <div class="downloads"><button type="button" data-topic="{{oi}}" data-topic-view="history">Themenverlauf als PNG</button></div>
-{% if child_rates or comparisons %}<h4>Aktueller OE-Vergleich · {{reference_wave}}</h4><div class="overview-chart" style="height:{{180+overview.indices|length*100}}px"><canvas id="overview-children-{{oi}}" role="img" aria-label="{{theme}}: aktueller OE-Vergleich"></canvas></div><div class="downloads"><button type="button" data-topic="{{oi}}" data-topic-view="children">Themenvergleich als PNG</button></div>{% endif %}
+{% if child_results or comparisons %}<h4>Aktueller OE-Vergleich · {{reference_wave}}</h4><div class="overview-chart" style="height:{{180+overview.indices|length*100}}px"><canvas id="overview-children-{{oi}}" role="img" aria-label="{{theme}}: aktueller OE-Vergleich"></canvas></div><div class="downloads"><button type="button" data-topic="{{oi}}" data-topic-view="children">Themenvergleich als PNG</button></div>{% endif %}
 </div>
 {% endfor %}
 {% if profile=='gl' %}{% for r in text_groups.get(theme,[]) %}{{text_detail(r,true,false)}}{% endfor %}{% endif %}

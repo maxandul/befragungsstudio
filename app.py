@@ -665,7 +665,7 @@ def create_app(instance=None):
         child_scope=node or (single_root if not dimension else None)
         child_parent=child_scope['id'] if child_scope else ''
         child_nodes=[]
-        if include_children and (node or not dimension):
+        if reference_wave and include_children and (node or not dimension):
             child_nodes=[n for n in reference_nodes if n['parent']==child_parent]
         group_text_paths=group_text_origins
         rows,participation,grounds=results(pid,dimension,unit,node['path'] if node else (),group_text_paths=group_text_paths)
@@ -722,13 +722,15 @@ def create_app(instance=None):
         for child in child_nodes:
             cr,cp,cg=results(pid,path=child['path'])
             n=cp.get(reference_wave,0)
-            if n<minimum:
-                continue
-            child_results.append((child,cr))
+            visible=n>=minimum
+            if visible:
+                child_results.append((child,cr))
             totals=[g['total'] for g in cg if g['wave']==reference_wave and g['dimension']==child['dimension'] and g['unit']==child['unit']]
             total=totals[0] if totals and sum(x['dimension']==child['dimension'] and x['unit']==child['unit'] for x in nodes)==1 else None
             child_ground=next((g for g in cg if g['wave']==reference_wave and g['dimension']==child['dimension'] and g['unit']==child['unit']),{})
-            child_rates.append(dict(unit=child['unit'],n=n,total=total,rate=100*n/total if total else None,leader_basis_missing=child_ground.get('leader_basis_missing',False)))
+            child_rates.append(dict(unit=child['unit'],n=n if visible else None,total=total,
+                                    rate=100*n/total if visible and total else None,
+                                    leader_basis_missing=child_ground.get('leader_basis_missing',False)))
         text_disclosure=None
         if group_text_paths:
             from report_text_privacy import TextDisclosure

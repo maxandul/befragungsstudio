@@ -119,8 +119,10 @@ class OrganisationReportTests(unittest.TestCase):
         self.assertIn(b'<summary>B <span class="answer-count">',report.data)
         self.assertEqual([row['unit'] for row in payload['cards'][0]['children']],['B'])
         participation=report.data.split(b'id="participation"',1)[1].split(b'</section>',1)[0]
-        self.assertNotIn(b'<td>A</td>',participation)
-        self.assertIn(b'<td>B</td>',participation)
+        self.assertIn('<tr><td>A</td><td>–</td><td>2</td><td>n &lt; 3</td></tr>',
+                      participation.decode())
+        self.assertIn(b'<tr><td>B</td><td>3</td><td>3</td><td>100.0 %</td></tr>',participation)
+        self.assertIn(b'<tr><td>2026</td><td>5</td><td>5</td><td>100.0 %</td></tr>',participation)
 
     def test_texts_opt_in_notes_are_scoped_and_escaped(self):
         response,_=self.payload()
