@@ -84,7 +84,7 @@ class ReportEditorialTests(unittest.TestCase):
         for suffix in ('','&include_children=0'):
             filtered=self.client.get(root+'&min_n=2&print_mode=full&download=1'+suffix).text
             self.assertIn('Geprüft q',filtered)
-            self.assertIn('Herkunft auf Berichtsebene (AFA)',filtered)
+            self.assertIn('Zusammengefasste Anliegen aus AFA',filtered)
             self.assertNotIn('Aussage person-b',filtered)
             self.assertNotIn('Genannt in',filtered)
             self.assertNotIn('3 von 3 Textantwortenden',filtered)
@@ -151,9 +151,9 @@ class ReportEditorialTests(unittest.TestCase):
     def test_no_arbitrary_top_three_or_fabricated_compact_summary(self):
         topics={'q':[dict(titel='Thema',statements=[dict(text='Punkt '+str(i),kind='normal',details=[]) for i in range(12)])]}
         oe=prepare_text_views(topics,'oe')['q'][0]
-        self.assertEqual(len(oe['main']),12);self.assertTrue(oe['collapse'])
+        self.assertEqual(len(oe['main']),12)
         gl=prepare_text_views(topics,'gl')['q'][0]
-        self.assertEqual(gl['main'],[]);self.assertEqual(len(gl['remaining']),12)
+        self.assertEqual(gl['main'],[]);self.assertEqual(len(gl['all']),12)
 
     def test_rejects_cross_question_duplicate_assignments_and_stale_sources(self):
         _,url,index=self.ready()
@@ -253,7 +253,7 @@ class EditorialScaleTests(unittest.TestCase):
         self.assertEqual(len(entries),1)
         self.assertEqual(entries[0]['count'],100)
         self.assertEqual(len(entries[0]['details']),100)
-        self.assertNotIn('Detail 9999',entries[0]['details'])
+        self.assertNotIn('Detail 9999',{n['text'] for n in entries[0]['details']})
 
 
 if __name__=='__main__':unittest.main()

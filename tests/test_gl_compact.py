@@ -1,7 +1,11 @@
 import re
 import unittest
 import test_report_editorial as editorial
-from report_views import prepare_text_views,gl_highlights,GL_MAX_HIGHLIGHTS,GL_EXCERPT_CHARS
+from report_views import prepare_text_views,ranking,GL_MAX_HIGHLIGHTS
+
+
+def compact_entries(views):
+    return sorted((e for topic in views['q'] for e in topic['main']),key=ranking)
 
 
 class CompactSelectionTests(unittest.TestCase):
@@ -11,30 +15,27 @@ class CompactSelectionTests(unittest.TestCase):
     def test_one_hundred_single_hints_are_not_one_hundred_highlights(self):
         entries=[self.entry('Einzelhinweis '+str(i),1,'key' if i%2 else 'single') for i in range(100)]
         views=prepare_text_views({'q':[dict(titel='Führungsrolle',statements=entries)]},'gl')
-        self.assertEqual(gl_highlights(views)['q'],[])
+        self.assertEqual(compact_entries(views),[])
         self.assertEqual(sum(len(t['all']) for t in views['q']),100)
-        self.assertEqual(sum(len(t['remaining']) for t in views['q']),100)
 
     def test_frequency_wins_over_kind_and_priority_and_is_capped_per_question(self):
         entries=[self.entry('A',14,'normal',999),self.entry('B',10,'single',999),
                  self.entry('C',5,'normal',999),self.entry('D',4,'key',0),self.entry('E',1,'key',0)]
         data={'q':[dict(titel=str(i),statements=[e]) for i,e in enumerate(entries)]}
-        views=prepare_text_views(data,'gl');selected=gl_highlights(views)['q']
+        views=prepare_text_views(data,'gl');selected=compact_entries(views)
         self.assertEqual([e['text'] for e in selected],['A','B','C'])
         self.assertEqual(len(selected),GL_MAX_HIGHLIGHTS)
         self.assertEqual(sum(len(t['all']) for t in views['q']),5)
         smaller={'q':[dict(titel='OE',statements=[dict(e,count=1) for e in entries])]}
-        self.assertEqual(gl_highlights(prepare_text_views(smaller,'gl'))['q'],[])
+        self.assertEqual(compact_entries(prepare_text_views(smaller,'gl')),[])
 
-    def test_duplicates_not_double_counted_and_long_excerpts_stay_bounded(self):
+    def test_duplicate_concerns_do_not_inflate_compact_print_selection(self):
         long='Ein langes Anliegen '+('mit weiteren Details '*40)
         entries=[self.entry('Gleiches Anliegen.',9),self.entry('gleiches  Anliegen',8),self.entry(long,4)]
         views=prepare_text_views({'q':[dict(titel='Thema',statements=entries)]},'gl')
-        highlights=gl_highlights(views)['q']
+        highlights=compact_entries(views)
         self.assertEqual(len(highlights),2)
         self.assertEqual(highlights[0]['count'],9)  # Do not add possibly overlapping source groups.
-        self.assertLessEqual(len(highlights[1]['display_text']),GL_EXCERPT_CHARS)
-        self.assertTrue(highlights[1]['display_text'].endswith('…'))
         self.assertEqual(highlights[1]['text'],long)
 
     def test_topics_count_people_once_and_singles_stay_last(self):
@@ -50,7 +51,7 @@ class CompactSelectionTests(unittest.TestCase):
                 entry('Rollen erläutern', ['a'])])]}
         topics=prepare_text_views(data,'oe')['q']
         self.assertEqual([t['title'] for t in topics],['Information','Zusammenarbeit','Einzelaussagen'])
-        self.assertEqual([t.get('count') for t in topics],[4,3,None])
+        self.assertEqual([t.get('count') for t in topics],[4,3,1])
         self.assertEqual(topics[-1]['all'][0]['text'],'Rollen erläutern')
 
     def test_repeated_sentence_heading_is_suppressed_and_oe_keeps_all(self):
@@ -85,13 +86,15 @@ class CompactReportTests(unittest.TestCase):
             raw=json.dumps({'Amt':'AFA','Bereich':'A','Kadertyp':'','Question':'Skalenfrage'})
             c.execute("INSERT INTO answers VALUES(1,'2026','person-a','score','3','2026-10-01',?)",(raw,))
         html=self.client.get('/p/1/report?focus_wave=2026&profile=gl&min_n=1').text
-        self.assertLess(html.index('class="overview-chart"'),html.index('class="gl-highlights"'))
-        self.assertNotIn('<h4>'+body+'</h4>',html)
-        self.assertIn('2 von 3 Textantwortenden',html)
-        self.assertIn('<details class="gl-text-details"><summary>Alle Anliegen',html)
-        # No default-open qualitative disclosure; no individual hint promotion.
-        self.assertNotIn('<details class="gl-text-details" open',html)
-        self.assertNotIn('Besonderer Hinweis:</strong> '+body,html)
+        self.assertLess(html.index('class="overview-chart"'),html.index('class="qual-topic"'))
+        screen=html.split('<div class="qual-print">',1)[0]
+        self.assertEqual(screen.count(body),1)
+        self.assertIn('<details class="qual-topic"><summary>Anliegen · <small>2 von 3 Textantwortenden</small>',screen)
+        self.assertIn('<details class="qual-nuances"><summary>Nuancen</summary>',screen)
+        self.assertRegex(screen,r'Aussage person-a<br><small>1 von 3 Textantwortenden</small>')
+        self.assertNotIn('class="qual-topic" open',screen)
+        self.assertNotIn('class="qual-nuances" open',screen)
+        self.assertNotIn('Besonderer Hinweis:</strong> '+body,screen)
         print_blocks=''.join(re.findall(r'<div class="qual-print">(.*?)</div>',html,re.S))
         self.assertIn(body,print_blocks)
 

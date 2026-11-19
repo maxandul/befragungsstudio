@@ -46,9 +46,19 @@ def project_concerns(index,concerns,eligible,aliases,disclosure=None):
         if attribution is None:
             continue
         topic=aliases.get(c['topic'],c['topic'])
-        details=sorted({v['text'] for v in visible if normalized(v['text'])!=normalized(c['body'])
-                        and not attribution.get('pooled')
-                        and (not disclosure or disclosure.allows_detail(disclosure.paths[tuple(v['key'][:2])]))})
+        nuances={}
+        if not attribution.get('pooled'):
+            concern_text=normalized(c['body'])
+            for source in visible:
+                key=normalized(source['text'])
+                if key==concern_text:
+                    continue
+                nuance=nuances.setdefault(key, dict(text=source['text'],people=set()))
+                nuance['people'].add(tuple(source['key'][:2]))
+        details=sorted(
+            (dict(text=nuance['text'],count=len(nuance['people'])) for nuance in nuances.values()),
+            key=lambda nuance: (-nuance['count'],nuance['text'].casefold()),
+        )
         add(c['canonical'],topic,dict(text=c['body'],kind=c['kind'],order=c['sort_order'],reviewed=True,
             details=details,count=len(people),people=people,**attribution))
     ungrouped={}
