@@ -107,10 +107,16 @@ class OrganisationReportTests(unittest.TestCase):
         self.assertIn(b'Vertraulicher Text 2',groups[b'B'])
         self.assertIn(b'<h4>A</h4><ol><li>Vertraulicher Text 0</li>',report.data)
 
-        # A alone would be identifiable as the remaining origin at min_n=3.
+        # Original answers from A cannot be pooled with other groups.
+        token=self.evidence_token()
+        self.assertEqual(self.save_evidence([token]).status_code,302)
+        for suffix in ('','&include_children=0'):
+            report,payload=self.payload('include_texts=1&include_evidence=1&min_n=3&print_mode=full'+suffix)
+            self.assertNotIn(b'Vertraulicher Text 0',report.data)
+            self.assertIn(b'Vertraulicher Text 2',report.data)
         report,payload=self.payload('include_texts=1&min_n=3')
-        self.assertNotIn(b'class="text-answer-oe"',report.data)
-        self.assertIn(b'Vertraulicher Text 0',report.data)
+        self.assertNotIn(b'<summary>A <span class="answer-count">',report.data)
+        self.assertIn(b'<summary>B <span class="answer-count">',report.data)
         self.assertEqual([row['unit'] for row in payload['cards'][0]['children']],['B'])
         participation=report.data.split(b'id="participation"',1)[1].split(b'</section>',1)[0]
         self.assertNotIn(b'<td>A</td>',participation)

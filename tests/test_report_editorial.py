@@ -76,16 +76,49 @@ class ReportEditorialTests(unittest.TestCase):
         self.assertIn('Genannt in A und B',printed)
         single=re.search(r'<li><p><strong>Besonderer Hinweis:</strong> Geprüft t.*?</li>',html,re.S)
         self.assertIsNotNone(single)
-        self.assertNotIn('Genannt in',single[0])
+        self.assertIn('Genannt in A und B',single[0])
         self.assertNotIn('Genannt in Nord',html)
         area=self.client.get('/p/1/report?'+self.query+'&profile=oe&download=1').text
         self.assertIn('Genannt in Nord',area)
         self.assertNotIn('Genannt in A und B',area)
-        for suffix in ('&include_children=0','&min_n=2'):
-            filtered=self.client.get(root+suffix).text
+        for suffix in ('','&include_children=0'):
+            filtered=self.client.get(root+'&min_n=2&print_mode=full&download=1'+suffix).text
             self.assertIn('Geprüft q',filtered)
+            self.assertIn('Herkunft auf Berichtsebene (AFA)',filtered)
+            self.assertNotIn('Aussage person-b',filtered)
             self.assertNotIn('Genannt in',filtered)
+            self.assertNotIn('3 von 3 Textantwortenden',filtered)
         self.assertNotIn('Genannt in',self.client.get(root+'&include_summaries=0').text)
+
+    def test_small_unit_single_is_withheld_and_single_section_is_last(self):
+        _,url,index=self.ready()
+        self.assertEqual(self.create(url,index).status_code,302)
+        with self.db() as c:
+            c.execute("INSERT INTO answers SELECT project,wave,'participant-without-text',source,'',date,raw "
+                      "FROM answers WHERE feedback='person-a' AND wave='2026' AND source='q'")
+        root='/p/1/report?focus_wave=2026&profile=oe&min_n=2&download=1'
+        html=self.client.get(root).text
+        self.assertIn('Gemeinsames Anliegen',html)
+        self.assertIn('Einzelaussagen',html)
+        self.assertIn('Aussage person-a',html)
+        self.assertNotIn('Aussage person-b',html)
+        self.assertLess(html.index('Gemeinsames Anliegen'),html.index('<h4>Einzelaussagen'))
+        self.assertNotIn('n &lt; 2)',html)
+
+    def test_pool_uses_only_participation_in_contributing_groups(self):
+        from report_text_privacy import TextDisclosure
+
+        records=[]
+        for group,n in [('A',2),('B',2),('C',8)]:
+            for number in range(n):
+                records.append(dict(wave='2026',feedback=f'{group}{number}',raw=dict(Amt='AFA',Bereich=group)))
+        mappings=[dict(wave='*',dimension=d,source=d) for d in ('Amt','Bereich')]
+        disclosure=TextDisclosure((records,{},mappings,[],[],[]),'2026',5,[],False)
+        source=lambda name: ('2026',name)
+        self.assertIsNone(disclosure.summarise({source('A0'),source('B0')},bundled=True))
+        self.assertIsNone(disclosure.summarise({source('A0'),source('A1')},bundled=True))
+        self.assertEqual(disclosure.summarise({source('A0'),source('C0')},bundled=True),
+                         dict(pooled=True,origins=[]))
 
     def test_profiles_and_deterministic_print_content(self):
         _,url,index=self.ready();self.create(url,index)

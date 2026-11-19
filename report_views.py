@@ -24,21 +24,40 @@ def ranking(entry):
 def prepare_text_views(summaries,profile):
     output={}
     for canonical,topics in summaries.items():
-        prepared=[];flat=[]
+        prepared=[];flat=[];singles=[]
         for topic in topics:
             entries=topic.get('statements')
             if entries is None:
-                entries=[dict(text=topic['aussage'],kind='normal',order=100,details=[],origins=topic.get('origins',[]))] if topic.get('aussage') else []
-            entries=[dict(e,kind=e.get('kind','normal'),kind_label=KINDS.get(e.get('kind','normal'),''),
-                          details=e.get('details',[]),display_text=excerpt(e['text'])) for e in entries]
-            if entries:
-                show_title=len(topic['titel'])<=80 and not (len(entries)==1 and normalized(topic['titel'])==normalized(entries[0]['text']))
-                prepared.append(dict(title=topic['titel'],all=entries,show_title=show_title))
-                flat.extend(entries)
+                entries=[dict(text=topic['aussage'],kind='normal',order=100,details=[],
+                              origins=topic.get('origins',[]),people=topic.get('people',set()),
+                              pooled=topic.get('pooled',False))] if topic.get('aussage') else []
+            bundled=[]
+            for entry in entries:
+                e=dict(entry,kind=entry.get('kind','normal'),kind_label=KINDS.get(entry.get('kind','normal'),''),
+                       details=entry.get('details',[]),display_text=excerpt(entry['text']))
+                if 'people' in e:
+                    e.setdefault('count',len(e['people']))
+                if e.get('count')==1 or ('people' in e and not e.get('reviewed',True)):
+                    singles.append(e)
+                else:
+                    bundled.append(e)
+            if bundled:
+                bundled.sort(key=ranking)
+                people=set().union(*(e.get('people',set()) for e in bundled))
+                pooled=any(e.get('pooled') for e in bundled)
+                show_title=not pooled and len(topic['titel'])<=80 and (len(bundled)>1 or 'people' not in bundled[0]
+                           and normalized(topic['titel'])!=normalized(bundled[0]['text']))
+                prepared.append(dict(title=topic['titel'],all=bundled,show_title=show_title,
+                                     count=None if pooled else len(people),
+                                     rank_count=len(people)))
+                flat.extend(bundled)
+        prepared.sort(key=lambda topic: (-topic['rank_count'],topic['title'].casefold()))
+        if singles:
+            singles.sort(key=ranking)
+            prepared.append(dict(title='Einzelaussagen',all=singles,show_title=True,singles=True))
         selected=set();seen=set()
         if profile=='gl':
             for e in sorted(flat,key=ranking):
-                # A lone statement is a detail, regardless of its AI-assigned label.
                 if e.get('count',0)<2:continue
                 key=normalized(e['text'])
                 if key in seen:continue
@@ -71,13 +90,3 @@ def group_original_texts(texts_by_path, visible_children):
     if groups and remaining:
         groups.append(dict(label='Ohne OE-Angabe', texts=[text for texts in remaining for text in texts]))
     return groups
-
-
-def concern_origins(people, source_oes):
-    if len(people) < 2 or not source_oes:
-        return []
-    labels = {source_oes.get(person) for person in people}
-    # Omit the attribution if identifying the other sources would single out an unnamed group.
-    if None in labels:
-        return []
-    return sorted(labels, key=str.casefold)

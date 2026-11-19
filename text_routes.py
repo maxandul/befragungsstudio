@@ -4,25 +4,7 @@ import json
 import secrets
 import zipfile
 from flask import abort, flash, redirect, render_template, request, send_file, url_for
-from core import mapped_dimensions
-from organisation import oe_path
-from report_views import concern_origins
 import text_analysis as ta
-
-
-def report_source_oes(sources, wave, children):
-    if not children:
-        return {}
-    labels = {tuple(child['path']): child['unit'] for child, _ in children}
-    depth = len(next(iter(labels)))
-    records, _, mappings, aliases, _, _ = sources
-    people = {}
-    for record in records:
-        person = (record['wave'], record['feedback'])
-        if record['wave'] == wave and person not in people:
-            path = oe_path(mapped_dimensions(record, mappings, aliases))[:depth]
-            people[person] = labels.get(path)
-    return people
 
 
 def register(app, db, project, report_data, result_sources):
@@ -154,7 +136,7 @@ def register(app, db, project, report_data, result_sources):
         stream.seek(0)
         return send_file(stream,mimetype='application/zip',as_attachment=True,download_name='Textauswertung_'+jid[:8]+'.zip')
 
-    def summaries(pid,ctx,source_oes):
+    def summaries(pid,ctx,disclosure):
         with db() as c:
             jobs=[dict(r) for r in c.execute("SELECT * FROM text_jobs WHERE project=? AND scope=? AND wave=? AND state='approved' ORDER BY rowid DESC",
                                            (pid,ctx['scope'],ctx['reference_wave']))]
@@ -167,10 +149,12 @@ def register(app, db, project, report_data, result_sources):
             for q in json.loads(job['result'])['fragen']:
                 canonical=by_id[q['id']]['canonical']
                 if canonical not in output:
-                    output[canonical]=[
-                        dict(topic,origins=concern_origins(
-                            {tuple(by_id[ref]['key'][:2]) for ref in topic['quellen']},source_oes))
-                        for topic in q['themen']]
+                    output[canonical]=[]
+                    for topic in q['themen']:
+                        people={tuple(by_id[ref]['key'][:2]) for ref in topic['quellen']}
+                        attribution=disclosure.summarise(people,bundled=True) if disclosure else {}
+                        if attribution is not None:
+                            output[canonical].append(dict(topic,people=people,**attribution))
         return output
     from wave_routes import register as register_wave
     wave_home,wave_summaries=register_wave(app,db,project,report_data,result_sources)
@@ -178,8 +162,8 @@ def register(app, db, project, report_data, result_sources):
     def combined_summaries(pid,ctx):
         if not ctx.get('include_summaries'):
             return {}
-        source_oes=report_source_oes(result_sources(pid),ctx['reference_wave'],ctx['child_results'])
-        legacy=summaries(pid,ctx,source_oes)
-        legacy.update(wave_summaries(pid,ctx,source_oes))
+        disclosure=ctx['text_disclosure']
+        legacy=summaries(pid,ctx,disclosure)
+        legacy.update(wave_summaries(pid,ctx,disclosure))
         return legacy
     return combined_summaries

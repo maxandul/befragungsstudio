@@ -97,7 +97,7 @@ class SynthesisTests(unittest.TestCase):
         cases=[]
         bad=copy.deepcopy(value);bad['teile'].pop();cases.append(bad)
         bad=copy.deepcopy(value);bad['teile'][0]['antworten'].pop();cases.append(bad)
-        bad=copy.deepcopy(value);bad['anliegen'][0]['quellen'].pop();cases.append(bad)
+        bad=copy.deepcopy(value);bad['anliegen'][0]['quellen']=[];cases.append(bad)
         bad=copy.deepcopy(value);bad['anliegen'][0]['quellen'].append(bad['anliegen'][0]['quellen'][0]);cases.append(bad)
         bad=copy.deepcopy(value);bad['anliegen'][0]['quellen'][0]['antwort']='unknown';cases.append(bad)
         bad=copy.deepcopy(value);bad['anliegen'][0]['quellen'][0]['aussage']=0;cases.append(bad)
@@ -109,6 +109,14 @@ class SynthesisTests(unittest.TestCase):
             self.assertEqual(self.parts(),parts)
             self.assertIsNone(self.synth())
         self.assertEqual(self.upload(url,value).status_code,302)
+
+    def test_import_accepts_unassigned_statements_without_losing_them(self):
+        _,url,value=self.overall()
+        value['anliegen'][0]['quellen'].pop()
+        self.assertEqual(self.upload(url,value).status_code,302)
+        self.assertEqual(self.approve(url).status_code,302)
+        html=self.client.get('/p/1/report?focus_wave=2026&profile=oe&min_n=1').text
+        self.assertIn('Einzelaussagen',html)
 
     def test_counts_deduplicate_people_and_include_non_evaluable_denominator(self):
         _,url,value=self.overall()

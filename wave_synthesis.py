@@ -18,20 +18,21 @@ Die Nummer einer Aussage ist ihre Position in der aussagen-Liste, beginnend bei 
 
 2. ALLE TEILERGEBNISSE ZUSAMMENFÜHREN
 Prüfe anhand des Manifests, dass jeder Teil und jede Antwort berücksichtigt ist.
-Vereinheitliche konkrete Themenüberschriften über alle Teile derselben Frage hinweg.
+Verwende als Thema ein kurzes Stichwort, das mehrere verwandte Anliegen derselben Frage
+ordnet, zum Beispiel Zusammenarbeit. Erhalte Unterschiede und Gegensätze innerhalb des Themas.
 Bündle semantisch gleichbedeutende Einzelaussagen zu gemeinsamen konkreten Anliegen.
 Jede Quelle muss die GESAMTE Formulierung ihres Anliegens stützen. Teilweise überlappende
 Anliegen, verschiedene Ursachen, Gegensätze und positive Erfahrungen getrennt erhalten.
-Jede Einzelaussage muss genau einem Anliegen zugeordnet sein. Ihre Details bleiben in
-den Teilergebnissen erhalten. Niemals Aussagen verschiedener Fragen zusammenlegen.
+Bilde ein Anliegen nur, wenn mindestens zwei verschiedene Antworten die gesamte
+Aussage stützen. Ordne jede Einzelaussage höchstens einem Anliegen zu. Aussagen ohne
+passende zweite Stimme bleiben ausschliesslich in den Teilpaketen erhalten.
+Niemals Aussagen verschiedener Fragen zusammenlegen.
 
-3. KERNAUSSAGEN VORSCHLAGEN
-Gib je Anliegen eine passende art an: key (Kernaussage), difference (abweichende Sichtweise),
-single (besonderer Hinweis) oder normal (weiteres Anliegen). Begründe die Auswahl knapp.
-Wiederkehrende Anliegen sind Kandidaten für key. Inhaltliche Relevanz und konkrete
-Einzelhinweise zusätzlich berücksichtigen. Nicht jede Frage braucht zwingend eine
-Kernaussage. Seltene Anliegen nicht löschen. Schätze keine Häufigkeiten oder Prozente:
-Die App zählt später unterschiedliche Textantwortende aus den Quellen, auch je OE.
+3. ANLIEGEN EINORDNEN
+Verwende normal als Standard und difference für belegte abweichende Sichtweisen.
+Die Redaktion kann Anliegen bei Bedarf hervorheben. Die App ordnet sie anhand der
+Anzahl unterschiedlicher Textantwortender, auch je OE. Schätze keine Häufigkeiten
+oder Prozente. Setze prioritaet standardmässig auf 100.
 Formuliere Anliegen ohne Häufigkeitsbehauptungen; eine konkrete Aussage, die jede Quelle
 stützt, muss auch nach Filterung auf eine einzelne OE zutreffen. Eine abweichende
 Sichtweise darf nur bei einem tatsächlich erkennbaren Gegensatz so bezeichnet werden.
@@ -75,7 +76,7 @@ def validate(value,jid,parts):
         raise ValueError('Formatversion oder Auftragskennung der Gesamtrückgabe passt nicht.')
     if not isinstance(value['teile'],list) or not isinstance(value['anliegen'],list):
         raise ValueError('teile und anliegen müssen Listen sein.')
-    expected={p['id']:p for p in parts};seen=set();results={};index_parts=[];lookup={};all_refs=set()
+    expected={p['id']:p for p in parts};seen=set();results={};index_parts=[];lookup={}
     for result in value['teile']:
         bid=result.get('teil') if isinstance(result,dict) else None
         if not isinstance(bid,str) or bid not in expected or bid in seen:
@@ -86,7 +87,7 @@ def validate(value,jid,parts):
         index_parts.append(dict(p,result=json.dumps(result)))
         for a in result['antworten']:
             for i,s in enumerate(a['aussagen']):
-                ref=digest([bid,a['id'],i]);lookup[(bid,a['id'],i+1)]=ref;all_refs.add(ref)
+                ref=digest([bid,a['id'],i]);lookup[(bid,a['id'],i+1)]=ref
     if seen!=set(expected):
         raise ValueError(f'{len(set(expected)-seen)} Teilpakete fehlen. Bitte erst die gesamte Welle zusammenführen.')
     index=statement_index(index_parts);used=set();concerns=[];ids=set()
@@ -114,5 +115,4 @@ def validate(value,jid,parts):
             used.add(ref);refs[ref]=index[ref]['hash']
         concerns.append(dict(id=digest([jid,a['id']]),job=jid,canonical=question_map[a['frage']],topic=a['thema'].strip(),
             body=a['aussage'].strip(),kind=a['art'],sort_order=a['prioritaet'],sources=json.dumps(refs),rationale=a['begruendung'].strip()))
-    if used!=all_refs:raise ValueError(f'{len(all_refs-used)} Einzelaussagen sind noch keinem Anliegen zugeordnet.')
     return results,concerns,index

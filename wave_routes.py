@@ -236,7 +236,7 @@ def register(app,db,project,report_data,result_sources):
         stream.seek(0)
         return send_file(stream,mimetype='application/zip',as_attachment=True,download_name=f'Wellenauswertung_{jid[:8]}.zip')
 
-    def summaries(pid,ctx,source_oes=None):
+    def summaries(pid,ctx,disclosure=None):
         if not ctx.get('include_summaries'):return {}
         with db() as c:
             jobs=[dict(r) for r in c.execute('''SELECT j.* FROM wave_text_jobs j WHERE j.project=? AND j.wave=?
@@ -251,7 +251,7 @@ def register(app,db,project,report_data,result_sources):
         output={};claimed=set()
         for job in jobs:
             if not is_current(pid,job):continue
-            grouped=project_job(job['id'],eligible,json.loads(job['aliases']),source_oes)
+            grouped=project_job(job['id'],eligible,json.loads(job['aliases']),disclosure)
             denominators={r['canonical']:r['n'] for items in ctx['text_groups'].values() for r in items}
             for canonical,topics in grouped.items():
                 for topic in topics:
