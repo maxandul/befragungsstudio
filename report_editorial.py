@@ -3,7 +3,6 @@ import json
 import secrets
 from collections import defaultdict
 from flask import abort, flash, g, redirect, render_template, request, url_for
-from report_views import concern_origins
 from text_analysis import digest
 from wave_analysis import normalized
 
@@ -31,7 +30,7 @@ def valid_concern(concern,index):
     return bool(refs) and all(ref in index and index[ref]['hash']==h and index[ref]['canonical']==concern['canonical'] for ref,h in refs.items())
 
 
-def project_concerns(index,concerns,eligible,aliases,source_oes=None):
+def project_concerns(index,concerns,eligible,aliases,disclosure=None):
     """A reviewed sentence must be supported by EACH source; never concatenate narratives."""
     grouped=defaultdict(dict);assigned=set()
     def add(canonical,topic,entry):
@@ -42,22 +41,30 @@ def project_concerns(index,concerns,eligible,aliases,source_oes=None):
         refs=json.loads(c['sources']);assigned.update(refs)
         visible=[index[ref] for ref in refs if tuple(index[ref]['key']) in eligible]
         if not visible:continue
-        topic=aliases.get(c['topic'],c['topic'])
-        details=sorted({v['text'] for v in visible if normalized(v['text'])!=normalized(c['body'])})
         people={tuple(v['key'][:2]) for v in visible}
-        origins=concern_origins(people,source_oes) if c['kind']!='single' else []
+        attribution=disclosure.summarise(people,bundled=True) if disclosure else {}
+        if attribution is None:
+            continue
+        topic=aliases.get(c['topic'],c['topic'])
+        details=sorted({v['text'] for v in visible if normalized(v['text'])!=normalized(c['body'])
+                        and not attribution.get('pooled')
+                        and (not disclosure or disclosure.allows_detail(disclosure.paths[tuple(v['key'][:2])]))})
         add(c['canonical'],topic,dict(text=c['body'],kind=c['kind'],order=c['sort_order'],reviewed=True,
-            details=details,count=len(people),origins=origins))
+            details=details,count=len(people),people=people,**attribution))
     ungrouped={}
     for ref,s in index.items():
         if ref in assigned or tuple(s['key']) not in eligible:continue
+        person=tuple(s['key'][:2])
+        if disclosure and disclosure.summarise({person}) is None:
+            continue
         topic=aliases.get(s['topic'],s['topic'])
         key=(s['canonical'],normalized(topic),normalized(s['text']))
         item=ungrouped.setdefault(key,dict(canonical=s['canonical'],topic=topic,text=s['text'],people=set()))
-        item['people'].add(tuple(s['key'][:2]))
+        item['people'].add(person)
     for s in ungrouped.values():
+        attribution=disclosure.summarise(s['people']) if disclosure else {}
         add(s['canonical'],s['topic'],dict(text=s['text'],kind='normal',order=100,reviewed=False,
-            details=[],count=len(s['people'])))
+            details=[],count=len(s['people']),people=s['people'],**attribution))
     output={}
     for canonical,topics in grouped.items():
         output[canonical]=[]
@@ -177,7 +184,7 @@ def register(app,db,project,job_for,is_current):
             unassigned=sum(s['canonical']==canonical and ref not in occupied for ref,s in index.items()),concern_total=concern_total,concern_page=concern_page,concern_pages=concern_pages,
             occupied=occupied,kinds=KINDS,stale=stale,ready=ready,tab='texts')
 
-    def project_job(jid,eligible,aliases,source_oes=None):
+    def project_job(jid,eligible,aliases,disclosure=None):
         index,concerns=load(jid)
-        return project_concerns(index,concerns,eligible,aliases,source_oes)
+        return project_concerns(index,concerns,eligible,aliases,disclosure)
     return project_job

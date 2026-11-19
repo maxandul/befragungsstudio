@@ -210,7 +210,7 @@ def oe_leaders(records, mappings=(), aliases=(), dimension='', unit='', path=())
     return leaders
 
 
-def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit='', exclusions=(), path=(), exclude_leaders=False, text_group_depth=0):
+def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit='', exclusions=(), path=(), exclude_leaders=False, group_text_paths=False):
     from organisation import oe_path
 
     exclusions=set(exclusions)
@@ -280,9 +280,9 @@ def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit=''
                     counts[option] += 1
             elif q['type'] == 'text':
                 texts.append(value)
-                if text_group_depth:
+                if group_text_paths:
                     dims = dim_cache[(wave, r['feedback'])]
-                    texts_by_path[oe_path(dims)[:text_group_depth]].append(value)
+                    texts_by_path[oe_path(dims)].append(value)
             else:
                 counts[value] += 1
             valid_people += 1
@@ -294,7 +294,7 @@ def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit=''
                          top_from=q['top_from'],sort_order=q.get('sort_order',0),text_parent=q.get('text_parent',''),
                          unanswered=len(participation[wave])-valid_people-invalid,
                          **scale_intervals(values,q['top_from'])))
-        if q['type'] == 'text' and text_group_depth:
+        if q['type'] == 'text' and group_text_paths:
             rows[-1]['texts_by_path'] = texts_by_path
     return sorted(rows, key=lambda x: (x['theme'], x['sort_order'],x['label'], x['wave'])), {
         wave: len(ids) for wave, ids in participation.items()}

@@ -126,10 +126,10 @@ def create_app(instance=None):
         g.result_sources=(records,qs,mappings,aliases,grounds,exclusions)
         return g.result_sources
 
-    def results(pid, dimension='', unit='', path=(), text_group_depth=0):
+    def results(pid, dimension='', unit='', path=(), group_text_paths=False):
         records,qs,mappings,aliases,grounds,exclusions=result_sources(pid)
         rows,participation=aggregate(records,qs,mappings,aliases,dimension,unit,exclusions,path,exclude_leaders=True,
-                                     text_group_depth=text_group_depth)
+                                     group_text_paths=group_text_paths)
         role_waves={r['wave'] for r in records if 'Kadertyp (subject)' in r['raw'] or 'Kadertyp' in r['raw']}
         with db() as c:
             leader_totals={(r['wave'],r['dimension'],r['unit']):r['total'] for r in c.execute('SELECT * FROM ground_leaders WHERE project=?',(pid,))}
@@ -667,10 +667,8 @@ def create_app(instance=None):
         child_nodes=[]
         if include_children and (node or not dimension):
             child_nodes=[n for n in reference_nodes if n['parent']==child_parent]
-        text_group_depth=0
-        if child_nodes and group_text_origins and include_texts:
-            text_group_depth=len(child_nodes[0]['path'])
-        rows,participation,grounds=results(pid,dimension,unit,node['path'] if node else (),text_group_depth=text_group_depth)
+        group_text_paths=group_text_origins
+        rows,participation,grounds=results(pid,dimension,unit,node['path'] if node else (),group_text_paths=group_text_paths)
         if focus_wave:
             rows=[r for r in rows if r['canonical'] in eligible]
         rows=[r for r in rows if r['wave'] in selected]
@@ -705,7 +703,7 @@ def create_app(instance=None):
             for item in items:
                 for text in item['texts']:
                     token=hashlib.sha256(json.dumps([item['canonical'],text],ensure_ascii=False).encode()).hexdigest()
-                    options.setdefault(token,dict(token=token,text=text,label=item['label'],wording=item['wording']))
+                    options.setdefault(token,dict(token=token,text=text,label=item['label'],wording=item['wording'],canonical=item['canonical']))
             evidence_options[theme]=options
 
         grouped={}
@@ -731,12 +729,24 @@ def create_app(instance=None):
             total=totals[0] if totals and sum(x['dimension']==child['dimension'] and x['unit']==child['unit'] for x in nodes)==1 else None
             child_ground=next((g for g in cg if g['wave']==reference_wave and g['dimension']==child['dimension'] and g['unit']==child['unit']),{})
             child_rates.append(dict(unit=child['unit'],n=n,total=total,rate=100*n/total if total else None,leader_basis_missing=child_ground.get('leader_basis_missing',False)))
-        if text_group_depth:
+        text_disclosure=None
+        if group_text_paths:
+            from report_text_privacy import TextDisclosure
             from report_views import group_original_texts
             text_origin_nodes=[child for child,_ in child_results]
-            for items in text_groups.values():
+            text_disclosure=TextDisclosure(result_sources(pid),reference_wave,minimum,text_origin_nodes,include_children)
+            child_depth=len(child_nodes[0]['path']) if child_nodes else 0
+            for theme, items in text_groups.items():
                 for item in items:
-                    item['text_origins']=group_original_texts(item.pop('texts_by_path'),text_origin_nodes)
+                    safe_by_child={}
+                    for path,texts in item.pop('texts_by_path').items():
+                        if text_disclosure.allows_detail(path):
+                            safe_by_child.setdefault(path[:child_depth],[]).extend(texts)
+                    item['report_texts']=[text for texts in safe_by_child.values() for text in texts]
+                    item['text_origins']=group_original_texts(safe_by_child,text_origin_nodes) if child_depth else []
+                safe_texts={(item['canonical'],text) for item in items for text in item['report_texts']}
+                evidence_options[theme]={token:option for token,option in evidence_options[theme].items()
+                                         if (option['canonical'],option['text']) in safe_texts}
         parent=next((x for x in nodes if node and x['id']==node['parent']),None)
         comparisons=[]
         candidates=([('parent','Übergeordnete OE: '+parent['unit'],parent['path'])] if parent else [])
@@ -771,7 +781,7 @@ def create_app(instance=None):
         return dict(p=p,grouped=grouped,rates=rates,minimum=minimum,hidden=hidden,
                     dimension=dimension,unit=unit,selected=selected,available=available,focus_wave=focus_wave,
                     nodes=nodes,node=node,node_id=node_id,display_unit=display_unit,single_root=single_root,child_rates=child_rates,child_results=child_results,
-                    include_children=include_children,
+                    include_children=include_children,text_disclosure=text_disclosure,
                     batch_nodes=[n for n in nodes if not node or n['path'][:len(node['path'])]==node['path']],
                     comparisons=comparisons,reference_wave=reference_wave,notes=notes,scope=scope,
                     text_groups=text_groups,include_texts=include_texts,include_summaries=include_summaries,afa=afa,
@@ -790,8 +800,6 @@ def create_app(instance=None):
         from report_views import prepare_text_views, gl_highlights
         ctx['text_views']=prepare_text_views(ctx['text_summaries'],ctx['profile'])
         ctx['gl_highlights']=gl_highlights(ctx['text_views'])
-        from report_views import ranking
-        ctx['all_concerns']={key:sorted([s for t in topics for s in t['all']],key=ranking) for key,topics in ctx['text_views'].items()}
         if ctx['include_summaries'] and not ctx['include_texts']:
             ctx['text_groups']={theme:[r for r in rows if ctx['text_summaries'].get(r['canonical'])]
                                 for theme,rows in ctx['text_groups'].items()}

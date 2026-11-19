@@ -32,7 +32,8 @@ Niemals Inhalte mehrerer Antworten zu einer Aussage zusammenziehen. Keine Antwor
 FRAGEKONTEXT UND VERSTÄNDLICHKEIT
 Interpretiere die Antwort im Kontext des Freitextfragetexts und der gegebenenfalls
 mitgelieferten zugehörigen Skalenfrage. Leite daraus keine individuellen Skalenwerte ab.
-Jede Einzelaussage muss ohne Originalantwort eigenständig verständlich sein. Löse kurze
+Kürze sinngemäss auf eine kurze, eigenständig verständliche Aussage je Gedanke.
+Erhalte die Unterscheidung zwischen Erfahrung, Bewertung und Wunsch. Löse kurze
 Bezüge wie «das», «dort» oder «zu wenig» nur auf, wenn der Bezug aus Frage und Antwort
 eindeutig hervorgeht. Ergänze keine Akteure, Ursachen, Folgen oder Lösungsvorschläge.
 Ist ein Bezug unklar, erhalte diese Unklarheit; keine präzisere Diagnose erfinden.

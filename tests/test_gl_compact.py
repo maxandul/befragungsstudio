@@ -37,12 +37,28 @@ class CompactSelectionTests(unittest.TestCase):
         self.assertTrue(highlights[1]['display_text'].endswith('…'))
         self.assertEqual(highlights[1]['text'],long)
 
+    def test_topics_count_people_once_and_singles_stay_last(self):
+        def entry(text, people):
+            return dict(self.entry(text,len(people)),people=set(people),reviewed=True)
+
+        data={'q':[
+            dict(titel='Zusammenarbeit',statements=[
+                entry('Gemeinsame Abläufe beibehalten', ['a','b']),
+                entry('Übergaben vereinfachen', ['a','c'])]),
+            dict(titel='Information',statements=[
+                entry('Früher informieren', ['a','b','c','d']),
+                entry('Rollen erläutern', ['a'])])]}
+        topics=prepare_text_views(data,'oe')['q']
+        self.assertEqual([t['title'] for t in topics],['Information','Zusammenarbeit','Einzelaussagen'])
+        self.assertEqual([t.get('count') for t in topics],[4,3,None])
+        self.assertEqual(topics[-1]['all'][0]['text'],'Rollen erläutern')
+
     def test_repeated_sentence_heading_is_suppressed_and_oe_keeps_all(self):
         body='Viele Termine und Hektik erschweren den Alltag.'
         data={'q':[dict(titel=body,statements=[self.entry(body,1)])]}
         views=prepare_text_views(data,'oe')
-        self.assertFalse(views['q'][0]['show_title'])
-        self.assertEqual(len(views['q'][0]['main']),1)
+        self.assertEqual(views['q'][0]['title'],'Einzelaussagen')
+        self.assertEqual(views['q'][0]['main'][0]['text'],body)
 
 
 class CompactReportTests(unittest.TestCase):
