@@ -210,7 +210,9 @@ def oe_leaders(records, mappings=(), aliases=(), dimension='', unit='', path=())
     return leaders
 
 
-def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit='', exclusions=(), path=(), exclude_leaders=False):
+def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit='', exclusions=(), path=(), exclude_leaders=False, text_group_depth=0):
+    from organisation import LEVELS
+
     exclusions=set(exclusions)
     by_question = defaultdict(dict)
     participation = defaultdict(set)
@@ -242,6 +244,7 @@ def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit=''
     for (wave, canonical), answers in by_question.items():
         r, q = next(iter(answers.values()))
         values, counts, missing, invalid, texts = [], defaultdict(int), 0, 0, []
+        texts_by_path = defaultdict(list)
         valid_people = 0
         abstentions = 0
         for r, source_q in answers.values():
@@ -277,6 +280,10 @@ def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit=''
                     counts[option] += 1
             elif q['type'] == 'text':
                 texts.append(value)
+                if text_group_depth:
+                    dims = dim_cache[(wave, r['feedback'])]
+                    full_path = tuple((d, dims[d]) for d, _ in LEVELS if dims.get(d))
+                    texts_by_path[full_path[:text_group_depth]].append(value)
             else:
                 counts[value] += 1
             valid_people += 1
@@ -288,6 +295,8 @@ def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit=''
                          top_from=q['top_from'],sort_order=q.get('sort_order',0),text_parent=q.get('text_parent',''),
                          unanswered=len(participation[wave])-valid_people-invalid,
                          **scale_intervals(values,q['top_from'])))
+        if q['type'] == 'text' and text_group_depth:
+            rows[-1]['texts_by_path'] = texts_by_path
     return sorted(rows, key=lambda x: (x['theme'], x['sort_order'],x['label'], x['wave'])), {
         wave: len(ids) for wave, ids in participation.items()}
 

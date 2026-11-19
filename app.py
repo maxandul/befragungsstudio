@@ -126,9 +126,10 @@ def create_app(instance=None):
         g.result_sources=(records,qs,mappings,aliases,grounds,exclusions)
         return g.result_sources
 
-    def results(pid, dimension='', unit='', path=()):
+    def results(pid, dimension='', unit='', path=(), text_group_depth=0):
         records,qs,mappings,aliases,grounds,exclusions=result_sources(pid)
-        rows,participation=aggregate(records,qs,mappings,aliases,dimension,unit,exclusions,path,exclude_leaders=True)
+        rows,participation=aggregate(records,qs,mappings,aliases,dimension,unit,exclusions,path,exclude_leaders=True,
+                                     text_group_depth=text_group_depth)
         role_waves={r['wave'] for r in records if 'Kadertyp (subject)' in r['raw'] or 'Kadertyp' in r['raw']}
         with db() as c:
             leader_totals={(r['wave'],r['dimension'],r['unit']):r['total'] for r in c.execute('SELECT * FROM ground_leaders WHERE project=?',(pid,))}
@@ -623,7 +624,7 @@ def create_app(instance=None):
         nodes=tree(entries,observed.values())
         return nodes,tree(entries) if entries else nodes
 
-    def report_data(pid):
+    def report_data(pid, group_text_origins=False):
         p=project(pid)
         dimension=request.args.get('dimension','').strip()
         unit=request.args.get('unit','').strip()
@@ -657,7 +658,19 @@ def create_app(instance=None):
             raise ValueError('Die ausgewählte Organisationseinheit ist nicht vorhanden.')
         if node:
             dimension,unit=node['dimension'],node['unit']
-        rows,participation,grounds=results(pid,dimension,unit,node['path'] if node else ())
+        include_children=request.args.get('include_children','1')=='1'
+        include_texts=request.args.get('include_texts')=='1'
+        roots=[n for n in reference_nodes if not n['parent']]
+        single_root=roots[0] if len(roots)==1 else None
+        child_scope=node or (single_root if not dimension else None)
+        child_parent=child_scope['id'] if child_scope else ''
+        child_nodes=[]
+        if include_children and (node or not dimension):
+            child_nodes=[n for n in reference_nodes if n['parent']==child_parent]
+        text_group_depth=0
+        if child_nodes and group_text_origins and include_texts:
+            text_group_depth=len(child_nodes[0]['path'])
+        rows,participation,grounds=results(pid,dimension,unit,node['path'] if node else (),text_group_depth=text_group_depth)
         if focus_wave:
             rows=[r for r in rows if r['canonical'] in eligible]
         rows=[r for r in rows if r['wave'] in selected]
@@ -683,7 +696,6 @@ def create_app(instance=None):
         print_mode=request.args.get('print_mode','full' if profile=='oe' and 'profile' in request.args else 'compact')
         if profile not in ('gl','oe') or print_mode not in ('compact','full'):
             raise ValueError('Bitte eine vorhandene Berichtsvorlage und Druckansicht wählen.')
-        include_texts=request.args.get('include_texts')=='1'
         include_summaries=request.args.get('include_summaries')=='1' or (
             'profile' in request.args and 'text_options_set' not in request.args and 'include_summaries' not in request.args)
         include_evidence=request.args.get('include_evidence')=='1'
@@ -707,24 +719,26 @@ def create_app(instance=None):
             grouped.setdefault(r['canonical'],[]).append(r)
         for group in grouped.values():
             group.sort(key=lambda row:available.index(row['wave']))
-        child_parent=node_id or ''
-        roots=[n for n in reference_nodes if not n['parent']]
-        if not node and not dimension and len(roots)==1:
-            child_parent=roots[0]['id']
-        child_nodes=[n for n in reference_nodes if n['parent']==child_parent]
         child_rates=[]
         child_results=[]
         for child in child_nodes:
             cr,cp,cg=results(pid,path=child['path'])
-            child_results.append((child,cr))
             n=cp.get(reference_wave,0)
+            if n<minimum:
+                continue
+            child_results.append((child,cr))
             totals=[g['total'] for g in cg if g['wave']==reference_wave and g['dimension']==child['dimension'] and g['unit']==child['unit']]
             total=totals[0] if totals and sum(x['dimension']==child['dimension'] and x['unit']==child['unit'] for x in nodes)==1 else None
             child_ground=next((g for g in cg if g['wave']==reference_wave and g['dimension']==child['dimension'] and g['unit']==child['unit']),{})
             child_rates.append(dict(unit=child['unit'],n=n,total=total,rate=100*n/total if total else None,leader_basis_missing=child_ground.get('leader_basis_missing',False)))
+        if text_group_depth:
+            from report_views import group_original_texts
+            text_origin_nodes=[child for child,_ in child_results]
+            for items in text_groups.values():
+                for item in items:
+                    item['text_origins']=group_original_texts(item.pop('texts_by_path'),text_origin_nodes)
         parent=next((x for x in nodes if node and x['id']==node['parent']),None)
         comparisons=[]
-        single_root=roots[0] if len(roots)==1 else None
         candidates=([('parent','Übergeordnete OE: '+parent['unit'],parent['path'])] if parent else [])
         total_path=single_root['path'] if single_root else []
         if node and node['path']!=total_path and not any(path==total_path for _,_,path in candidates):
@@ -757,6 +771,7 @@ def create_app(instance=None):
         return dict(p=p,grouped=grouped,rates=rates,minimum=minimum,hidden=hidden,
                     dimension=dimension,unit=unit,selected=selected,available=available,focus_wave=focus_wave,
                     nodes=nodes,node=node,node_id=node_id,display_unit=display_unit,single_root=single_root,child_rates=child_rates,child_results=child_results,
+                    include_children=include_children,
                     batch_nodes=[n for n in nodes if not node or n['path'][:len(node['path'])]==node['path']],
                     comparisons=comparisons,reference_wave=reference_wave,notes=notes,scope=scope,
                     text_groups=text_groups,include_texts=include_texts,include_summaries=include_summaries,afa=afa,
@@ -770,7 +785,7 @@ def create_app(instance=None):
 
     @app.route('/p/<int:pid>/report')
     def report(pid):
-        ctx=report_data(pid)
+        ctx=report_data(pid,group_text_origins=True)
         ctx['text_summaries']=approved_summaries(pid,ctx)
         from report_views import prepare_text_views, gl_highlights
         ctx['text_views']=prepare_text_views(ctx['text_summaries'],ctx['profile'])
