@@ -54,6 +54,16 @@ class CompactSelectionTests(unittest.TestCase):
         self.assertEqual([t.get('count') for t in topics],[4,3,1])
         self.assertEqual(topics[-1]['all'][0]['text'],'Rollen erläutern')
 
+    def test_several_unbundled_statements_with_shared_theme_become_direct_nuances(self):
+        statements=[dict(self.entry('Information kommt früh',1),people={'a'},reviewed=False),
+                    dict(self.entry('Information kommt spät',1),people={'b'},reviewed=False)]
+        isolated=dict(self.entry('Ein anderer Aspekt',1),people={'c'},reviewed=False)
+        themes=prepare_text_views({'q':[dict(titel='Informationsfluss',statements=statements),
+                                         dict(titel='Anderes Thema',statements=[isolated])]},'oe')['q']
+        self.assertEqual([theme['title'] for theme in themes],['Informationsfluss','Einzelaussagen'])
+        self.assertEqual(themes[0]['count'],2)
+        self.assertTrue(all(not entry['details'] for entry in themes[0]['all']))
+
     def test_repeated_sentence_heading_is_suppressed_and_oe_keeps_all(self):
         body='Viele Termine und Hektik erschweren den Alltag.'
         data={'q':[dict(titel=body,statements=[self.entry(body,1)])]}
@@ -89,9 +99,9 @@ class CompactReportTests(unittest.TestCase):
         self.assertLess(html.index('class="overview-chart"'),html.index('class="qual-topic"'))
         screen=html.split('<div class="qual-print">',1)[0]
         self.assertEqual(screen.count(body),1)
-        self.assertIn('<details class="qual-topic"><summary>Anliegen · <small>2 von 3 Textantwortenden</small>',screen)
-        self.assertIn('<details class="qual-nuances"><summary>Nuancen</summary>',screen)
-        self.assertRegex(screen,r'Aussage person-a<br><small>1 von 3 Textantwortenden</small>')
+        self.assertRegex(screen,r'<details class="qual-topic"><summary>Anliegen ·\s*<small class="concern-origin">2 von 3 Textantwortenden · A, B</small>')
+        self.assertRegex(screen,r'<details class="qual-nuances"><summary>\s*'+re.escape(body)+r'\s*·\s*<small class="concern-origin">2 von 3 Textantwortenden · A, B</small>')
+        self.assertRegex(screen,r'Aussage person-a ·\s*<small class="concern-origin">1 von 3 Textantwortenden · A</small>')
         self.assertNotIn('class="qual-topic" open',screen)
         self.assertNotIn('class="qual-nuances" open',screen)
         self.assertNotIn('Besonderer Hinweis:</strong> '+body,screen)

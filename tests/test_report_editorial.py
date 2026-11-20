@@ -45,7 +45,6 @@ class ReportEditorialTests(unittest.TestCase):
         self.assertEqual(self.client.get(url).status_code,200)
         html=self.client.get('/p/1/report?'+self.query+'&profile=oe').text
         self.assertIn('Gemeinsames Anliegen',html)
-        self.assertIn('Aussage person-a',html)  # Nuance is preserved.
         self.assertNotIn('Aussage person-b',html)
         self.assertNotIn('Aussage leader-a',html)
         self.assertNotIn('mail@example.org',html)
@@ -73,20 +72,20 @@ class ReportEditorialTests(unittest.TestCase):
         root='/p/1/report?focus_wave=2026&profile=gl'
         html=self.client.get(root).text
         printed=''.join(re.findall(r'<div class="qual-print">(.*?)</div>',html,re.S))
-        self.assertIn('Genannt in A und B',printed)
-        single=re.search(r'<li><p><strong>Besonderer Hinweis:</strong> Geprüft t.*?</li>',html,re.S)
+        self.assertIn('3 von 3 Textantwortenden · A, B',printed)
+        single=re.search(r'<summary>\s*<strong>Besonderer Hinweis:</strong> Geprüft t.*?</summary>',html,re.S)
         self.assertIsNotNone(single)
-        self.assertIn('Genannt in A und B',single[0])
-        self.assertNotIn('Genannt in Nord',html)
+        self.assertIn('3 von 3 Textantwortenden · A, B',single[0])
+        self.assertNotIn('Textantwortenden · Nord',html)
         area=self.client.get('/p/1/report?'+self.query+'&profile=oe&download=1').text
-        self.assertIn('Genannt in Nord',area)
-        self.assertNotIn('Genannt in A und B',area)
+        self.assertIn('2 von 2 Textantwortenden · Nord',area)
+        self.assertNotIn('Textantwortenden · A, B',area)
         for suffix in ('','&include_children=0'):
             filtered=self.client.get(root+'&min_n=2&print_mode=full&download=1'+suffix).text
             self.assertIn('Geprüft q',filtered)
-            self.assertIn('Zusammengefasste Anliegen aus AFA',filtered)
+            self.assertRegex(filtered,r'<summary>Zusammenarbeit ·\s*<small class="concern-origin">AFA</small>')
             self.assertNotIn('Aussage person-b',filtered)
-            self.assertNotIn('Genannt in',filtered)
+            self.assertNotIn('Textantwortenden · B',filtered)
             self.assertNotIn('3 von 3 Textantwortenden',filtered)
         self.assertNotIn('Genannt in',self.client.get(root+'&include_summaries=0').text)
 
@@ -118,7 +117,20 @@ class ReportEditorialTests(unittest.TestCase):
         self.assertIsNone(disclosure.summarise({source('A0'),source('B0')},bundled=True))
         self.assertIsNone(disclosure.summarise({source('A0'),source('A1')},bundled=True))
         self.assertEqual(disclosure.summarise({source('A0'),source('C0')},bundled=True),
-                         dict(pooled=True,origins=[]))
+                         dict(pooled=True,origins=[],show_count=False))
+
+    def test_protected_total_needs_room_for_multiple_distributions(self):
+        from report_text_privacy import TextDisclosure
+
+        records=[dict(wave='2026',feedback=f'{group}{n}',raw=dict(Amt='AFA',Bereich=group))
+                 for group in ('A','B') for n in range(4)]
+        mappings=[dict(wave='*',dimension=d,source=d) for d in ('Amt','Bereich')]
+        disclosure=TextDisclosure((records,{},mappings,[],[],[]),'2026',5,[],True)
+        people=set(disclosure.paths)
+        safe=people-{('2026','A3'),('2026','B3'),('2026','B2')}
+        self.assertTrue(disclosure.summarise(safe,bundled=True)['show_count'])
+        self.assertFalse(disclosure.summarise(people,bundled=True)['show_count'])
+        self.assertFalse(disclosure.summarise(safe-{('2026','A2')},bundled=True)['show_count'])
 
     def test_profiles_and_deterministic_print_content(self):
         _,url,index=self.ready();self.create(url,index)
@@ -137,7 +149,8 @@ class ReportEditorialTests(unittest.TestCase):
         self.assertNotIn('Aussage person-a',printed)  # Nuance not in compact print.
         full=self.client.get('/p/1/report?'+self.query+'&profile=gl&print_mode=full').text
         printed=''.join(re.findall(r'<div class="qual-print">(.*?)</div>',full,re.S))
-        self.assertIn('Aussage person-a',printed)
+        self.assertNotIn('Aussage person-a',printed)
+        self.assertIn('Gemeinsames Anliegen',printed)
         self.assertNotIn('Aussage person-b',printed)
         self.assertNotIn('mail@example.org',printed)
         # Full raw text remains a separate explicit opt-in.

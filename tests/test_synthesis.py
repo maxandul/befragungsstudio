@@ -79,7 +79,7 @@ class SynthesisTests(unittest.TestCase):
         html=self.client.get(report).text
         self.assertIn('Gemeinsames Anliegen',html)
         self.assertIn('1 von 1 Textantwortenden',html)
-        self.assertIn('Aussage person-a',html)
+        self.assertNotIn('Aussage person-a',html)
         self.assertNotIn('Aussage leader-a',html);self.assertNotIn('Aussage person-b',html)
         overall=self.client.get('/p/1/report?focus_wave=2026&profile=gl&min_n=1').text
         self.assertIn('3 von 3 Textantwortenden',overall)
