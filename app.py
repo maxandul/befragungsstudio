@@ -446,8 +446,12 @@ def create_app(instance=None):
                     c.execute('INSERT INTO mappings(project,wave,dimension,source) VALUES(?,?,?,?) ON CONFLICT(project,wave,dimension) DO UPDATE SET source=excluded.source',
                               (pid,f['wave'],dim,f['source']))
                 else:
+                    clear=f.get('clear')=='1'
+                    target='' if clear else f.get('target','').strip()
+                    if not clear and not target:
+                        raise ValueError('Bitte einen Berichtsnamen eingeben oder den Wert weglassen.')
                     c.execute('INSERT INTO aliases(project,wave,dimension,source,target) VALUES(?,?,?,?,?) ON CONFLICT(project,wave,dimension,source) DO UPDATE SET target=excluded.target',
-                              (pid,f['wave'],dim,f['source'],f['target']))
+                              (pid,f['wave'],dim,f['source'],target))
                 flash('Zuordnung gespeichert.')
                 return redirect(url_for('segments',pid=pid,wave=f['wave'],dimension=dim,
                                         source=f['source'] if f['action']=='mapping' else ''))
@@ -480,7 +484,8 @@ def create_app(instance=None):
             aliases=[dict(r) for r in c.execute("SELECT * FROM aliases WHERE project=? ORDER BY (wave != '*'),id",(pid,))]
         return jsonify(segment_preview(records,mappings,aliases,wave=scope,
                        source=request.args.get('source',''),dimension=request.args.get('dimension',''),
-                       original=request.args.get('original',''),target=request.args.get('target','')))
+                       original=request.args.get('original',''),target=request.args.get('target','').strip(),
+                       clear=request.args.get('clear')=='1'))
 
     @app.post('/p/<int:pid>/rule/delete')
     def delete_rule(pid):
@@ -725,9 +730,11 @@ def create_app(instance=None):
             visible=n>=minimum
             if visible:
                 child_results.append((child,cr))
-            totals=[g['total'] for g in cg if g['wave']==reference_wave and g['dimension']==child['dimension'] and g['unit']==child['unit']]
-            total=totals[0] if totals and sum(x['dimension']==child['dimension'] and x['unit']==child['unit'] for x in nodes)==1 else None
             child_ground=next((g for g in cg if g['wave']==reference_wave and g['dimension']==child['dimension'] and g['unit']==child['unit']),{})
+            unique_unit=sum(x['dimension']==child['dimension'] and x['unit']==child['unit'] for x in nodes)==1
+            if unique_unit and child_ground.get('inclusive_total')==0:
+                continue
+            total=child_ground.get('total') if unique_unit else None
             child_rates.append(dict(unit=child['unit'],n=n if visible else None,total=total,
                                     rate=100*n/total if visible and total else None,
                                     leader_basis_missing=child_ground.get('leader_basis_missing',False)))

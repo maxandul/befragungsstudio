@@ -94,6 +94,22 @@ class OrganisationReportTests(unittest.TestCase):
         settings=self.client.get('/p/1/results?'+query)
         self.assertIn(b'<option value="0" selected>Weglassen</option>',settings.data)
 
+    def test_ruecklauf_omits_units_with_zero_invited(self):
+        with self.db() as c:
+            for unit in ('Ohne Eingeladene','Ohne Grundmenge','Nur Leitung'):
+                c.execute('INSERT INTO organisation VALUES(?,?)',
+                          (unit,json.dumps(dict(OE_Kürzel=unit,Amt='AFA',Bereich=unit))))
+            c.execute("""UPDATE answers SET raw=json_set(raw,'$.Kadertyp','')
+                         WHERE wave='2026' AND feedback='0'""")
+            c.execute("INSERT INTO grounds VALUES(1,'2026','Bereich','Ohne Eingeladene',0)")
+            c.execute("INSERT INTO grounds VALUES(1,'2026','Bereich','Nur Leitung',1)")
+            c.execute("INSERT INTO ground_leaders VALUES(1,'2026','Bereich','Nur Leitung',1)")
+        report,_=self.payload()
+        participation=report.get_data(as_text=True).split('id="participation"',1)[1].split('</section>',1)[0]
+        self.assertNotIn('Ohne Eingeladene',participation)
+        self.assertIn('<tr><td>Ohne Grundmenge</td><td>n &lt; 2</td><td>Nicht hinterlegt</td>',participation)
+        self.assertIn('<tr><td>Nur Leitung</td><td>n &lt; 2</td><td>0</td>',participation)
+
     def test_text_origin_uses_wave_participation_and_keeps_originals(self):
         with self.db() as c:
             # A reaches the participation threshold with only one original answer.
@@ -119,7 +135,7 @@ class OrganisationReportTests(unittest.TestCase):
         self.assertIn(b'<summary>B <span class="answer-count">',report.data)
         self.assertEqual([row['unit'] for row in payload['cards'][0]['children']],['B'])
         participation=report.data.split(b'id="participation"',1)[1].split(b'</section>',1)[0]
-        self.assertIn('<tr><td>A</td><td>–</td><td>2</td><td>n &lt; 3</td></tr>',
+        self.assertIn('<tr><td>A</td><td>n &lt; 3</td><td>2</td><td>n &lt; 3</td></tr>',
                       participation.decode())
         self.assertIn(b'<tr><td>B</td><td>3</td><td>3</td><td>100.0 %</td></tr>',participation)
         self.assertIn(b'<tr><td>2026</td><td>5</td><td>5</td><td>100.0 %</td></tr>',participation)
