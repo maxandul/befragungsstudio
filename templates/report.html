@@ -18,8 +18,19 @@ blockquote{margin:16px 0;padding:12px 20px;border-left:4px solid #0070b4;backgro
 @media print{body{background:white}.report-section,.report-header,.report-nav,.overview-chart,.chart-container{box-shadow:none}.downloads{display:none}.chart-container{height:420px}article{break-inside:avoid}}
 
 .text-summary>summary{font-weight:bold;font-size:1.15em;cursor:pointer;color:#00407c}.status:empty{display:none}
-.qual-print{display:none;overflow-wrap:anywhere}.qual-screen li p{white-space:pre-line;margin:6px 0}.qual-screen details{margin:12px 0}.qual-screen summary{cursor:pointer;color:#00407c}.qual-screen ul{padding-left:22px}.qual-nuances{font-size:15px}.concern-origin{display:block;color:#526b7c}.concern-label{display:block;margin-bottom:3px}.concern-text{display:block}.concern-origin{margin-top:5px;font-size:14px;font-weight:normal}.qual-screen .qual-nuances{font-size:inherit}.qual-screen li{margin:12px 0}.qual-screen ul[aria-label="Nuancen"]{margin-top:12px;border-left:2px solid #c9dfed;padding-left:24px}.qual-screen details.concern-origin{margin:4px 0}.qual-topic{border:1px solid #c9dfed;border-radius:8px;padding:12px}
-@media print{.qual-screen{display:none!important}.qual-print{display:block!important;break-inside:auto;border-top:1px solid #ccd5dd;padding-top:12px}.qual-print p,.qual-print li{white-space:pre-line}.qual-print h3,.qual-print h4{break-after:avoid}.report-controls,.report-nav{display:none!important}}
+.qual-print{display:none;overflow-wrap:anywhere}
+.qual-screen details{margin:10px 0}.qual-screen summary{cursor:pointer;color:#00407c}
+.qual-screen .concern-list,.qual-screen ul[aria-label="Nuancen"]{list-style:none;padding:0;margin:12px 0 0}
+.qual-screen .concern-list>li{margin:12px 0}.qual-screen .concern-list>li:last-child{margin-bottom:0}
+.concern-body{margin:0;white-space:normal}.concern-label{display:block;margin:0}
+.qual-nuances>summary>.concern-label{display:inline}
+.concern-text{display:block;white-space:pre-line;margin-top:2px}
+.concern-origin{display:block;color:#526b7c;margin-top:4px;font-size:14px;font-weight:normal;white-space:normal}
+.qual-screen .qual-nuances{font-size:inherit;margin:0}
+.qual-screen ul[aria-label="Nuancen"]{border-left:2px solid #c9dfed;padding-left:18px}
+.qual-screen ul[aria-label="Nuancen"]>li{margin:10px 0}
+.qual-topic{border:1px solid #c9dfed;border-radius:8px;padding:12px}
+@media print{.qual-screen{display:none!important}.qual-print{display:block!important;break-inside:auto;border-top:1px solid #ccd5dd;padding-top:12px}.qual-print p,.qual-print li{white-space:normal}.qual-print h3,.qual-print h4{break-after:avoid}.report-controls,.report-nav{display:none!important}}
 @page{size:A4 portrait;margin:14mm 12mm 16mm}
 .print-chart-image{display:none}
 @media print{
@@ -49,16 +60,16 @@ blockquote{margin:16px 0;padding:12px 20px;border-left:4px solid #0070b4;backgro
 {% if count or origin %}<small class="concern-origin">
 {%- if origin %}Herkunft {{origin}}{% endif -%}
 {%- if count and origin %} · {% endif -%}
-{%- if count %}{{count}} {{'Textantwort' if count==1 else 'Textantworten'}}{% endif -%}
+{%- if count %}{{count}} {{'Textantwort' if count==1 else 'Textantworten'}}{% elif entry.pooled and not entry.show_count %} · Anzahl Textantworten aus Anonymitätsgründen ausgeblendet{% endif -%}
 </small>{% endif %}
 {%- endmacro %}
 {% macro concern_entry(s, printed=false) %}
 {% set expandable = s.details and not printed %}
 <li>
-{% if expandable %}<details class="qual-nuances"><summary>{% else %}<p>{% endif %}
+{% if expandable %}<details class="qual-nuances"><summary>{% else %}<div class="concern-body">{% endif %}
 <strong class="concern-label">{{s.kind_label}}</strong> <span class="concern-text">{{s.text}}</span>
 {{text_meta(s)}}
-{% if expandable %}</summary>{% else %}</p>{% endif %}
+{% if expandable %}</summary>{% else %}</div>{% endif %}
 {% if s.details and (not printed or print_mode=='full') %}
 <ul aria-label="Nuancen">{% for nuance in s.details %}<li><strong class="concern-label">Nuance</strong> <span class="concern-text">{{nuance.text}}</span> {{text_meta(nuance)}}</li>{% endfor %}</ul>
 {% endif %}
@@ -73,7 +84,7 @@ blockquote{margin:16px 0;padding:12px 20px;border-left:4px solid #0070b4;backgro
 {{- 'Thema · ' if t.title != 'Einzelaussagen' }}{{t.title}}
 {{text_meta(t)}}
 {% if printed %}</h4>{% else %}</summary>{% endif %}
-<ul>{% for s in entries %}{{concern_entry(s,printed)}}{% endfor %}</ul>
+<ul class="concern-list">{% for s in entries %}{{concern_entry(s,printed)}}{% endfor %}</ul>
 {% if not printed %}</details>{% endif %}
 {% endif %}
 {% endfor %}

@@ -84,7 +84,7 @@ class ReportEditorialTests(unittest.TestCase):
             filtered=self.client.get(root+'&min_n=2&print_mode=full&download=1'+suffix).text
             self.assertIn('Geprüft q',filtered)
             self.assertIn('<summary>Thema · Zusammenarbeit',filtered)
-            self.assertRegex(filtered,r'Geprüft q</span>\s*<small class="concern-origin">Herkunft AFA</small>')
+            self.assertRegex(filtered,r'Geprüft q</span>\s*<small class="concern-origin">Herkunft AFA · Anzahl Textantworten aus Anonymitätsgründen ausgeblendet</small>')
             self.assertIn('kleine Gruppen (weniger als 2 Teilnehmende)',filtered)
             self.assertNotIn('Aussage person-b',filtered)
             self.assertNotIn('Herkunft B',filtered)
