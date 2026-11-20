@@ -167,3 +167,9 @@ Bestehende Schutzregeln für kleine Gruppen gelten auch für Themensummen: Eine
 Themensumme legt keine auf unterer Ebene unterdrückte Anzahl offen. Bezeichnung,
 Aussage und Herkunft stehen mit Abstand in getrennten Zeilen; Nuancen sind eingerückt.
 Die Darstellung gilt für Vorschau, HTML-Download und Druck.
+
+Die Textebenen verwenden Listen ohne Bulletpoints. Bei aufklappbaren Kernaussagen
+steht der Toggle direkt neben der Bezeichnung. Strukturelle HTML-Zeilenumbrüche
+erzeugen keine zusätzlichen Leerzeilen; nur der Aussageinhalt erhält Zeilenumbrüche.
+Unterdrückte Anzahlen sind ausdrücklich mit «Anzahl Textantworten aus
+Anonymitätsgründen ausgeblendet» gekennzeichnet.

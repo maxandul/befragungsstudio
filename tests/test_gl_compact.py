@@ -108,6 +108,9 @@ class CompactReportTests(unittest.TestCase):
                       '<small class="concern-origin">Herkunft A · 1 Textantwort</small>',screen)
         self.assertNotIn('class="qual-topic" open',screen)
         self.assertNotIn('class="qual-nuances" open',screen)
+        self.assertIn('<ul class="concern-list">',screen)
+        self.assertIn('.qual-nuances>summary>.concern-label{display:inline}',screen)
+        self.assertIn('list-style:none',screen)
         print_blocks=''.join(re.findall(r'<div class="qual-print">(.*?)</div>',html,re.S))
         self.assertIn(body,print_blocks)
 
@@ -121,6 +124,8 @@ class CompactReportTests(unittest.TestCase):
         guide=html.split('<summary>So liest du die Ergebnisse</summary>',1)[1].split('</details>',1)[0]
         self.assertIn('<p><strong>Textantworten:</strong>',guide)
         self.assertNotIn('<h3>Textantworten</h3>',guide)
+        self.assertIn('<div class="concern-body">',html)
+        self.assertNotIn('<p>\n<strong class="concern-label">',html)
 
     def test_editor_explains_disabled_sources_and_places_optional_work_last(self):
         _,url,index=self.ready();self.create(url,index)
