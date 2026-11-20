@@ -154,3 +154,16 @@ Einzelaussagen derselben Person. Mehrere Anliegen pro Person sind möglich; die 
 beschreiben Textantwortende, nicht alle Mitarbeitenden. Der globale CSV-Prüfexport nennt
 zusätzlich Anteile und bezieht sich ausdrücklich auf die Wellenbasis vor OE-Filtern.
 Details, Format, sichere Wiederholung und Grenzen siehe README 0.1.20.
+
+
+## Herkunft und Anzahl auf allen Textebenen
+
+Die Lesehilfe zu Textantworten verwendet denselben Absatzstil mit fett gesetztem
+Stichwort wie die übrigen Lesehinweise. Thema, Kernaussage und Nuance zeigen jeweils
+Herkunft und Anzahl Textantworten. Auf Themenebene wird die Vereinigungsmenge der
+einbezogenen Textantwortenden gezählt; mehrere Aussagen derselben Person erhöhen
+die Anzahl nicht. Ohne feinere Herkunftsangabe steht die ausgewählte Berichtseinheit.
+Bestehende Schutzregeln für kleine Gruppen gelten auch für Themensummen: Eine
+Themensumme legt keine auf unterer Ebene unterdrückte Anzahl offen. Bezeichnung,
+Aussage und Herkunft stehen mit Abstand in getrennten Zeilen; Nuancen sind eingerückt.
+Die Darstellung gilt für Vorschau, HTML-Download und Druck.

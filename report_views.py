@@ -14,13 +14,20 @@ def ranking(entry):
     return (-entry.get('count',0),0 if entry['kind']=='key' else 1,entry.get('order',100),entry['text'].casefold())
 
 
-def topic_view(title, entries):
+def topic_view(title, entries, disclosure=None):
     entries.sort(key=ranking)
     people=set().union(*(entry.get('people',set()) for entry in entries))
-    return dict(title=title,all=entries,count=len(people) or None,rank_count=len(people))
+    attribution=disclosure.summarise(people,bundled=True) if disclosure and people else {}
+    attribution=attribution or {}
+    # A topic total must not reveal a subtotal withheld on a lower level.
+    if any(entry.get('pooled') and not entry.get('show_count') for entry in entries):
+        attribution.update(pooled=True,show_count=False)
+    elif not disclosure:
+        attribution['origins']=sorted({origin for entry in entries for origin in entry.get('origins',[])},key=str.casefold)
+    return dict(title=title,all=entries,count=len(people) or None,rank_count=len(people),**attribution)
 
 
-def prepare_text_views(summaries,profile):
+def prepare_text_views(summaries,profile,disclosure=None):
     output={}
     for canonical,topics in summaries.items():
         prepared=[];singles=[]
@@ -53,10 +60,10 @@ def prepare_text_views(summaries,profile):
                 title=topic['titel']
                 if len(items)==1 and normalized(title)==normalized(items[0]['text']):
                     title='Weitere Rückmeldungen'
-                prepared.append(topic_view(title,items))
+                prepared.append(topic_view(title,items,disclosure))
         prepared.sort(key=lambda topic: (-topic['rank_count'],topic['title'].casefold()))
         if singles:
-            prepared.append(topic_view('Einzelaussagen',singles))
+            prepared.append(topic_view('Einzelaussagen',singles,disclosure))
         selected=set();seen=set()
         if profile=='gl':
             for e in sorted((e for t in prepared for e in t['all']),key=ranking):

@@ -100,14 +100,27 @@ class CompactReportTests(unittest.TestCase):
         screen=html.split('<div class="qual-print">',1)[0]
         self.assertEqual(screen.count(body),1)
         self.assertIn('<summary>Thema · Weitere Rückmeldungen',screen)
-        self.assertRegex(screen,r'<summary>\s*<strong class="concern-label">Kernaussage</strong>'
-                         +re.escape(body)+r'\s*<small class="concern-origin">Herkunft A, B · 2 Textantworten</small>')
-        self.assertIn('<strong class="concern-label">Nuance</strong>Aussage person-a'
+        self.assertRegex(screen,r'<summary>Thema · Weitere Rückmeldungen\s*'
+                         r'<small class="concern-origin">Herkunft A, B · 2 Textantworten</small>')
+        self.assertRegex(screen,r'<summary>\s*<strong class="concern-label">Kernaussage</strong> <span class="concern-text">'
+                         +re.escape(body)+r'</span>\s*<small class="concern-origin">Herkunft A, B · 2 Textantworten</small>')
+        self.assertIn('<strong class="concern-label">Nuance</strong> <span class="concern-text">Aussage person-a</span> '
                       '<small class="concern-origin">Herkunft A · 1 Textantwort</small>',screen)
         self.assertNotIn('class="qual-topic" open',screen)
         self.assertNotIn('class="qual-nuances" open',screen)
         print_blocks=''.join(re.findall(r'<div class="qual-print">(.*?)</div>',html,re.S))
         self.assertIn(body,print_blocks)
+
+    def test_selected_unit_is_origin_when_children_are_hidden(self):
+        _,url,index=self.ready()
+        self.create(url,index)
+        html=self.client.get('/p/1/report?focus_wave=2026&profile=oe&min_n=1&include_children=0').text
+        self.assertRegex(html,r'<summary>Thema · Zusammenarbeit\s*'
+                         r'<small class="concern-origin">Herkunft AFA · 2 Textantworten</small>')
+        self.assertIn('Herkunft AFA · 1 Textantwort',html)
+        guide=html.split('<summary>So liest du die Ergebnisse</summary>',1)[1].split('</details>',1)[0]
+        self.assertIn('<p><strong>Textantworten:</strong>',guide)
+        self.assertNotIn('<h3>Textantworten</h3>',guide)
 
     def test_editor_explains_disabled_sources_and_places_optional_work_last(self):
         _,url,index=self.ready();self.create(url,index)

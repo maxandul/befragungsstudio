@@ -73,7 +73,7 @@ class ReportEditorialTests(unittest.TestCase):
         html=self.client.get(root).text
         printed=''.join(re.findall(r'<div class="qual-print">(.*?)</div>',html,re.S))
         self.assertIn('Herkunft A, B · 3 Textantworten',printed)
-        single=re.search(r'<summary>\s*<strong class="concern-label">Besonderer Hinweis</strong>Geprüft t.*?</summary>',html,re.S)
+        single=re.search(r'<summary>\s*<strong class="concern-label">Besonderer Hinweis</strong> <span class="concern-text">Geprüft t.*?</summary>',html,re.S)
         self.assertIsNotNone(single)
         self.assertIn('Herkunft A, B · 3 Textantworten',single[0])
         self.assertNotIn('Herkunft Nord',html)
@@ -84,7 +84,7 @@ class ReportEditorialTests(unittest.TestCase):
             filtered=self.client.get(root+'&min_n=2&print_mode=full&download=1'+suffix).text
             self.assertIn('Geprüft q',filtered)
             self.assertIn('<summary>Thema · Zusammenarbeit',filtered)
-            self.assertRegex(filtered,r'Geprüft q\s*<small class="concern-origin">Herkunft AFA</small>')
+            self.assertRegex(filtered,r'Geprüft q</span>\s*<small class="concern-origin">Herkunft AFA</small>')
             self.assertIn('kleine Gruppen (weniger als 2 Teilnehmende)',filtered)
             self.assertNotIn('Aussage person-b',filtered)
             self.assertNotIn('Herkunft B',filtered)
