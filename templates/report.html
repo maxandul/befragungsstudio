@@ -18,7 +18,7 @@ blockquote{margin:16px 0;padding:12px 20px;border-left:4px solid #0070b4;backgro
 @media print{body{background:white}.report-section,.report-header,.report-nav,.overview-chart,.chart-container{box-shadow:none}.downloads{display:none}.chart-container{height:420px}article{break-inside:avoid}}
 
 .text-summary>summary{font-weight:bold;font-size:1.15em;cursor:pointer;color:#00407c}.status:empty{display:none}
-.qual-print{display:none;overflow-wrap:anywhere}.qual-screen li p{white-space:pre-line;margin:6px 0}.qual-screen details{margin:12px 0}.qual-screen summary{cursor:pointer;color:#00407c}.qual-screen ul{padding-left:22px}.qual-nuances{font-size:15px}.concern-origin{display:block;color:#526b7c}.concern-label{display:block}.qual-screen details.concern-origin{margin:4px 0}.qual-topic{border:1px solid #c9dfed;border-radius:8px;padding:12px}
+.qual-print{display:none;overflow-wrap:anywhere}.qual-screen li p{white-space:pre-line;margin:6px 0}.qual-screen details{margin:12px 0}.qual-screen summary{cursor:pointer;color:#00407c}.qual-screen ul{padding-left:22px}.qual-nuances{font-size:15px}.concern-origin{display:block;color:#526b7c}.concern-label{display:block;margin-bottom:3px}.concern-text{display:block}.concern-origin{margin-top:5px;font-size:14px;font-weight:normal}.qual-screen .qual-nuances{font-size:inherit}.qual-screen li{margin:12px 0}.qual-screen ul[aria-label="Nuancen"]{margin-top:12px;border-left:2px solid #c9dfed;padding-left:24px}.qual-screen details.concern-origin{margin:4px 0}.qual-topic{border:1px solid #c9dfed;border-radius:8px;padding:12px}
 @media print{.qual-screen{display:none!important}.qual-print{display:block!important;break-inside:auto;border-top:1px solid #ccd5dd;padding-top:12px}.qual-print p,.qual-print li{white-space:pre-line}.qual-print h3,.qual-print h4{break-after:avoid}.report-controls,.report-nav{display:none!important}}
 @page{size:A4 portrait;margin:14mm 12mm 16mm}
 .print-chart-image{display:none}
@@ -45,7 +45,7 @@ blockquote{margin:16px 0;padding:12px 20px;border-left:4px solid #0070b4;backgro
 </style></head>
 {% macro text_meta(entry) -%}
 {% set count = entry.count if not entry.pooled or entry.show_count else none -%}
-{% set origin = display_unit if entry.pooled else entry.origins|default([])|join(', ') -%}
+{% set origin = (entry.origins|default([])|join(', ')) or display_unit -%}
 {% if count or origin %}<small class="concern-origin">
 {%- if origin %}Herkunft {{origin}}{% endif -%}
 {%- if count and origin %} · {% endif -%}
@@ -56,11 +56,11 @@ blockquote{margin:16px 0;padding:12px 20px;border-left:4px solid #0070b4;backgro
 {% set expandable = s.details and not printed %}
 <li>
 {% if expandable %}<details class="qual-nuances"><summary>{% else %}<p>{% endif %}
-<strong class="concern-label">{{s.kind_label}}</strong>{{s.text}}
+<strong class="concern-label">{{s.kind_label}}</strong> <span class="concern-text">{{s.text}}</span>
 {{text_meta(s)}}
 {% if expandable %}</summary>{% else %}</p>{% endif %}
 {% if s.details and (not printed or print_mode=='full') %}
-<ul aria-label="Nuancen">{% for nuance in s.details %}<li><strong class="concern-label">Nuance</strong>{{nuance.text}}{{text_meta(nuance)}}</li>{% endfor %}</ul>
+<ul aria-label="Nuancen">{% for nuance in s.details %}<li><strong class="concern-label">Nuance</strong> <span class="concern-text">{{nuance.text}}</span> {{text_meta(nuance)}}</li>{% endfor %}</ul>
 {% endif %}
 {% if expandable %}</details>{% endif %}
 </li>
@@ -71,6 +71,7 @@ blockquote{margin:16px 0;padding:12px 20px;border-left:4px solid #0070b4;backgro
 {% if entries %}
 {% if printed %}<h4>{% else %}<details class="qual-topic"><summary>{% endif %}
 {{- 'Thema · ' if t.title != 'Einzelaussagen' }}{{t.title}}
+{{text_meta(t)}}
 {% if printed %}</h4>{% else %}</summary>{% endif %}
 <ul>{% for s in entries %}{{concern_entry(s,printed)}}{% endfor %}</ul>
 {% if not printed %}</details>{% endif %}
@@ -110,9 +111,8 @@ blockquote{margin:16px 0;padding:12px 20px;border-left:4px solid #0070b4;backgro
 
 <p><strong>Diagramme lesen:</strong> Jede Zeile der Themenübersicht zeigt eine Frage. Farben und Symbole unterscheiden Wellen und Einheiten. Mit einem Klick auf einen Eintrag in der Legende lässt sich die entsprechende Gruppe aus- und einblenden. Die Anzahl gültiger Antworten (n) und der vollständige Fragetext stehen in den Tooltips (Datenpunkte mit der Maus berührer) und in den Einzelfragen. Leere Stellen bedeuten: nicht erhoben, keine gültige Antwort oder zu wenige Antworten für die Ausgabe.</p>
 {% if include_summaries %}
-<h3>Textantworten</h3>
-<p>Unter einem <strong>Thema</strong> bündeln wir Rückmeldungen zum selben Gegenstand. Eine <strong>Kernaussage</strong> fasst zusammen, was in mehreren Antworten wiederkehrt. Das kann eine Erfahrung, eine Einschätzung oder ein Anliegen sein. Eine <strong>Nuance</strong> ergänzt die Kernaussage, wenn Mitarbeitende unterschiedliche Erfahrungen machen oder etwas unterschiedlich beurteilen.</p>
-<p>Wenn eine Anzahl angegeben ist, zeigt sie, in wie vielen Textantworten die jeweilige Kernaussage oder Nuance vorkommt. Die genannte Einheit zeigt, woher diese Antworten stammen. Fliessen Rückmeldungen aus mehreren Gruppen ein und sind darunter kleine Gruppen (weniger als {{minimum}} Teilnehmende), nennen wir die gemeinsame übergeordnete Einheit. Anzahl oder genauere Herkunft lassen wir weg, wenn sich daraus Beiträge kleiner Gruppen ableiten lassen.</p>
+<p><strong>Textantworten:</strong> Unter einem <strong>Thema</strong> bündeln wir Rückmeldungen zum selben Gegenstand. Eine <strong>Kernaussage</strong> fasst zusammen, was in mehreren Antworten wiederkehrt. Das kann eine Erfahrung, eine Einschätzung oder ein Anliegen sein. Eine <strong>Nuance</strong> ergänzt die Kernaussage, wenn Mitarbeitende unterschiedliche Erfahrungen machen oder etwas unterschiedlich beurteilen.<br>
+Wenn eine Anzahl angegeben ist, zeigt sie, in wie vielen Textantworten das jeweilige Thema, die Kernaussage oder Nuance vorkommt. Jede Textantwort zählt pro Thema, Kernaussage oder Nuance höchstens einmal. Die genannte Einheit zeigt, woher diese Antworten stammen. Fliessen Rückmeldungen aus mehreren Gruppen ein und sind darunter kleine Gruppen (weniger als {{minimum}} Teilnehmende), nennen wir die gemeinsame übergeordnete Einheit. Anzahl oder genauere Herkunft lassen wir weg, wenn sich daraus Beiträge kleiner Gruppen ableiten lassen.</p>
 {% endif %}
 <p><strong>Vergleiche:</strong> Unterschiede zwischen Wellen oder OEs geben Hinweise für die Diskussion. Sie belegen allein noch keine gesicherte Veränderung oder deren Ursache. Bei Mehrfachauswahl kann eine Person mehrere Optionen nennen; die Anteile können deshalb zusammen mehr als 100 % ergeben.</p>
 <p><strong>Optionale Unsicherheitsbereiche:</strong> Die Linien an den Werten zeigen, wie genau ein Wert rechnerisch bestimmt ist, wenn man die Antworten als Stichprobe betrachtet. Wenige oder sehr unterschiedliche Antworten führen meist zu einem breiteren Bereich und damit zu grösserer Unsicherheit. Die Bereiche allein sind kein Test, ob Unterschiede statistisch gesichert sind. Sie helfen aber bei der Einschätzung, wie belastbar ein Unterschied ist: Überschneiden sich die Bereiche zweier Werte nicht, spricht viel dafür, dass ein tatsächlicher Unterschied besteht. Überschneiden sie sich stark, kann der Unterschied auch zufällig entstanden sein und sollte nicht überinterpretiert werden.</p>
