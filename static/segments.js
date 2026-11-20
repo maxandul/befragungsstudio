@@ -3,6 +3,7 @@
   const byId=id=>document.getElementById(id);
   const wave=byId('segment-wave'), source=byId('mapping-source');
   const dimension=byId('alias-dimension'), original=byId('alias-source'), target=byId('alias-target');
+  const clear=byId('alias-clear');
   const mappingDimension=byId('mapping-dimension');
   const rules=JSON.parse(byId('mapping-rules').textContent);
   const dimensionValue=()=>dimension.value==='__custom__'?byId('alias-custom').value.trim():dimension.value;
@@ -58,16 +59,16 @@
       ? `${data.mapped} von ${data.total} Teilnahmen dem Merkmal zugeordnet · ${data.unmapped} ohne Zuordnung · ${data.mapping_conflicts} mit widersprüchlichen Werten.`
       : 'Bitte ein Merkmal wählen.';
     const aliases=byId('alias-preview');aliases.replaceChildren();
-    data.effective.forEach(value=>{const row=document.createElement('tr');cell(row,value.source);cell(row,value.current);cell(row,value.after);cell(row,value.n);if(value.current!==value.after)row.className='preview-change';aliases.appendChild(row);});
+    data.effective.forEach(value=>{const row=document.createElement('tr');cell(row,value.source);cell(row,value.current||'Ohne Wert');cell(row,value.after||'Ohne Wert');cell(row,value.n);if(value.current!==value.after)row.className='preview-change';aliases.appendChild(row);});
     if(!data.effective.length)messageRow(aliases,'Noch keine Werte für dieses Merkmal. Zuerst oben eine passende Spalte auswählen und die Zuordnung speichern.',4);
     byId('resulting-preview').hidden=!data.effective.length;
     const resulting=byId('resulting-values');resulting.replaceChildren();
-    data.resulting.forEach(value=>{const row=document.createElement('tr');cell(row,value.value);cell(row,value.n);resulting.appendChild(row);});
+    data.resulting.forEach(value=>{const row=document.createElement('tr');cell(row,value.value||'Ohne Wert');cell(row,value.n);resulting.appendChild(row);});
   }
   async function refresh(){
     const mine=++requestNumber;
     const url=new URL(location.href);url.pathname=url.pathname.replace(/\/$/,'')+'/preview';
-    url.search=new URLSearchParams({wave:wave.value,source:source.value,dimension:dimensionValue(),original:original.value,target:target.value});
+    url.search=new URLSearchParams({wave:wave.value,source:source.value,dimension:dimensionValue(),original:original.value,target:target.value,clear:clear.checked?'1':'0'});
     document.querySelectorAll('input[type=hidden][name=wave]').forEach(input=>input.value=wave.value);
     byId('preview-error').hidden=true;
     try{
@@ -79,6 +80,10 @@
     }catch(error){if(mine!==requestNumber)return;byId('preview-error').textContent=error.message;byId('preview-error').hidden=false;}
   }
   const later=()=>{clearTimeout(timer);timer=setTimeout(refresh,300);};
+  function syncAliasTarget(){
+    target.disabled=clear.checked;
+    target.required=!clear.checked;
+  }
   byId('scope-form').addEventListener('submit',event=>{event.preventDefault();refresh();});
   wave.addEventListener('change',()=>{original.value='';target.value='';chooseSavedSource();refresh();});
   source.addEventListener('change',refresh);
@@ -94,8 +99,10 @@
   dimension.addEventListener('change',()=>{original.value='';target.value='';customFields();refresh();});
   byId('alias-custom').addEventListener('input',later);
   original.addEventListener('change',refresh);target.addEventListener('input',later);
+  clear.addEventListener('change',()=>{syncAliasTarget();refresh();});
   byId('column-search').addEventListener('input',renderColumns);byId('all-columns').addEventListener('change',renderColumns);
   customFields();
+  syncAliasTarget();
   if(!source.value)chooseSavedSource();
   refresh();
 })();

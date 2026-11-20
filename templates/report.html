@@ -121,7 +121,7 @@ blockquote{margin:16px 0;padding:12px 20px;border-left:4px solid #0070b4;backgro
 <div class="table-wrap"><table>
 <tr><th>Einheit</th><th>Teilnehmende</th><th>Eingeladen</th><th>Rücklauf</th></tr>
 {% for r in child_rates %}
-<tr><td>{{r.unit}}</td><td>{{r.n if r.n is not none else '–'}}</td><td>{{r.total if r.total is not none else ('Leitungsanteil der Grundmenge fehlt' if r.leader_basis_missing else 'Nicht hinterlegt')}}</td><td>{% if r.n is none %}n &lt; {{minimum}}{% else %}{{'%.1f %%'|format(r.rate) if r.rate is not none else '–'}}{% endif %}</td></tr>
+<tr><td>{{r.unit}}</td><td>{% if r.n is none %}n &lt; {{minimum}}{% else %}{{r.n}}{% endif %}</td><td>{{r.total if r.total is not none else ('Leitungsanteil der Grundmenge fehlt' if r.leader_basis_missing else 'Nicht hinterlegt')}}</td><td>{% if r.n is none %}n &lt; {{minimum}}{% else %}{{'%.1f %%'|format(r.rate) if r.rate is not none else '–'}}{% endif %}</td></tr>
 {% endfor %}
 </table></div>
 {% endif %}

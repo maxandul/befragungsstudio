@@ -126,16 +126,20 @@ def mapped_dimensions(record, mappings, aliases):
     original_dims=dict(dims)
     for a in aliases:
         if a['wave'] in ('*', record['wave']) and original_dims.get(a['dimension']) == a['source']:
-            dims[a['dimension']] = a['target']
+            if a['target']:
+                dims[a['dimension']] = a['target']
+            else:
+                dims.pop(a['dimension'], None)
     return dims
 
 
 def segment_preview(records, mappings=(), aliases=(), wave='*', source='', dimension='',
-                    original='', target=''):
+                    original='', target='', clear=False):
     """Teilnahmen statt Antwortzeilen zählen; widersprüchliche Werte sichtbar machen."""
     records=[r for r in records if wave=='*' or r['wave']==wave]
     proposed=[dict(a) for a in aliases]
-    if dimension and original and target:
+    if dimension and original and (target or clear):
+        target='' if clear else target
         existing=next((a for a in proposed if a['wave']==wave and a['dimension']==dimension and a['source']==original),None)
         if existing is not None:
             existing['target']=target
