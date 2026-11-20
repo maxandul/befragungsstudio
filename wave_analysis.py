@@ -38,22 +38,26 @@ Bezüge wie «das», «dort» oder «zu wenig» nur auf, wenn der Bezug aus Frag
 eindeutig hervorgeht. Ergänze keine Akteure, Ursachen, Folgen oder Lösungsvorschläge.
 Ist ein Bezug unklar, erhalte diese Unklarheit; keine präzisere Diagnose erfinden.
 
-KONKRETE THEMENÜBERSCHRIFTEN
-Das Feld thema ist eine kurze inhaltliche Überschrift: Gegenstand plus konkret genannte
-Erfahrung, Anliegen oder offene Frage. Es soll bereits erkennen lassen, WAS ausgesagt wird.
-Vermeide reine Gegenstandsbezeichnungen wie «Strategiekommunikation», «Verständnis der
-Strategie», «Erwartungen an Veränderungen», «Kommunikation» oder «Veränderungen».
-Schärfe Überschriften nur so weit, wie die Quelle es trägt. Bei einer allgemeinen Antwort
-bleibt auch die Überschrift allgemein; erfinde keine Konkretisierung, um diese Regel zu erfüllen.
-Verwende bei gleichbedeutenden Anliegen möglichst dieselbe Themenüberschrift, auch über
-Teilpakete hinweg. Unterschiedliche Anliegen im selben Gegenstand getrennt halten:
-fehlende Kenntnis einer Strategie, unklarer Bezug zur eigenen Arbeit und Zweifel am Nutzen
-sind verschiedene Inhalte. Positive/negative Oberkategorien ersetzen keine inhaltlichen Themen.
+THEMEN ALS GEMEINSAMER GEGENSTAND
+Das Feld thema benennt knapp und möglichst konkret den Gegenstand der Aussage, zum
+Beispiel «Information über Veränderungen», «Bezug der Strategie zur eigenen Arbeit» oder
+«Unterstützung durch die direkte Führungskraft». Das Feld aussage beschreibt, WAS dazu
+berichtet wird. Gleichartige Gegenstände erhalten innerhalb derselben Frage exakt dieselbe
+Themenüberschrift, auch über Teilpakete hinweg. Positive, kritische und unterschiedliche
+Erfahrungen zum selben Gegenstand können so unter einem Thema zusammenfinden.
+Eigenständige Gegenstände nicht in pauschalen Themen wie «Kommunikation verbessern»
+zusammenziehen. Eine allgemeine Antwort bleibt allgemein; erfinde keine Konkretisierung.
+Im selben Thema unterschiedliche Erfahrungen als getrennte Einzelaussagen erhalten:
+fehlende Kenntnis einer Strategie, unklarer Arbeitsbezug und Zweifel am Nutzen sind
+verschiedene Inhalte. Nicht jede Aussage ist ein Anliegen oder Verbesserungswunsch.
+Die spätere Gesamtverdichtung bildet aus wiederkehrenden Inhalten Kernaussagen und
+bewahrt Unterschiede als Nuancen. Hier noch keine antwortübergreifenden Befunde bilden.
 
 EINZELAUSSAGEN UND AUSSAGEART
 Teile eine Antwort bei mehreren unterschiedlichen Inhalten in einzelne Aussagen auf.
-Das Feld aussage konkretisiert die Überschrift knapp und sinngemäss; es ist kein blosses
-Etikett. Erhalte Nuancen, positive Erfahrungen, Gegensätze, Vorschläge und Einzelhinweise.
+Das Feld aussage beschreibt die Erfahrung, Einschätzung oder das Anliegen konkret und
+sinngemäss; es ist kein blosses Etikett. Erhalte Nuancen, positive Erfahrungen,
+Gegensätze, Vorschläge und Einzelhinweise.
 Ein Verständnisproblem ist keine Ablehnung. Eine offene Frage ist keine Forderung.
 Eine positive Erfahrung darf nicht als Verbesserungsbedarf formuliert werden.
 Formuliere Wünsche nur dann als Wünsche, wenn sie in der Antwort enthalten sind; mache
@@ -63,16 +67,17 @@ Fakten, Bewertungen, Häufigkeitswörter oder Prozente erfinden. Nicht verallgem
 
 FORMULIERUNGSBEISPIELE (nur Stilbeispiele, niemals als zusätzliche Daten übernehmen)
 Antwort: «Ich sehe nicht, was die Strategie für meine Arbeit bedeutet.»
-  thema: «Bezug der Strategie zur eigenen Arbeit unklar»
+  thema: «Bezug der Strategie zur eigenen Arbeit»
   aussage: «Es ist noch unklar, welche Bedeutung die Strategie für die eigene Arbeit hat.»
 Antwort: «Endlich gibt die Strategie eine klare Richtung vor.»
-  thema: «Strategie gibt Orientierung»
+  thema: «Orientierung durch die Strategie»
   aussage: «Die durch die Strategie vorgegebene Richtung wird als klar erlebt.»
 Antwort: «Die Ziele sind verständlich, aber die konkreten nächsten Schritte fehlen mir.»
-  Zwei Aussagen: «Strategische Ziele verständlich» und «Konkrete Umsetzungsschritte noch unklar».
+  Zwei Aussagen unter den Themen «Verständlichkeit der strategischen Ziele» und
+  «Klarheit der Umsetzungsschritte».
   Die Verständlichkeit der Ziele und die fehlende Klarheit über nächste Schritte getrennt erhalten.
 Antwort: «Braucht es wirklich noch weitere Projekte?»
-  thema: «Notwendigkeit weiterer Projekte wird hinterfragt»
+  thema: «Notwendigkeit weiterer Projekte»
   aussage: «Die Notwendigkeit zusätzlicher Projekte wird als offene Frage aufgeworfen.»
   Keine Forderung nach einem Projektstopp oder Überlastung daraus ableiten.
 

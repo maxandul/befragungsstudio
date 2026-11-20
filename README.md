@@ -808,3 +808,32 @@ und Rücklauf sowie die Einheit-/Mindestfallzahlbox entfallen. Nach dem Laden
 der Diagramme wird keine Bereitschaftsmeldung mehr angezeigt; Exportfortschritt
 und Fehlermeldungen bleiben sichtbar. Die Druckauswahl bleibt unabhängig von den
 geöffneten Aufklappfeldern.
+
+
+## Textantworten: Themen, Kernaussagen und Nuancen
+
+Der Gesamtprompt strukturiert die Auswertung pro Freitextfrage nach gemeinsamen
+Gegenständen (Themen), wiederkehrenden Erfahrungen, Einschätzungen oder Anliegen
+(Kernaussagen) und ergänzenden Unterschieden (Nuancen). Themenüberschriften benennen
+den Gegenstand, die Aussagen beschreiben den Inhalt. Auch der Teilprompt verwendet
+diese Trennung, damit gleiche Gegenstände über Teilpakete hinweg zusammenfinden.
+
+Gebündelt wird nach Bedeutung. Jede Quelle muss die gesamte gemeinsame Formulierung
+stützen. Besonderheiten bleiben in den Einzelaussagen erhalten und können im Bericht
+als Nuancen erscheinen; eigenständige wiederkehrende Gegensätze bilden getrennte
+Kernaussagen unter demselben Thema. Einzelstimmen bleiben in den Teilpaketen erhalten.
+Die KI soll keine Ursachen oder Empfehlungen ergänzen und Erfahrungen nicht pauschal
+in Verbesserungswünsche umformulieren. Die Zahl der Themen ergibt sich aus dem Material.
+
+Das technische JSON-Feld `anliegen` umfasst weiterhin alle gebündelten Kernaussagen,
+auch Erfahrungen und Einschätzungen. Es gibt keine neuen JSON-Felder oder Formatversionen.
+Die App berechnet Anzahl und Herkunft weiterhin lokal und wendet die bestehenden
+Anonymitätsregeln an. Die Prompts enthalten keine eigenen OE-Zuordnungen oder Zahlen.
+
+Für die neue Anleitung das Gesamtpaket erneut herunterladen. Bestehende Aufträge,
+Kennungen, Exporttexte und Ergebnisse werden dadurch nicht verändert. Bereits geladene
+ZIP-Dateien bleiben unverändert; vorhandene Ergebnisse werden nicht automatisch neu
+ausgewertet. Die bestehenden Regeln zum Ersetzen importierter Ergebnisse gelten weiter.
+Export-/Importtests prüfen die Auslieferung beider Prompts sowie unveränderte Nutzdaten
+bei wiederholtem Download. Die tatsächliche Qualität der KI-Verdichtung muss anhand
+echter Antworten geprüft werden; diese Änderung führt keinen Modellaufruf aus.
