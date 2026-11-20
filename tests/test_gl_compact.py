@@ -99,12 +99,13 @@ class CompactReportTests(unittest.TestCase):
         self.assertLess(html.index('class="overview-chart"'),html.index('class="qual-topic"'))
         screen=html.split('<div class="qual-print">',1)[0]
         self.assertEqual(screen.count(body),1)
-        self.assertRegex(screen,r'<details class="qual-topic"><summary>Anliegen ·\s*<small class="concern-origin">2 von 3 Textantwortenden · A, B</small>')
-        self.assertRegex(screen,r'<details class="qual-nuances"><summary>\s*'+re.escape(body)+r'\s*·\s*<small class="concern-origin">2 von 3 Textantwortenden · A, B</small>')
-        self.assertRegex(screen,r'Aussage person-a ·\s*<small class="concern-origin">1 von 3 Textantwortenden · A</small>')
+        self.assertIn('<summary>Thema · Weitere Rückmeldungen',screen)
+        self.assertRegex(screen,r'<summary>\s*<strong class="concern-label">Kernaussage</strong>'
+                         +re.escape(body)+r'\s*<small class="concern-origin">Herkunft A, B · 2 Textantworten</small>')
+        self.assertIn('<strong class="concern-label">Nuance</strong>Aussage person-a'
+                      '<small class="concern-origin">Herkunft A · 1 Textantwort</small>',screen)
         self.assertNotIn('class="qual-topic" open',screen)
         self.assertNotIn('class="qual-nuances" open',screen)
-        self.assertNotIn('Besonderer Hinweis:</strong> '+body,screen)
         print_blocks=''.join(re.findall(r'<div class="qual-print">(.*?)</div>',html,re.S))
         self.assertIn(body,print_blocks)
 

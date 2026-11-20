@@ -807,7 +807,7 @@ def create_app(instance=None):
         ctx=report_data(pid,group_text_origins=True)
         ctx['text_summaries']=approved_summaries(pid,ctx)
         from report_views import prepare_text_views
-        ctx['text_views']=prepare_text_views(ctx['text_summaries'],ctx['profile'],ctx['text_disclosure'])
+        ctx['text_views']=prepare_text_views(ctx['text_summaries'],ctx['profile'])
         if ctx['include_summaries'] and not ctx['include_texts']:
             ctx['text_groups']={theme:[r for r in rows if ctx['text_summaries'].get(r['canonical'])]
                                 for theme,rows in ctx['text_groups'].items()}
