@@ -61,11 +61,33 @@ class SynthesisTests(unittest.TestCase):
             self.assertEqual(len(manifest['teile']),len(self.parts()))
             self.assertEqual(sum(p['antworten'] for p in manifest['teile']),6)
             self.assertEqual(z.read('standardprompt.txt').decode(),ws.PROMPT)
+            self.assertEqual(z.read('teilprompt.txt').decode(),ws.wa.PROMPT)
             for entry in manifest['teile']:
                 data=json.loads(z.read(entry['datei']));self.assertEqual(data['teil'],entry['teil'])
                 for private in ('person-a','person-b','leader-a','Kadertyp','Bereich','feedback'):
                     self.assertNotIn(private,json.dumps(data))
             self.assertEqual(json.loads(z.read('gesamt_ergebnis_vorlage.json'))['version'],3)
+
+    def test_repeated_overall_download_preserves_payload_and_importable_result(self):
+        _,url,value=self.overall()
+        before=self.parts()
+        archives=[]
+        for _ in range(2):
+            response=self.client.get(url+'/overall-download')
+            self.assertEqual(response.status_code,200)
+            with zipfile.ZipFile(io.BytesIO(response.data)) as z:
+                self.assertEqual(z.read('standardprompt.txt').decode(),ws.PROMPT)
+                self.assertEqual(z.read('teilprompt.txt').decode(),ws.wa.PROMPT)
+                archives.append({name:z.read(name) for name in z.namelist()})
+                manifest=json.loads(z.read('manifest.json'))
+                self.assertEqual(json.loads(z.read('gesamt_ergebnis_vorlage.json'))['version'],3)
+                for entry in manifest['teile']:
+                    part=next(p for p in before if p['id']==entry['teil'])
+                    self.assertEqual(json.loads(z.read(entry['datei'])),json.loads(part['exported']))
+        self.assertEqual(archives[0],archives[1])
+        self.assertEqual(self.parts(),before)
+        self.assertEqual(self.upload(url,value).status_code,302)
+        self.assertEqual(self.synth()['state'],'imported')
 
     def test_single_import_review_approval_and_local_counts(self):
         _,url,value=self.overall()
