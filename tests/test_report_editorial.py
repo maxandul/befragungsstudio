@@ -72,21 +72,23 @@ class ReportEditorialTests(unittest.TestCase):
         root='/p/1/report?focus_wave=2026&profile=gl'
         html=self.client.get(root).text
         printed=''.join(re.findall(r'<div class="qual-print">(.*?)</div>',html,re.S))
-        self.assertIn('3 von 3 Textantwortenden · A, B',printed)
-        single=re.search(r'<summary>\s*<strong>Besonderer Hinweis:</strong> Geprüft t.*?</summary>',html,re.S)
+        self.assertIn('Herkunft A, B · 3 Textantworten',printed)
+        single=re.search(r'<summary>\s*<strong class="concern-label">Besonderer Hinweis</strong>Geprüft t.*?</summary>',html,re.S)
         self.assertIsNotNone(single)
-        self.assertIn('3 von 3 Textantwortenden · A, B',single[0])
-        self.assertNotIn('Textantwortenden · Nord',html)
+        self.assertIn('Herkunft A, B · 3 Textantworten',single[0])
+        self.assertNotIn('Herkunft Nord',html)
         area=self.client.get('/p/1/report?'+self.query+'&profile=oe&download=1').text
-        self.assertIn('2 von 2 Textantwortenden · Nord',area)
-        self.assertNotIn('Textantwortenden · A, B',area)
+        self.assertIn('Herkunft Nord · 2 Textantworten',area)
+        self.assertNotIn('Herkunft A, B',area)
         for suffix in ('','&include_children=0'):
             filtered=self.client.get(root+'&min_n=2&print_mode=full&download=1'+suffix).text
             self.assertIn('Geprüft q',filtered)
-            self.assertRegex(filtered,r'<summary>Zusammenarbeit ·\s*<small class="concern-origin">AFA</small>')
+            self.assertIn('<summary>Thema · Zusammenarbeit',filtered)
+            self.assertRegex(filtered,r'Geprüft q\s*<small class="concern-origin">Herkunft AFA</small>')
+            self.assertIn('kleine Gruppen (weniger als 2 Teilnehmende)',filtered)
             self.assertNotIn('Aussage person-b',filtered)
-            self.assertNotIn('Textantwortenden · B',filtered)
-            self.assertNotIn('3 von 3 Textantwortenden',filtered)
+            self.assertNotIn('Herkunft B',filtered)
+            self.assertNotIn('3 Textantworten',filtered)
         self.assertNotIn('Genannt in',self.client.get(root+'&include_summaries=0').text)
 
     def test_small_unit_single_is_withheld_and_single_section_is_last(self):

@@ -1,7 +1,7 @@
 """Presentation only: source filters and numerical calculations remain unchanged."""
 import re
 
-KINDS={'key':'','difference':'Abweichende Sichtweise','single':'Besonderer Hinweis','normal':''}
+KINDS={'key':'Kernaussage','difference':'Nuance','single':'Besonderer Hinweis','normal':'Kernaussage'}
 GL_MAX_HIGHLIGHTS=3
 
 
@@ -14,21 +14,13 @@ def ranking(entry):
     return (-entry.get('count',0),0 if entry['kind']=='key' else 1,entry.get('order',100),entry['text'].casefold())
 
 
-def topic_view(title, entries, disclosure, *, singles=False):
+def topic_view(title, entries):
     entries.sort(key=ranking)
     people=set().union(*(entry.get('people',set()) for entry in entries))
-    attribution=disclosure.summarise(people,bundled=not singles) if disclosure and people else {}
-    if attribution is None:
-        attribution=dict(pooled=True,show_count=False)
-    if attribution.get('pooled'):
-        # A topic total must not disclose a new difference between its items.
-        attribution['show_count']=any(
-            entry.get('show_count') and entry.get('people')==people for entry in entries)
-    return dict(title=title,all=entries,count=len(people) or None,rank_count=len(people),
-                denominator=entries[0].get('denominator',0),**attribution)
+    return dict(title=title,all=entries,count=len(people) or None,rank_count=len(people))
 
 
-def prepare_text_views(summaries,profile,disclosure=None):
+def prepare_text_views(summaries,profile):
     output={}
     for canonical,topics in summaries.items():
         prepared=[];singles=[]
@@ -50,17 +42,21 @@ def prepare_text_views(summaries,profile,disclosure=None):
             # An existing shared subject is enough for a direct theme-to-nuance path.
             direct_people=set().union(*(entry.get('people',set()) for entry in direct))
             if len(direct_people)<2:
+                for entry in direct:
+                    entry['kind_label']='Einzelaussage'
                 singles.extend(direct)
                 direct=[]
+            for entry in direct:
+                entry['kind_label']='Nuance'
             items=concerns+direct
             if items:
                 title=topic['titel']
                 if len(items)==1 and normalized(title)==normalized(items[0]['text']):
-                    title='Anliegen'
-                prepared.append(topic_view(title,items,disclosure))
+                    title='Weitere Rückmeldungen'
+                prepared.append(topic_view(title,items))
         prepared.sort(key=lambda topic: (-topic['rank_count'],topic['title'].casefold()))
         if singles:
-            prepared.append(topic_view('Einzelaussagen',singles,disclosure,singles=True))
+            prepared.append(topic_view('Einzelaussagen',singles))
         selected=set();seen=set()
         if profile=='gl':
             for e in sorted((e for t in prepared for e in t['all']),key=ranking):

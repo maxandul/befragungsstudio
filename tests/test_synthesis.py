@@ -78,11 +78,11 @@ class SynthesisTests(unittest.TestCase):
         self.assertEqual(self.approve(url).status_code,302)
         html=self.client.get(report).text
         self.assertIn('Gemeinsames Anliegen',html)
-        self.assertIn('1 von 1 Textantwortenden',html)
+        self.assertIn('1 Textantwort</small>',html)
         self.assertNotIn('Aussage person-a',html)
         self.assertNotIn('Aussage leader-a',html);self.assertNotIn('Aussage person-b',html)
         overall=self.client.get('/p/1/report?focus_wave=2026&profile=gl&min_n=1').text
-        self.assertIn('3 von 3 Textantwortenden',overall)
+        self.assertIn('3 Textantworten</small>',overall)
         before=self.parts()
         self.assertEqual(self.upload(url,value).status_code,302)
         self.assertEqual(before,self.parts());self.assertEqual(self.synth()['state'],'approved')
