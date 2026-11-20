@@ -47,18 +47,24 @@ def project_concerns(index,concerns,eligible,aliases,disclosure=None):
             continue
         topic=aliases.get(c['topic'],c['topic'])
         nuances={}
-        if not attribution.get('pooled'):
-            concern_text=normalized(c['body'])
+        concern_text=normalized(c['body'])
+        if len(people)>1:
             for source in visible:
                 key=normalized(source['text'])
                 if key==concern_text:
                     continue
                 nuance=nuances.setdefault(key, dict(text=source['text'],people=set()))
                 nuance['people'].add(tuple(source['key'][:2]))
-        details=sorted(
-            (dict(text=nuance['text'],count=len(nuance['people'])) for nuance in nuances.values()),
-            key=lambda nuance: (-nuance['count'],nuance['text'].casefold()),
-        )
+        details=[]
+        for nuance in nuances.values():
+            origin=disclosure.summarise(nuance['people'],bundled=True) if disclosure else {}
+            if origin is None:
+                continue
+            if origin.get('pooled') and attribution.get('show_count') and nuance['people']!=people:
+                # A visible subtotal must not expose the protected difference.
+                origin['show_count']=False
+            details.append(dict(text=nuance['text'],count=len(nuance['people']),**origin))
+        details.sort(key=lambda nuance: (-nuance['count'],nuance['text'].casefold()))
         add(c['canonical'],topic,dict(text=c['body'],kind=c['kind'],order=c['sort_order'],reviewed=True,
             details=details,count=len(people),people=people,**attribution))
     ungrouped={}

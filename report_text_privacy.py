@@ -54,4 +54,22 @@ class TextDisclosure:
             population += (self.direct_participants if has_source_below else self.participants)[path]
         if population < self.minimum:
             return None
-        return dict(pooled=True, origins=[])
+        return dict(pooled=True, origins=[], show_count=self.pooled_count_is_safe(people))
+
+    def pooled_count_is_safe(self, people):
+        """Allow totals only when a residual still spans several protected groups."""
+        protected = [self.paths[person] for person in people if not self.allows_detail(self.paths[person])]
+        if len(protected) < self.minimum:
+            return False
+        source_counts = Counter(protected)
+        paths = set(source_counts)
+        if len(paths) < 2 or len({path[:-1] for path in paths}) != 1:
+            return False
+        capacity = {path: self.participants[path] for path in paths}
+        if any(source_counts[path] > limit for path, limit in capacity.items()):
+            return False
+        total_capacity = sum(capacity.values())
+        # Even if the contribution from larger OEs is known, the residual must
+        # admit multiple source counts for every protected OE.
+        return all(max(0, len(protected) - (total_capacity - size)) < min(size, len(protected))
+                   for size in capacity.values())

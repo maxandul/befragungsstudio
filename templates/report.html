@@ -43,36 +43,35 @@ blockquote{margin:16px 0;padding:12px 20px;border-left:4px solid #0070b4;backgro
  .methodology details{display:none}.hint{padding:3mm}.report-header .hint{background:#fff}
 }
 </style></head>
-{% macro concern_origin(s,printed=false) %}
-{% if s.origins %}
-{% if s.origins|length>3 and not printed %}
-<details class="concern-origin"><summary><small>Genannt in {{s.origins|length}} OEs</small></summary><small>{{s.origins|join(', ')}}</small></details>
-{% else %}
-<p class="concern-origin"><small>Genannt in {{s.origins[:-1]|join(', ') ~ ' und ' if s.origins|length>1 else ''}}{{s.origins[-1]}}</small></p>
-{% endif %}
-{% endif %}
-{% endmacro %}
-{% macro person_count(count, denominator) -%}
-{% if count %}<small>{{count}}{% if denominator %} von {{denominator}}{% endif %} Textantwortende{{'n' if denominator else ''}}</small>{% endif %}
+{% macro text_meta(entry, denominator) -%}
+{% set count = entry.count if not entry.pooled or entry.show_count else none %}
+{% set origin = display_unit if entry.pooled else entry.origins|default([])|join(', ') %}
+{% if count or origin %}<small class="concern-origin">
+{%- if count %}{{count}}{% if denominator %} von {{denominator}} Textantwortenden{% else %} Textantwortende{% endif %}{% endif -%}
+{%- if count and origin %} · {% endif -%}
+{%- if origin %}{{origin}}{% endif -%}
+</small>{% endif %}
 {%- endmacro %}
 {% macro concern_entry(s, printed=false) %}
-<li><p>{% if s.kind_label %}<strong>{{s.kind_label}}:</strong> {% endif %}{{s.text}}</p>
-{% if not s.pooled and s.count is defined %}<p>{{person_count(s.count,s.denominator)}}</p>{% endif %}
-{{concern_origin(s,printed)}}
+{% set expandable = s.details and not printed %}
+<li>
+{% if expandable %}<details class="qual-nuances"><summary>{% else %}<p>{% endif %}
+{% if s.kind_label %}<strong>{{s.kind_label}}:</strong> {% endif %}{{s.text}}
+{% set meta = text_meta(s,s.denominator) %}{% if meta|trim %} · {{meta}}{% endif %}
+{% if expandable %}</summary>{% else %}</p>{% endif %}
 {% if s.details and (not printed or print_mode=='full') %}
-{% if not printed %}<details class="qual-nuances"><summary>Nuancen</summary>{% endif %}
-<ul>{% for nuance in s.details %}<li>{{nuance.text}}<br>{{person_count(nuance.count,s.denominator)}}</li>{% endfor %}</ul>
-{% if not printed %}</details>{% endif %}
+<ul aria-label="Nuancen">{% for nuance in s.details %}<li>{{nuance.text}}{% set meta = text_meta(nuance,s.denominator) %}{% if meta|trim %} · {{meta}}{% endif %}</li>{% endfor %}</ul>
 {% endif %}
+{% if expandable %}</details>{% endif %}
 </li>
 {% endmacro %}
 {% macro concern_topics(views, printed=false) %}
 {% for t in views %}
 {% set entries=t.main if printed and print_mode=='compact' else t.all %}
 {% if entries %}
-{% set title=t.title ~ ' aus ' ~ display_unit if t.pooled else t.title %}
-{% if printed %}<h4>{{title}}{% if t.count %} · {{person_count(t.count,t.denominator)}}{% endif %}</h4>
-{% else %}<details class="qual-topic"><summary>{{title}}{% if t.count %} · {{person_count(t.count,t.denominator)}}{% endif %}</summary>{% endif %}
+{% if printed %}<h4>{% else %}<details class="qual-topic"><summary>{% endif %}
+{{- t.title }}{% set meta = text_meta(t,t.denominator) %}{% if meta|trim %} · {{meta}}{% endif %}
+{% if printed %}</h4>{% else %}</summary>{% endif %}
 <ul>{% for s in entries %}{{concern_entry(s,printed)}}{% endfor %}</ul>
 {% if not printed %}</details>{% endif %}
 {% endif %}
@@ -110,7 +109,7 @@ blockquote{margin:16px 0;padding:12px 20px;border-left:4px solid #0070b4;backgro
 <p><strong>Wer ist einbezogen?</strong> Die vorstehende Führungskraft wird aus ihrer eigenen OE ausgeschlossen. Führungskräfte unterstellter Einheiten bleiben im übergeordneten Ergebnis enthalten. Das gilt für Zahlen, Textantworten und Rücklauf.</p>
 
 <p><strong>Diagramme lesen:</strong> Jede Zeile der Themenübersicht zeigt eine Frage. Farben und Symbole unterscheiden Wellen und Einheiten. Mit einem Klick auf einen Eintrag in der Legende lässt sich die entsprechende Gruppe aus- und einblenden. Die Anzahl gültiger Antworten (n) und der vollständige Fragetext stehen in den Tooltips (Datenpunkte mit der Maus berührer) und in den Einzelfragen. Leere Stellen bedeuten: nicht erhoben, keine gültige Antwort oder zu wenige Antworten für die Ausgabe.</p>
-<p><strong>Textantworten:</strong> Die sinngemäss zusammengefassten Anliegen sind nach Zahl unterschiedlicher Textantwortender geordnet. Klappe ein Thema auf, um seine Anliegen zu lesen. Unter einem Anliegen kannst du die zugehörigen Nuancen öffnen. Das beschreibt Häufigkeit, nicht Wichtigkeit. Die Zahlen beziehen sich auf die Textantwortenden dieser Frage, nicht auf alle Mitarbeitenden der OE. Eine Person kann mehrere Anliegen nennen. Einzelaussagen stehen in der Vertiefung am Schluss.</p>
+<p><strong>Textantworten:</strong> Die sinngemäss zusammengefassten Anliegen sind nach Zahl unterschiedlicher Textantwortender geordnet. Klappe ein Thema auf, um seine Kernaussagen oder Nuancen zu lesen. Kernaussagen mit zusätzlichen Nuancen lassen sich weiter aufklappen. Das beschreibt Häufigkeit, nicht Wichtigkeit. Die Zahlen beziehen sich auf die Textantwortenden dieser Frage, nicht auf alle Mitarbeitenden der OE. Eine Person kann mehrere Anliegen nennen. Einzelaussagen stehen in der Vertiefung am Schluss.</p>
 {% if include_summaries or include_texts or include_evidence %}<p>Für die Herkunft von Textantworten zählt die Teilnahme an der Welle. Hinweise aus kleinen Einheiten können als gemeinsam gestütztes Anliegen auf Berichtsebene einfliessen.</p>{% endif %}
 <p><strong>Vergleiche:</strong> Unterschiede zwischen Wellen oder OEs geben Hinweise für die Diskussion. Sie belegen allein noch keine gesicherte Veränderung oder deren Ursache. Bei Mehrfachauswahl kann eine Person mehrere Optionen nennen; die Anteile können deshalb zusammen mehr als 100 % ergeben.</p>
 <p><strong>Optionale Unsicherheitsbereiche:</strong> Die Linien an den Werten zeigen, wie genau ein Wert rechnerisch bestimmt ist, wenn man die Antworten als Stichprobe betrachtet. Wenige oder sehr unterschiedliche Antworten führen meist zu einem breiteren Bereich und damit zu grösserer Unsicherheit. Die Bereiche allein sind kein Test, ob Unterschiede statistisch gesichert sind. Sie helfen aber bei der Einschätzung, wie belastbar ein Unterschied ist: Überschneiden sich die Bereiche zweier Werte nicht, spricht viel dafür, dass ein tatsächlicher Unterschied besteht. Überschneiden sie sich stark, kann der Unterschied auch zufällig entstanden sein und sollte nicht überinterpretiert werden.</p>

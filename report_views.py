@@ -14,62 +14,63 @@ def ranking(entry):
     return (-entry.get('count',0),0 if entry['kind']=='key' else 1,entry.get('order',100),entry['text'].casefold())
 
 
-def prepare_text_views(summaries,profile):
+def topic_view(title, entries, disclosure, *, singles=False):
+    entries.sort(key=ranking)
+    people=set().union(*(entry.get('people',set()) for entry in entries))
+    attribution=disclosure.summarise(people,bundled=not singles) if disclosure and people else {}
+    if attribution is None:
+        attribution=dict(pooled=True,show_count=False)
+    if attribution.get('pooled'):
+        # A topic total must not disclose a new difference between its items.
+        attribution['show_count']=any(
+            entry.get('show_count') and entry.get('people')==people for entry in entries)
+    return dict(title=title,all=entries,count=len(people) or None,rank_count=len(people),
+                denominator=entries[0].get('denominator',0),**attribution)
+
+
+def prepare_text_views(summaries,profile,disclosure=None):
     output={}
     for canonical,topics in summaries.items():
-        prepared=[];flat=[];singles=[];pooled_entries=[]
+        prepared=[];singles=[]
         for topic in topics:
             entries=topic.get('statements')
             if entries is None:
-                entries=[dict(text=topic['aussage'],kind='normal',order=100,details=[],
-                              origins=topic.get('origins',[]),people=topic.get('people',set()),
-                              denominator=topic.get('denominator',0),pooled=topic.get('pooled',False))] if topic.get('aussage') else []
-            bundled=[]
+                entries=[dict(topic,text=topic['aussage'],kind='normal',order=100,details=[])] if topic.get('aussage') else []
+            concerns=[];direct=[]
             for entry in entries:
-                e=dict(entry,kind=entry.get('kind','normal'),kind_label=KINDS.get(entry.get('kind','normal'),''),
-                       details=entry.get('details',[]))
+                e=dict(entry,kind=entry.get('kind','normal'),
+                       kind_label=KINDS.get(entry.get('kind','normal'),''),details=entry.get('details',[]))
                 if 'people' in e:
                     e.setdefault('count',len(e['people']))
                 if e.get('count')==1 or ('people' in e and not e.get('reviewed',True)):
-                    singles.append(e)
-                elif e.get('pooled'):
-                    pooled_entries.append(e)
+                    e['details']=[]
+                    direct.append(e)
                 else:
-                    bundled.append(e)
-            if bundled:
-                bundled.sort(key=ranking)
-                people=set().union(*(e.get('people',set()) for e in bundled))
-                duplicate_title=len(bundled)==1 and normalized(topic['titel'])==normalized(bundled[0]['text'])
-                prepared.append(dict(title='Anliegen' if duplicate_title else topic['titel'],all=bundled,
-                                     count=len(people) or None,rank_count=len(people),
-                                     denominator=bundled[0].get('denominator',0)))
-                flat.extend(bundled)
-        if pooled_entries:
-            pooled_entries.sort(key=ranking)
-            people=set().union(*(e['people'] for e in pooled_entries))
-            prepared.append(dict(title='Zusammengefasste Anliegen',all=pooled_entries,
-                                 pooled=True,rank_count=len(people)))
-            flat.extend(pooled_entries)
+                    concerns.append(e)
+            # An existing shared subject is enough for a direct theme-to-nuance path.
+            direct_people=set().union(*(entry.get('people',set()) for entry in direct))
+            if len(direct_people)<2:
+                singles.extend(direct)
+                direct=[]
+            items=concerns+direct
+            if items:
+                title=topic['titel']
+                if len(items)==1 and normalized(title)==normalized(items[0]['text']):
+                    title='Anliegen'
+                prepared.append(topic_view(title,items,disclosure))
         prepared.sort(key=lambda topic: (-topic['rank_count'],topic['title'].casefold()))
         if singles:
-            singles.sort(key=ranking)
-            people=set().union(*(e.get('people',set()) for e in singles))
-            prepared.append(dict(title='Einzelaussagen',all=singles,singles=True,
-                                 count=len(people) or None,denominator=singles[0].get('denominator',0)))
+            prepared.append(topic_view('Einzelaussagen',singles,disclosure,singles=True))
         selected=set();seen=set()
         if profile=='gl':
-            for e in sorted(flat,key=ranking):
+            for e in sorted((e for t in prepared for e in t['all']),key=ranking):
                 if e.get('count',0)<2:continue
                 key=normalized(e['text'])
                 if key in seen:continue
                 seen.add(key);selected.add(id(e))
                 if len(selected)>=GL_MAX_HIGHLIGHTS:break
-        result=[]
-        for t in prepared:
-            entries=t['all']
-            main=entries if profile=='oe' else [e for e in entries if id(e) in selected]
-            result.append(dict(t,main=main))
-        output[canonical]=result
+        output[canonical]=[dict(t,main=t['all'] if profile=='oe' else [e for e in t['all'] if id(e) in selected])
+                           for t in prepared]
     return output
 
 
