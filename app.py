@@ -56,6 +56,11 @@ def create_app(instance=None):
           total INTEGER NOT NULL,PRIMARY KEY(project,wave,dimension,unit));
         CREATE TABLE IF NOT EXISTS ground_leaders(project INTEGER,wave TEXT,dimension TEXT,unit TEXT,
           total INTEGER NOT NULL,PRIMARY KEY(project,wave,dimension,unit));
+        CREATE TABLE IF NOT EXISTS participation_policies(project INTEGER,wave TEXT,dimension TEXT,unit TEXT,
+          mode TEXT NOT NULL,rate REAL,note TEXT NOT NULL,
+          PRIMARY KEY(project,wave,dimension,unit),
+          CHECK ((mode='published' AND rate IS NOT NULL AND rate>=0 AND rate<=100 AND length(trim(note))>0)
+                 OR (mode='omit' AND rate IS NULL)));
         CREATE TABLE IF NOT EXISTS population_snapshots(project INTEGER,wave TEXT,
           source TEXT,source_hash TEXT,reference_hash TEXT,details TEXT,created TEXT,
           PRIMARY KEY(project,wave));
@@ -689,6 +694,10 @@ def create_app(instance=None):
         rows=[r for r in rows if r['wave'] in selected]
 
         minimum=max(1,int(request.args.get('min_n',p['min_n'])))
+        from participation import apply_participation_policy
+        with db() as c:
+            participation_policies={(r['wave'],r['dimension'],r['unit']):dict(r)
+                                    for r in c.execute('SELECT * FROM participation_policies WHERE project=?',(pid,))}
         rates=[]
         for wave in available:
             n=participation.get(wave,0)
@@ -699,10 +708,10 @@ def create_app(instance=None):
             ambiguous=bool(node and not ground_path_matches(wave,node))
             if ambiguous:
                 total=None  # Mehrdeutige Grundmengen dürfen nicht für Teilpfade verwendet werden.
-            rates.append(dict(wave=wave,n=n,total=total,rate=100*n/total if total else None,
+            rates.append(apply_participation_policy(dict(wave=wave,n=n,total=total,rate=100*n/total if total else None,
                               ground_ambiguous=ambiguous,
                               leader_basis_missing=bool(matches and matches[0].get('leader_basis_missing')),
-                              warning=total is not None and n>total))
+                              warning=total is not None and n>total),participation_policies.get((wave,dimension,unit))))
         text_groups={}
         for r in rows:
             if r['type']=='text' and r['wave']==reference_wave and r['n']>=minimum:
@@ -747,10 +756,11 @@ def create_app(instance=None):
             if unique_unit and child_ground.get('inclusive_total')==0:
                 continue
             total=child_ground.get('total') if unique_unit else None
-            child_rates.append(dict(unit=child['unit'],n=n if visible else None,total=total,
+            child_rates.append(apply_participation_policy(dict(unit=child['unit'],n=n if visible else None,total=total,
                                     ground_ambiguous=not unique_unit,
                                     rate=100*n/total if visible and total else None,
-                                    leader_basis_missing=child_ground.get('leader_basis_missing',False)))
+                                    leader_basis_missing=child_ground.get('leader_basis_missing',False)),
+                                    participation_policies.get((reference_wave,child['dimension'],child['unit'])),visible=visible))
         text_disclosure=None
         if group_text_paths:
             from report_text_privacy import TextDisclosure

@@ -72,6 +72,45 @@ class OrganisationReportTests(unittest.TestCase):
         self.assertEqual(payload['cards'][0]['comparisons'][0]['rows'][-1]['mean'],3.4)
         self.assertEqual(payload['cards'][0]['wording'],'Vollständiger Fragewortlaut')
 
+    def test_published_historical_rate_has_own_definition_without_fabricated_counts(self):
+        area=self.node('Bereich','A')['id']
+        _,before=self.payload('oe='+area)
+        note='Historisch kommuniziert; inklusive eigener Leitung.'
+        with self.db() as c:
+            c.execute('INSERT INTO participation_policies VALUES(?,?,?,?,?,?,?)',
+                      (1,'2024','Bereich','A','published',90,note))
+        for extra in ('','&download=1'):
+            report,after=self.payload('oe='+area+extra)
+            self.assertEqual(before['cards'],after['cards'])
+            self.assertIn('<tr><td>2024</td><td>–</td><td>–</td><td>90.0 %<br><small>'+note,report.text)
+            self.assertIn('<tr><td>2026</td><td>2</td><td>2</td><td>100.0 %',report.text)
+        settings=self.client.get('/p/1/results?oe='+area)
+        self.assertEqual(settings.status_code,200)
+        self.assertIn('90.0 %',settings.text)
+        report=self.client.get('/p/1/report?focus_wave=2024&oe='+self.node('Amt','AFA')['id'])
+        self.assertIn('<tr><td>A</td><td>–</td><td>–</td><td>90.0 %',report.text)
+        suppressed=self.client.get('/p/1/report?focus_wave=2024&min_n=3&oe='+self.node('Amt','AFA')['id'])
+        self.assertNotIn('90.0 %',suppressed.text)
+        with self.db() as c:
+            self.assertEqual(c.execute("SELECT total FROM grounds WHERE wave='2024' AND unit='A'").fetchone()[0],2)
+
+    def test_omitted_historical_rate_does_not_cap_or_change_result_values(self):
+        area=self.node('Bereich','A')['id']
+        _,before=self.payload('oe='+area)
+        with self.db() as c:
+            c.execute('INSERT INTO participation_policies VALUES(?,?,?,?,?,?,?)',
+                      (1,'2024','Bereich','A','omit',None,'Historische Quote nicht vergleichbar.'))
+        report,after=self.payload('oe='+area)
+        self.assertEqual(before['cards'],after['cards'])
+        self.assertIn('<tr><td>2024</td><td>2</td><td>–</td><td>–<br><small>Historische Quote nicht vergleichbar.',report.text)
+        self.assertIn('<tr><td>2026</td><td>2</td><td>2</td><td>100.0 %',report.text)
+
+    def test_historical_rate_requires_valid_percentage_and_definition(self):
+        for mode,rate,note in [('published',101,'Quelle'),('published',None,'Quelle'),('published',90,''),('omit',90,'Quelle')]:
+            with self.db() as c,self.assertRaises(sqlite3.IntegrityError):
+                c.execute('INSERT INTO participation_policies VALUES(?,?,?,?,?,?,?)',
+                          (1,'2024','Bereich','A',mode,rate,note))
+
     def test_historical_parent_does_not_hide_current_ground(self):
         # Bereich A belonged to another Amt in 2024. Both paths remain selectable.
         old=[{**e,'Amt':'Alt'} if e['Bereich']=='A' else e for e in self.entries]
