@@ -26,7 +26,7 @@ def register(app, db, project, report_data, result_sources):
     def current(pid,job):
         selection=json.loads(job['selection'])
         records=ta.collect(result_sources(pid),**selection)
-        return ta.digest(records)==job['fingerprint']
+        return ta.matches_fingerprint(records,job['fingerprint'],json.loads(job['records']))
 
     def update(pid,job,**values):
         with db() as c:

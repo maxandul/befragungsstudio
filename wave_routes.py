@@ -34,8 +34,13 @@ def register(app,db,project,report_data,result_sources):
         if not hasattr(g,'wave_text_fingerprints'):g.wave_text_fingerprints={}
         key=(pid,job['selection'])
         if key not in g.wave_text_fingerprints:
-            g.wave_text_fingerprints[key]=ta.digest(wa.contextual_records(result_sources(pid),**json.loads(job['selection'])))
-        return g.wave_text_fingerprints[key]==job['fingerprint']
+            g.wave_text_fingerprints[key]=wa.contextual_records(result_sources(pid),**json.loads(job['selection']))
+        records=g.wave_text_fingerprints[key]
+        if ta.digest(records)==job['fingerprint']:return True
+        with db() as c:
+            snapshot=[r for part in c.execute('SELECT records FROM wave_text_parts WHERE job=?',(job['id'],))
+                      for r in json.loads(part['records'])]
+        return ta.matches_fingerprint(records,job['fingerprint'],snapshot)
 
     def part_for(pid,jid,bid):
         job=job_for(pid,jid)
