@@ -50,6 +50,17 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
     }
   };
   checkMarkerRoom(history);checkMarkerRoom(children);
+  assert.equal(history.options.plugins.valueLabels,false);
+  assert.equal(children.options.plugins.valueLabels,false);
+  assert.match(children.options.plugins.tooltip.callbacks.label({dataset:children.data.datasets[0],dataIndex:0,parsed:{x:4}}),/4\.00/);
+  // Full-population stars also remain on the first series without numeric labels.
+  const stars=[];
+  children.plugins.find(p=>p.id==='completeMarkers').afterDatasetsDraw({
+    ctx:{save(){},restore(){},fillText(text){stars.push(text);}},options:children.options,
+    data:{datasets:[{completePopulation:[true],data:[{x:4}]},{completePopulation:[true],data:[{x:5}]}]},
+    isDatasetVisible:()=>true,getDatasetMeta:()=>({data:[{x:40,y:20}]})
+  });
+  assert.deepEqual(stars,['*','*']);
   assert.equal(history.data.datasets[1].data[1].x,history.options.scales.x.min);
   assert.equal(children.data.datasets[1].data[0].x,children.options.scales.x.max);
   assert.equal(children.data.datasets.find(ds=>ds.id==='parent').data[0].x,3.5);
@@ -77,13 +88,14 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
   assert.equal(exported.data.datasets.find(ds=>ds.id==='parent').hidden,true);
   assert.equal(exported.data.datasets.find(ds=>ds.id==='total').data[0].x,76);
   assert.equal(exported.options.responsive,false);
-  assert.equal(exported.options.plugins.valueLabels.edge,true);
+  assert.equal(exported.options.plugins.valueLabels,false);
   assert.equal(exported.data.datasets.every(ds=>ds.data.every(point=>Number.isFinite(point.y))),true);
   assert.match(exported.data.labels[0].join(' '),/Vollständiger Wortlaut A/);
   assert.match(exported.data.labels[1].join(' '),/n: – \/ –/);
   // Mean PNGs use the same endpoint protection as percentage PNGs.
   elements['report-metric'].value='mean';events.metric();await events.png();
   checkMarkerRoom(configurations.at(-1).config);
+  assert.equal(configurations.at(-1).config.options.plugins.valueLabels,false);
   assert.equal(configurations.at(-1).config.options.scales.x.min,1);
   assert.equal(configurations.at(-1).config.options.scales.x.max,5);
   console.log('Themenexport: Metrik, fehlende aktuelle Werte, n und Legendenauswahl geprüft.');
