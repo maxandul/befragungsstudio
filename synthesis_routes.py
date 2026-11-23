@@ -8,7 +8,7 @@ from flask import flash, redirect, render_template, request, send_file, url_for
 import text_analysis as ta
 import wave_analysis as wa
 import wave_synthesis as ws
-from report_editorial import statement_index,valid_concern
+from report_editorial import statement_index,valid_concern,EDITOR_KINDS
 
 
 def register(app,db,project,job_for,is_current):
@@ -38,7 +38,7 @@ def register(app,db,project,job_for,is_current):
             refs=json.loads(a['sources']);members=[index[ref] for ref in refs if ref in index]
             n=len({tuple(s['key'][:2]) for s in members});total=len(denominators[a['canonical']])
             rows.append(dict(a,valid=valid,count=n,total=total,percent=100*n/total if total else None,
-                             references=members[:5],label=members[0]['label'] if members else a['canonical']))
+                             references=members[:50],source_count=len(refs),label=members[0]['label'] if members else a['canonical']))
         return rows
 
     @app.route('/p/<int:pid>/wave-texts/<jid>/overall-download',methods=['GET','POST'])
@@ -170,7 +170,7 @@ def register(app,db,project,job_for,is_current):
             rows=rows[(page-1)*50:page*50],total=len(rows),page=page,pages=pages,
             review_hash=review_hash(parts,concerns),answer_count=sum(p['count'] for p in parts),
             ignored=ignored[(ignored_page-1)*50:ignored_page*50],ignored_count=len(ignored),
-            ignored_page=ignored_page,ignored_pages=ignored_pages,tab='texts')
+            ignored_page=ignored_page,ignored_pages=ignored_pages,editor_kinds=EDITOR_KINDS,tab='texts')
 
     @app.get('/p/<int:pid>/wave-texts/<jid>/synthesis.csv')
     def synthesis_csv(pid,jid):
@@ -180,11 +180,11 @@ def register(app,db,project,job_for,is_current):
         if not synthesis:raise ValueError('Noch keine Gesamtauswertung vorhanden.')
         rows=summaries(parts,concerns,statement_index(parts));stream=io.StringIO()
         writer=csv.writer(stream,delimiter=';')
-        writer.writerow(['Frage','Thema','Anliegen','Vorschlag','Begründung','Textantwortende Anliegen','Textantwortende Frage','Anteil (%)','Status'])
+        writer.writerow(['Frage','Thema','Kernaussage oder Nuance','Einordnung','Begründung','Textantwortende Aussage','Textantwortende Frage','Anteil (%)','Status'])
         def safe(value):
             value=str(value)
             return "'"+value if value.lstrip().startswith(('=','+','-','@','\t','\r')) else value
         for r in rows:
-            writer.writerow([safe(r[k]) for k in ('label','topic','body','kind','rationale')]+[r['count'],r['total'],
+            writer.writerow([safe(r['label']),safe(r['topic']),safe(r['body']),EDITOR_KINDS[r['kind']],safe(r['rationale'])]+[r['count'],r['total'],
                 (f"{r['percent']:.1f}".replace('.',',') if r['percent'] is not None else ''),'aktuell' if r['valid'] else 'Quellen verändert'])
-        return send_file(io.BytesIO(stream.getvalue().encode('utf-8-sig')),mimetype='text/csv',as_attachment=True,download_name=f'Anliegen_{jid[:8]}.csv')
+        return send_file(io.BytesIO(stream.getvalue().encode('utf-8-sig')),mimetype='text/csv',as_attachment=True,download_name=f'Textauswertung_{jid[:8]}.csv')

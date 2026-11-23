@@ -101,6 +101,7 @@ class SynthesisTests(unittest.TestCase):
         html=self.client.get(report).text
         self.assertIn('Gemeinsames Anliegen',html)
         self.assertIn('1 Textantwort</small>',html)
+
         self.assertNotIn('Aussage person-a',html)
         self.assertNotIn('Aussage leader-a',html);self.assertNotIn('Aussage person-b',html)
         overall=self.client.get('/p/1/report?focus_wave=2026&profile=gl&min_n=1').text
@@ -111,8 +112,43 @@ class SynthesisTests(unittest.TestCase):
         csv=self.client.get(url+'/synthesis.csv')
         self.assertEqual(csv.status_code,200)
         self.assertTrue(csv.data.startswith(b'\xef\xbb\xbf'))
-        self.assertIn('Textantwortende Anliegen;Textantwortende Frage',csv.data.decode('utf-8-sig'))
+        self.assertIn('Textantwortende Aussage;Textantwortende Frage',csv.data.decode('utf-8-sig'))
         self.assertNotIn('person-a',csv.data.decode('utf-8-sig'))
+
+    def test_inline_editor_updates_current_import_without_losing_sources_or_approval(self):
+        _,url,value=self.overall()
+        self.assertEqual(self.upload(url,value,action='import_use').status_code,302)
+        before_parts=self.parts();before_synthesis=self.synth()
+        with self.db() as c:
+            c.row_factory=__import__('sqlite3').Row
+            concern=dict(c.execute('SELECT * FROM text_concerns ORDER BY id LIMIT 1').fetchone())
+        page=self.client.get(url+'/synthesis').text
+        self.assertIn('Optional: Themen, Kernaussagen und Nuancen bearbeiten',page)
+        self.assertIn('text-editor-question',page)
+        self.assertIn('Thema · Abläufe konkretisieren',page)
+        self.assertIn('name="return_to" value="synthesis"',page)
+        self.assertIn('Originalantwort vergleichen',page)
+        target=url+'/concerns?question='+concern['canonical']
+        data=dict(action='edit',concern=concern['id'],revision=str(concern['revision']),
+                  topic='Redigiertes Thema',body='Redigierte Nuance',kind='difference',order='12',rationale='Präzisiert',
+                  return_to='synthesis',synthesis_page='1')
+        self.assertEqual(self.post(target,**data).status_code,400) # Sources must still be confirmed.
+        response=self.post(target,**data,supported='on')
+        self.assertEqual(response.status_code,302)
+        self.assertIn('/synthesis?page=1#concern-',response.location)
+        self.assertEqual(self.client.get(response.location).status_code,200)
+        with self.db() as c:
+            c.row_factory=__import__('sqlite3').Row
+            saved=dict(c.execute('SELECT * FROM text_concerns WHERE id=?',(concern['id'],)).fetchone())
+        self.assertEqual(json.loads(saved['sources']),json.loads(concern['sources']))
+        self.assertEqual(saved['kind'],'difference')
+        self.assertEqual(self.parts(),before_parts)
+        self.assertEqual(self.synth(),before_synthesis)
+        report=self.client.get('/p/1/report?focus_wave=2026&profile=oe&min_n=1').text
+        self.assertIn('Redigierte Nuance',report)
+        self.assertIn('Redigiertes Thema',report)
+        self.assertEqual(self.upload(url,value,action='import_use').status_code,302)
+        self.assertIn('Redigierte Nuance',self.client.get(url+'/synthesis').text)
 
     def test_validation_is_atomic_for_missing_parts_sources_duplicate_or_foreign(self):
         job,url,value=self.overall();parts=self.parts()

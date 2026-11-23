@@ -68,8 +68,13 @@ class LeadershipTeamTests(unittest.TestCase):
         self.assertEqual(card['rows'][-1]['mean'],(3*5+3*1+9*2+1)/16)
         self.assertNotIn('Führungsteam',[r['unit'] for r in self.card(payload,'other')['children']])
         self.assertIn('<tr><td>Führungsteam</td><td>3</td><td>Leitungsanteil der Grundmenge fehlt</td><td>–</td></tr>',html)
-        _,hidden=self.report(include_children=0)
+        guide=html.split('<summary>So liest du die Ergebnisse</summary>',1)[1].split('</details>',1)[0]
+        self.assertIn('Die Leitungspersonen der direktunterstellten Einheiten',guide)
+        self.assertNotIn('berührer',guide)
+        hidden_html,hidden=self.report(include_children=0)
         self.assertEqual(self.card(hidden)['children'],[])
+        hidden_guide=hidden_html.split('<summary>So liest du die Ergebnisse</summary>',1)[1].split('</details>',1)[0]
+        self.assertNotIn('Die Leitungspersonen der direktunterstellten Einheiten',hidden_guide)
         _,small=self.report(min_n=4)
         self.assertNotIn('Führungsteam',[r['unit'] for r in self.card(small)['children']])
 

@@ -55,6 +55,18 @@ Validierung: `python -m unittest discover -s tests -q`; 51 Tests. Ergänzt um ak
 
 ## Redaktion und Detailansicht ab 0.1.11
 
+Die Lesehilfe «So liest du die Ergebnisse» erklärt Teilnahme, Kennzahlen, Vergleiche,
+Konfidenzintervalle, Vollerfassung und Textantworten in einer abgestimmten Kurzfassung.
+Der Zusatz zum Führungsteam erscheint nur, wenn die Gruppe im Bericht enthalten ist.
+
+In der Gesamtauswertung können importierte Formulierungen direkt unter ihrer Frage
+und ihrem Thema bearbeitet werden. Kernaussagen und Nuancen haben aufklappbare
+Formulare und Quellen mit Originalantworten. Die erweiterte Quellenprüfung bleibt
+für das Ergänzen von Quellen und neue Bündelungen erreichbar. Gespeicherte Änderungen
+an freigegebenen Auswertungen gelten für neu erzeugte Berichte; bestehende Downloads
+müssen neu erstellt werden. Importformat, Quellenkennungen und Freigaben bleiben
+bei reiner Textredaktion erhalten. Eine erneute KI-Auswertung ist nicht nötig.
+
 - Fragen unter «Fragen» mit ganzzahligen Reihenfolgen innerhalb des Abschnitts sortieren. Die Sortierung gilt für Einzelcharts, Themenübersichten und PNGs von oben nach unten.
 - Die «Zugehörige Frage» einer Textfrage bestimmt deren Abschnitt. Bei freigegebenen vollständigen Texten erscheint sie direkt unter dieser Frage in «Einzelfragen und Details». Ist die quantitative Frage im gewählten Bericht nicht sichtbar, bleibt der ausreichend grosse Textbestand innerhalb der Themendetails erreichbar. Unzugeordnete Texte erscheinen ebenfalls dort.
 - Die einmaligen AFA-Ergänzungen verschieben Entwicklungsmöglichkeiten aus der früheren Standardgruppe zu Arbeitsbedingungen/Gesundheit und ergänzen die bekannten Textbeziehungen und den BGM2-Optionskatalog. Eigene Themen, Reihenfolgen und Optionskataloge bleiben erhalten. Bestehende übergeordnete Zusammenfassungen werden nicht automatisch umgeschrieben.
