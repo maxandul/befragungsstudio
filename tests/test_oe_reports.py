@@ -384,6 +384,52 @@ class OrganisationReportTests(unittest.TestCase):
         response,_=self.payload('download=1')
         self.assertIn(b'id="show-ci" type="checkbox">',response.data) # Standard aus.
 
+    def test_complete_population_per_question_wave_and_scope(self):
+        response,payload=self.payload()
+        card=payload['cards'][0]
+        for row in card['rows']+card['children']:
+            self.assertTrue(row['complete_population'])
+            self.assertIsNone(row['mean_ci95'])
+            self.assertIsNone(row['top2_ci95'])
+        self.assertEqual(response.text.count('<strong>* Vollständig erfasst:</strong>'),1)
+        methodology=response.text.split('<summary>So liest du die Ergebnisse</summary>',1)[1].split('<section class="report-section"',1)[0]
+        self.assertIn('<strong>* Vollständig erfasst:</strong>',methodology)
+        _,area=self.payload('oe='+self.node('Bereich','A')['id'])
+        self.assertTrue(area['cards'][0]['comparisons'][0]['rows'][-1]['complete_population'])
+        _,team=self.payload('oe='+self.node('Team','Gleich','A')['id'])
+        self.assertFalse(team['cards'][0]['rows'][-1]['complete_population'])
+        # All participated, but one abstained on this question in the latest wave.
+        with self.db() as c:
+            c.execute("UPDATE answers SET answer='Keine Antwort' WHERE wave='2026' AND source='q' AND feedback='0'")
+        _,payload=self.payload('min_n=1')
+        rows=payload['cards'][0]['rows']
+        self.assertTrue(rows[0]['complete_population'])
+        self.assertFalse(rows[-1]['complete_population'])
+        self.assertIsNotNone(rows[-1]['mean_ci95'])
+        self.assertFalse(payload['cards'][0]['children'][0]['complete_population'])
+
+    def test_complete_population_needs_actual_consistent_counts(self):
+        with self.db() as c:
+            c.execute("UPDATE grounds SET total=10 WHERE wave='2026'")
+            c.execute("INSERT INTO participation_policies VALUES(1,'2026','','','published',100,'Historisch begrenzt')")
+        _,payload=self.payload()
+        self.assertFalse(payload['cards'][0]['rows'][-1]['complete_population'])
+        self.assertIsNotNone(payload['cards'][0]['rows'][-1]['top2_ci95'])
+        with self.db() as c:
+            c.execute("DELETE FROM grounds WHERE wave='2026'")
+        _,payload=self.payload()
+        self.assertFalse(payload['cards'][0]['rows'][-1]['complete_population'])
+
+    def test_complete_population_requires_confirmed_leader_adjustment(self):
+        self.add_leadership()
+        _,payload=self.payload()
+        self.assertFalse(payload['cards'][0]['rows'][-1]['complete_population'])
+        with self.db() as c:
+            c.execute("UPDATE grounds SET total=6 WHERE wave='2026' AND dimension='' AND unit=''")
+            c.execute("INSERT INTO ground_leaders VALUES(1,'2026','','',1)")
+        _,payload=self.payload()
+        self.assertTrue(payload['cards'][0]['rows'][-1]['complete_population'])
+
     @unittest.skipUnless(shutil.which('node'),'Optionaler Entwicklungstest benötigt Node.js')
     def test_confidence_chart_toggle_and_exports(self):
         result=subprocess.run(['node',str(Path(__file__).with_name('check_ci_exports.cjs'))],capture_output=True,text=True)

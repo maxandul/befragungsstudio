@@ -76,11 +76,23 @@
     ctx.font = `${options.fontSize || 13}px Arial, sans-serif`; ctx.textBaseline = 'middle';
     chart.getDatasetMeta(0).data.forEach((point, i) => {
       const entry = ds.data[i], v = entry && typeof entry === 'object' ? entry.x : entry; if (v == null) return;
-      const text = fmt(v, options.percent ? 1 : 2) + (options.percent ? ' %' : '');
+      const text = fmt(v, options.percent ? 1 : 2) + (options.percent ? ' %' : '') + (ds.completePopulation?.[i] ? '*' : '');
       const ci=chart.options.plugins.confidenceIntervals?.enabled ? ds.ci95?.[i] : null;
       if (chart.config.type === 'line') {ctx.textAlign = 'center';const y=ci ? Math.max(chart.chartArea.top+8,chart.scales.y.getPixelForValue(ci[1])-14) : point.y-22;ctx.fillText(text,point.x,y);}
       else {ctx.textAlign = 'left';ctx.fillStyle=options.edge ? '#0070b4' : '#18394f';const x=ci ? Math.min(chart.chartArea.right,chart.scales.x.getPixelForValue(ci[1]))+9 : point.x+9;ctx.fillText(text, options.edge ? chart.chartArea.right+12 : x, point.y);}
     }); ctx.restore();
+  }};
+  const completeMarkers={id:'completeMarkers',afterDatasetsDraw(chart){
+    const ctx=chart.ctx;ctx.save();ctx.font='bold 16px Arial, sans-serif';
+    chart.data.datasets.forEach((ds,k)=>{
+      if(k===0 || !chart.isDatasetVisible(k))return; // First series includes * in its value label.
+      ctx.fillStyle=ds.borderColor;
+      chart.getDatasetMeta(k).data.forEach((point,i)=>{
+        const value=ds.data[i];
+        if(ds.completePopulation?.[i] && value!=null && (typeof value!=='object' || value.x!=null))
+          ctx.fillText('*',point.x+10,point.y-10);
+      });
+    });ctx.restore();
   }};
 
   function config(card, metric = 'mean', layout = 'screen', view = 'history') {
@@ -96,6 +108,7 @@
     const children = view === 'children';
     const showCI=scale && intervalsEnabled(), intervalKey=top ? 'top2_ci95' : 'mean_ci95';
     const datasets = [{id:'selected',label: scale ? payload.unit : 'Anteil (%)',
+        completePopulation:(children ? card.children : card.rows).map(r=>!!r.complete_population),
         ci95:(children ? card.children : card.rows).map(r=>r[intervalKey] || null),
         ns:children ? card.children.map(r=>r.n) : card.rows.map(r=>r.n),
         data: children ? card.children.map(r => top ? r.top2 : r.mean) : values,
@@ -106,6 +119,7 @@
       (card.comparisons || []).filter(comparisonVisible).forEach(comp => datasets.push({id:comp.kind || comp.label,
         label:comp.label + (exporting ? ' · n=' + (children ? [latest] : card.rows).map(row=>comp.rows.find(r=>r.wave===row.wave)?.n ?? '–').join('/') : ''),
         ns:(children ? card.children : card.rows).map(row=>comp.rows.find(r=>r.wave===(children ? latest.wave : row.wave))?.n),
+        completePopulation:(children ? card.children : card.rows).map(row=>!!comp.rows.find(r=>r.wave===(children ? latest.wave : row.wave))?.complete_population),
         data:(children ? card.children : card.rows).map(row=>{const r=comp.rows.find(r=>r.wave===(children ? latest.wave : row.wave));return r ? (top ? r.top2 : r.mean) : null;}),
         type:'line',indexAxis:children ? 'y' : 'x',showLine:!children,
         borderColor:comp.kind==='total' ? '#647887' : '#ed8b23',backgroundColor:comp.kind==='total' ? '#647887' : '#ed8b23',
@@ -116,7 +130,7 @@
     return {
       type: scale && !children ? 'line' : 'bar',
       data: {labels:chartLabels,datasets},
-      plugins: [whiteBackground, confidenceIntervals, comparisonLines, valueLabels],
+      plugins: [whiteBackground, confidenceIntervals, comparisonLines, valueLabels, completeMarkers],
       options: {
         indexAxis: scale && !children ? 'x' : 'y', responsive: !exporting, maintainAspectRatio: false,
         animation: false, devicePixelRatio: exporting ? 1 : Math.min(window.devicePixelRatio || 1, 2),
@@ -130,8 +144,9 @@
             font: {family: 'Arial, sans-serif', size: fontSize}, color: '#607381', padding: {bottom: 35}},
           confidenceIntervals:{enabled:showCI,horizontal:children,exporting},comparisonLines:{enabled:children},
           tooltip: {enabled: !exporting,callbacks:{label:ctx=>{
-            const label=`${ctx.dataset.label}: ${fmt(scale && !children ? ctx.parsed.y : ctx.parsed.x,top ? 1 : 2)}${top || !scale ? ' %' : ''} · n=${ctx.dataset.ns?.[ctx.dataIndex] ?? latest.n}`;
-            if(!showCI || ctx.datasetIndex!==0)return label;
+            const complete=ctx.dataset.completePopulation?.[ctx.dataIndex];
+            const label=`${ctx.dataset.label}: ${fmt(scale && !children ? ctx.parsed.y : ctx.parsed.x,top ? 1 : 2)}${top || !scale ? ' %' : ''}${complete ? '*' : ''} · n=${ctx.dataset.ns?.[ctx.dataIndex] ?? latest.n}`;
+            if(!showCI || ctx.datasetIndex!==0 || complete)return label;
             const ci=ctx.dataset.ci95?.[ctx.dataIndex];
             return [label,ci ? `95%-KI: ${fmt(ci[0],top ? 1 : 2)}–${fmt(ci[1],top ? 1 : 2)}${top ? ' %' : ''}` : '95%-KI nicht berechenbar'];
           }}}, valueLabels: {fontSize, percent: !scale || top}
@@ -166,8 +181,9 @@
       ...(exporting ? wrap('n: ' + rows.map(rs => rs[i]?.n ?? '–').join(' / '), 58) : [])
     ]);
     return {
-      type:'scatter', plugins:[whiteBackground, valueLabels],
+      type:'scatter', plugins:[whiteBackground, valueLabels, completeMarkers],
       data:{labels,datasets:series.map((item,k) => ({id:item.id,label:item.label, ns:rows[k].map(r => r?.n),
+        completePopulation:rows[k].map(r=>!!r?.complete_population),
         data:rows[k].map((r,i) => ({x:r ? (top ? r.top2 : r.mean) : null,y:i})),
         borderColor:item.comparison ? (item.id==='parent' ? '#883e96' : '#485865') : palette[k % palette.length],
         backgroundColor:item.comparison ? (item.id==='parent' ? '#883e96' : '#485865') : palette[k % palette.length],
@@ -183,7 +199,7 @@
             ...(exporting ? ['n je Frage in Reihenfolge der Legende · – = kein freigegebenes Ergebnis'] : [])],font:{size:exporting ? 20 : 13}},
           valueLabels:{fontSize:exporting ? 21 : 13,percent:top,edge:true},
           tooltip:{enabled:!exporting,callbacks:{title:items => cards[items[0].dataIndex].wording || cards[items[0].dataIndex].label,
-            label:ctx => `${ctx.dataset.label}: ${fmt(ctx.parsed.x,top ? 1 : 2)}${top ? ' %' : ''} · n=${ctx.dataset.ns[ctx.dataIndex]}`}}},
+            label:ctx => `${ctx.dataset.label}: ${fmt(ctx.parsed.x,top ? 1 : 2)}${top ? ' %' : ''}${ctx.dataset.completePopulation?.[ctx.dataIndex] ? '*' : ''} · n=${ctx.dataset.ns[ctx.dataIndex]}`}}},
         scales:{x:{min:top ? 0 : overview.minimum,max:top ? 100 : overview.maximum,
           ticks:{stepSize:top ? 20 : 1,font:{size:exporting ? 23 : 14}},grid:{color:'#e2e9ef'}},
           y:{type:'category',labels,reverse:false,offset:true,grid:{color:'#edf1f5'},
