@@ -74,7 +74,7 @@ class LeadershipTeamTests(unittest.TestCase):
         hidden_html,hidden=self.report(include_children=0)
         self.assertEqual(self.card(hidden)['children'],[])
         hidden_guide=hidden_html.split('<summary>So liest du die Ergebnisse</summary>',1)[1].split('</details>',1)[0]
-        self.assertNotIn('Die Leitungspersonen der direktunterstellten Einheiten',hidden_guide)
+        self.assertIn('Die Leitungspersonen der direktunterstellten Einheiten',hidden_guide)
         _,small=self.report(min_n=4)
         self.assertNotIn('Führungsteam',[r['unit'] for r in self.card(small)['children']])
 
@@ -114,6 +114,22 @@ class LeadershipTeamTests(unittest.TestCase):
         self.assertEqual(other['n'],2)
         self.assertFalse(other['complete_population'])
         self.assertIsNotNone(other['mean_ci95'])
+
+    def test_participation_keeps_team_and_oes_when_results_are_hidden(self):
+        with self.db() as c:
+            for area in ('A','B','C'):
+                c.execute("INSERT INTO grounds VALUES(1,'2026','Bereich',?,5)",(area,))
+                c.execute("INSERT INTO ground_leaders VALUES(1,'2026','Bereich',?,1)",(area,))
+        shown,_=self.report()
+        hidden,payload=self.report(include_children=0,include_texts=1)
+        participation=lambda text:text.split('id="participation"',1)[1].split('</section>',1)[0]
+        self.assertEqual(participation(shown),participation(hidden))
+        self.assertIn('<tr><td>Führungsteam</td><td>3</td><td>3</td><td>100.0 %</td></tr>',participation(hidden))
+        self.assertTrue(all(not card['children'] for card in payload['cards']))
+        self.assertNotIn('<summary>Führungsteam <span',hidden)
+        small,_=self.report(include_children=0,min_n=4,download=1)
+        self.assertIn('<tr><td>Führungsteam</td><td>n &lt; 4</td><td>3</td><td>n &lt; 4</td></tr>',participation(small))
+        self.assertNotIn('<td>100.0 %</td>',participation(small).split('<td>Führungsteam</td>',1)[1])
 
     def test_missing_or_ambiguous_basis_never_uses_partial_sum_or_published_rate(self):
         with self.db() as c:

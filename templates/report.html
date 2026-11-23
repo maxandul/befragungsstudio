@@ -116,7 +116,7 @@ blockquote{margin:16px 0;padding:12px 20px;border-left:4px solid #0070b4;backgro
 
 <details class="methodology"><summary>So liest du die Ergebnisse</summary>
 <p><strong>Wer zählt zum Ergebnis?</strong><br>Ausgewertet werden die Antworten aus der gewählten Organisationseinheit und ihren unterstellten Einheiten. Die Antworten der Leitung der gewählten Organisationseinheit bleiben ausgeschlossen.</p>
-{% if leadership %}<p>Die Leitungspersonen der direktunterstellten Einheiten werden zusätzlich gemeinsam als <strong>Führungsteam</strong> angezeigt, sofern genügend Antworten vorliegen. Sie zählen zum Gesamtergebnis der übergeordneten Einheit, sind aber aus dem Ergebnis ihrer jeweils eigenen Einheit ebenfalls ausgeschlossen.</p>{% endif %}
+{% if leadership_rate %}<p>Die Leitungspersonen der direktunterstellten Einheiten werden zusätzlich gemeinsam als <strong>Führungsteam</strong> angezeigt, sofern genügend Antworten vorliegen. Sie zählen zum Gesamtergebnis der übergeordneten Einheit, sind aber aus dem Ergebnis ihrer jeweils eigenen Einheit ebenfalls ausgeschlossen.</p>{% endif %}
 <p><strong>Teilnahme und gültige Antworten</strong><br>Der Rücklauf zeigt, welcher Anteil der eingeladenen Personen teilgenommen hat. <strong>n</strong> bezeichnet die gültigen Antworten auf die jeweilige Frage und kann deshalb kleiner sein. Enthaltungen wie «Keine Antwort» fliessen nicht in Mittelwerte und Zustimmungsanteile ein. Ergebnisse werden erst ab der festgelegten Mindestanzahl gültiger Antworten angezeigt. <strong>«n &lt; {{minimum}}»</strong> bedeutet, dass weniger Personen teilgenommen haben; ihre Antworten zählen im übergeordneten Ergebnis mit.</p>
 <p><strong>Mittelwert und Zustimmung</strong><br>Der <strong>Mittelwert</strong> ist der Durchschnitt der Zahlenantworten. Auf der Skala von 1 bis 5 bedeutet ein höherer Wert mehr Zustimmung. Der <strong>Zustimmungsanteil</strong> zeigt, wie viele gültige Antworten auf die Werte 4 (trifft zu) oder 5 (trifft voll zu) entfallen. Bei Multiple-Choice-Fragen können sich die Anteile auf über 100 % summieren.</p>
 <p><strong>Diagramme und Vergleiche</strong><br>Farben und Symbole unterscheiden Wellen und Gruppen. Über die Legende kannst du Reihen ein- und ausblenden. Berührst du einen Datenpunkt mit der Maus, siehst du den vollständigen Fragetext, den Wert und die Anzahl gültiger Antworten. Leere Stellen bedeuten: nicht erhoben oder zu wenige gültige Antworten. Unterschiede geben Hinweise für die Diskussion.</p>
@@ -130,7 +130,7 @@ blockquote{margin:16px 0;padding:12px 20px;border-left:4px solid #0070b4;backgro
 <section class="report-section" id="participation"><h2>Teilnahme und Rücklauf</h2><div class="table-wrap"><table><tr><th>Welle</th><th>Feedbacks</th><th>Eingeladen</th><th>Rücklauf</th></tr>
 {% for r in rates %}<tr><td>{{r.wave}}</td><td>{{participation.count(r)}}</td><td>{{participation.invited(r)}}</td><td>{{participation.rate(r)}}</td></tr>{% endfor %}</table></div>
 {% if child_rates %}
-<h3>Direktunterstellte Einheiten{% if leadership %} und Führungsteam{% endif %} · {{reference_wave}}</h3>
+<h3>Direktunterstellte Einheiten{% if leadership_rate %} und Führungsteam{% endif %} · {{reference_wave}}</h3>
 <div class="table-wrap"><table>
 <tr><th>Einheit</th><th>Teilnehmende</th><th>Eingeladen</th><th>Rücklauf</th></tr>
 {% for r in child_rates %}
