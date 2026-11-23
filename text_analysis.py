@@ -28,6 +28,20 @@ def digest(value):
     return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
 
 
+def matches_fingerprint(records, fingerprint, snapshot):
+    """Allow display labels to change, preserving every other fingerprint field.
+
+    Compare against the original digest using only labels from the saved job.
+    Answer membership, text, canonical IDs and question wording still have to match.
+    """
+    if digest(records)==fingerprint:
+        return True
+    labels={tuple(r['key']):r['label'] for r in snapshot}
+    if any(tuple(r['key']) not in labels for r in records):
+        return False
+    return digest([dict(r,label=labels[tuple(r['key'])]) for r in records])==fingerprint
+
+
 def collect(sources, wave, dimension='', unit='', path=(), canonicals=None, minimum=1, exclude_leaders=True):
     path = [tuple(pair) for pair in path]
     records, questions, mappings, aliases, _, exclusions = sources

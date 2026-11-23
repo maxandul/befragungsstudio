@@ -105,6 +105,11 @@ Veraltete Datenstände, fehlende Freigaben oder eine unterschrittene Mindestfall
 verhindern die Ausgabe. Originalkennungen und interne Quellenlisten werden nicht
 in den HTML-Bericht eingebettet. Anleitung und Grenzen siehe README 0.1.15.
 
+Reine Änderungen der Fragenbezeichnung erhalten die Freigabe bestehender
+Textauswertungen. Die Prüfung verwendet dafür die beim Auftrag gespeicherten
+Bezeichnungen; Antworttexte, Quellenumfang, Fragenzuordnung und ursprünglicher
+Fragetext müssen weiterhin mit dem exportierten Datenstand übereinstimmen.
+
 
 ## Wiederverwendung der Wellenaufbereitung ab 0.1.16
 

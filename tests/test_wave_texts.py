@@ -97,6 +97,14 @@ class WaveTextTests(legacy.TextAnalysisTests):
         overall=self.client.get('/p/1/report?focus_wave=2026&include_summaries=1&min_n=1').text
         for name in ('person-a','leader-a','person-b'):self.assertIn('Aussage '+name,overall)
         self.assertNotIn('Aussage person-a',self.client.get(report.replace('min_n=1','min_n=2')).text)
+        # Renaming both report labels preserves the whole approved analysis.
+        with self.db() as c:
+            c.execute("UPDATE questions SET label='Neuer Titel ' || source WHERE type='text'")
+        html=self.client.get(report).text
+        self.assertIn('Aussage person-a',html)
+        self.assertIn('Neuer Titel q',html)
+        self.assertIn('Neuer Titel t',html)
+        self.assertNotIn('Der Auftrag ist veraltet',self.client.get(url).text)
         # Safe retry preserves approvals and edited state.
         revisions=[p['revision'] for p in self.parts()]
         self.assertEqual(self.import_files(url,results).status_code,302)
