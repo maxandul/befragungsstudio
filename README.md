@@ -341,6 +341,25 @@ Die Teilnahmeübersicht der direktunterstellten OEs und des Führungsteams bleib
 
 Bei Textantworten muss auch die Anzahl gültiger Führungsteam-Texte je Frage die Mindestfallzahl erreichen. Herkunftsangaben nennen nur «Führungsteam», ohne die einzelnen geleiteten OEs aufzuschlüsseln. Die bestehenden Schutzregeln für kleine Gruppen und ableitbare Restgruppen gelten weiter für Originaltexte, Belege, geprüfte Zusammenfassungen und Druckausgabe. Bestehende KI-Aufträge bleiben gültig; die Gruppierung wird erst bei der Berichtsausgabe angewendet.
 
+Für Freitexte können kleine direktunterstellte Einheiten als feste Gruppe «ad hoc»
+zusammengefasst werden. Massgebend ist die Teilnahme in der Bezugswelle nach dem
+Ausschluss der jeweils eigenen Leitung, unabhängig von einzelnen Textfragen und
+Nennungen. Erreicht diese gemeinsame Basis die Mindestfallzahl, können Originaltexte,
+geprüfte Zusammenfassungen und Belege daraus ausgegeben werden. Herkunft und Zahlen
+werden auf Themen-, Kernaussagen-, Nuancen- und Einzelaussagenebene aus den vorhandenen
+Quellen abgeleitet; Themen zählen Personen nur einmal. Die einzelnen kleinen OEs
+werden nicht als Textherkunft genannt. Bestehende Regeln für gemischte und geschützte
+Herkünfte bleiben bestehen. Der Fragenumfang und seine Mindestfallzahl gelten weiter.
+
+Die Gruppe wird je Bericht und Welle ausschliesslich aus kleinen Geschwister-OEs
+gebildet. So überlappen ihre Mitglieder nicht mit anderen ad-hoc-Gruppen in
+untergeordneten Berichten. Numerische OE-Ergebnisse und Grundmengen bleiben
+unverändert. Nur wenn im Bericht tatsächlich Texte aus der Gruppe erscheinen,
+ergänzt die Rücklauftabelle zuletzt «ad hoc (Freitext)» mit der gesamten Teilnehmerzahl
+dieser Gruppe; Einladungszahl und Rücklauf bleiben leer. Die Zeile ist eine Teilmenge
+der bestehenden Teilnahme und kein zusätzlicher Rücklauf. Kein erneuter KI-Import
+und keine Datenbankmigration nötig.
+
 **Update:** App beenden, `instance` sichern, Programmdateien aktualisieren und einmal `INSTALL.bat` ausführen. Für die t-Verteilung wird neu SciPy installiert. Danach `START.bat` starten. Kein Neuimport und keine Datenbankänderung nötig.
 
 Validierung: 62 Tests bestanden, darunter numerische Referenzen, Grenzfälle, Ausschlüsse/Mindestfallzahlen, Schalter, Tooltips, Fehlerbalkenrichtung und PNG-Übernahme. Tatsächliche PNGs mit lokalen AFA-Daten gerendert und visuell geprüft; der vollständige Browser-Layouttest bleibt offen.

@@ -813,22 +813,32 @@ def create_app(instance=None):
             from report_text_privacy import TextDisclosure
             from report_views import group_original_texts
             text_origin_nodes=[child for child,_ in child_results]
-            text_disclosure=TextDisclosure(result_sources(pid),reference_wave,minimum,text_origin_nodes,include_children,leadership)
+            text_disclosure=TextDisclosure(result_sources(pid),reference_wave,minimum,text_origin_nodes,include_children,leadership,
+                                           child_nodes,child_scope['path'] if child_scope else ())
+            if text_disclosure.adhoc_node:text_origin_nodes.append(text_disclosure.adhoc_node)
             child_depth=len(child_nodes[0]['path']) if child_nodes and include_children else 0
             for theme, items in text_groups.items():
+                adhoc_evidence=set()
                 for item in items:
                     safe_by_child={}
+                    item['adhoc_text_count']=0
                     item.pop('texts_by_path')
                     for person,text in item.pop('texts_by_person').items():
                         path=text_disclosure.paths[person]
                         if (text_disclosure.allows_source(person,item['canonical'])
                                 and text_disclosure.allows_detail(path,item['canonical'])):
-                            safe_by_child.setdefault(path[:child_depth],[]).append(text)
+                            origin=path if person in text_disclosure.adhoc_people else path[:child_depth]
+                            safe_by_child.setdefault(origin,[]).append(text)
+                            if person in text_disclosure.adhoc_people:
+                                item['adhoc_text_count']+=1
+                                adhoc_evidence.add((item['canonical'],text))
                     item['report_texts']=[text for texts in safe_by_child.values() for text in texts]
-                    item['text_origins']=group_original_texts(safe_by_child,text_origin_nodes) if child_depth else []
+                    item['text_origins']=group_original_texts(safe_by_child,text_origin_nodes) if child_depth or text_disclosure.adhoc_node else []
                 safe_texts={(item['canonical'],text) for item in items for text in item['report_texts']}
                 evidence_options[theme]={token:option for token,option in evidence_options[theme].items()
                                          if (option['canonical'],option['text']) in safe_texts}
+                for option in evidence_options[theme].values():
+                    option['adhoc']=(option['canonical'],option['text']) in adhoc_evidence
         parent=next((x for x in nodes if node and x['id']==node['parent']),None)
         comparisons=[]
         candidates=([('parent','Übergeordnete OE: '+parent['unit'],parent['path'])] if parent else [])
@@ -898,6 +908,14 @@ def create_app(instance=None):
             themes.setdefault(card['theme'],[]).append(dict(card,index=index))
         for theme in ctx['text_groups']:
             themes.setdefault(theme,[])
+        disclosure=ctx['text_disclosure']
+        adhoc_used=(ctx['include_texts'] and any(r.get('adhoc_text_count') for rows in ctx['text_groups'].values() for r in rows)
+                    or ctx['include_evidence'] and any(option.get('adhoc') for theme,options in ctx['selected_evidence'].items() if theme in themes for option in options)
+                    or ctx['include_summaries'] and any(entry.get('people',set()) & disclosure.adhoc_people
+                       for topics in ctx['text_views'].values() for topic in topics for entry in topic['all']))
+        if adhoc_used:
+            ctx['child_rates'].append(dict(unit='ad hoc (Freitext)',n=len(disclosure.adhoc_people),total=None,rate=None,
+                                           rate_mode='omit',rate_note=''))
         from report_themes import AFA_THEMES, topic_overviews
         theme_order={name:i for i,name in enumerate(AFA_THEMES)}
         themes=dict(sorted(themes.items(),key=lambda item:(theme_order.get(item[0],len(theme_order)),item[0])))
