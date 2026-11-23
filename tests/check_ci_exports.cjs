@@ -4,8 +4,9 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
   const configs=[],events={},names=[];
   const row={type:'scale',wave:'2026',n:10,mean:4,top2:80,minimum:1,maximum:5,
     mean_ci95:[3,5],top2_ci95:[49,94]};
-  const payload={project:'Test',unit:'Bereich',cards:[{label:'Frage',rows:[row],
-    children:[{...row,unit:'Team'}],comparisons:[{kind:'parent',label:'Amt',rows:[row]}]}]};
+  const complete={...row,wave:'2027',complete_population:true,mean_ci95:null,top2_ci95:null};
+  const payload={project:'Test',unit:'Bereich',cards:[{label:'Frage',rows:[row,complete],
+    children:[{...row,unit:'Team'},{...complete,unit:'Vollständig'}],comparisons:[{kind:'parent',label:'Amt',rows:[row,complete]}]}]};
   const elements={'chart-data':{textContent:JSON.stringify(payload)},'export-status':{},'chart-0':{},'children-0':{},
     'report-metric':{value:'mean',addEventListener(name,fn){events.metric=fn;}},
     'show-ci':{checked:false,addEventListener(name,fn){events.ci=fn;}},'ci-note':{hidden:true},'all-charts':{addEventListener(){}}};
@@ -35,6 +36,18 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
   assert.equal(children.options.plugins.confidenceIntervals.horizontal,true);
   const tip=history.options.plugins.tooltip.callbacks.label({dataset:history.data.datasets[0],datasetIndex:0,dataIndex:0,parsed:{y:4}});
   assert.match(tip.join(' '),/95%-KI: 3\.00–5\.00/);
+  const completeTip=history.options.plugins.tooltip.callbacks.label({dataset:history.data.datasets[0],datasetIndex:0,dataIndex:1,parsed:{y:4}});
+  assert.match(completeTip,/4\.00\* · n=10/);
+  assert.doesNotMatch(completeTip,/nicht berechenbar|95%-KI/);
+  assert.equal(history.data.datasets[0].ci95[1],null);
+  assert.equal(children.data.datasets[0].completePopulation[1],true);
+  const printed=[];
+  history.plugins.find(p=>p.id==='valueLabels').afterDatasetsDraw({
+    ctx:{save(){},restore(){},fillText(text){printed.push(text);}},
+    data:history.data,config:{type:'line'},options:{plugins:{}},isDatasetVisible:()=>true,
+    getDatasetMeta:()=>({data:[{x:20,y:20},{x:40,y:20}]})
+  },null,history.options.plugins.valueLabels);
+  assert.deepEqual(printed,['4.00','4.00*']);
   const lines=[];let strokes=0;
   const ctx={save(){},restore(){},beginPath(){},rect(){},clip(){},moveTo(x,y){lines.push([x,y]);},lineTo(x,y){lines.push([x,y]);},stroke(){strokes++;}};
   const stub={ctx,chartArea:{left:0,right:100,top:0,bottom:100},data:children.data,
@@ -53,6 +66,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
   plugin.afterDatasetsDraw(stub,null,history.options.plugins.confidenceIntervals);
   assert.equal(strokes,2); // Fehlende Grenzen erzeugen keine künstlichen Fehlerbalken.
   await events.history();assert.match(names.at(-1),/_ci95\.png$/);
+  assert.equal(configs.at(-1).config.data.datasets[0].completePopulation[1],true);
   assert.equal(configs.at(-1).config.options.plugins.confidenceIntervals.enabled,true);
   await events.children();assert.equal(configs.at(-1).config.options.plugins.confidenceIntervals.horizontal,true);
   elements['report-metric'].value='top2';events.metric();await events.history();

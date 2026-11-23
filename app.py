@@ -689,6 +689,24 @@ def create_app(instance=None):
             child_nodes=[n for n in reference_nodes if n['parent']==child_parent]
         group_text_paths=group_text_origins
         rows,participation,grounds=results(pid,dimension,unit,node['path'] if node else (),group_text_paths=group_text_paths)
+
+        def mark_complete_population(items, participants, population, target=None, dim='', name=''):
+            # Use actual, leader-adjusted counts, never displayed historical rates.
+            if target:
+                dim,name=target['dimension'],target['unit']
+            for row in items:
+                if row['wave'] not in selected or row['type']!='scale':continue
+                matches=[g for g in population if g['wave']==row['wave'] and g['dimension']==dim and g['unit']==name]
+                unique=ground_path_matches(row['wave'],target) if target else (
+                    not dim or len([n for n in wave_nodes[row['wave']] if n['dimension']==dim and n['unit']==name])==1)
+                ground=matches[0] if len(matches)==1 and unique else {}
+                total=ground.get('total')
+                row['complete_population']=bool(total and not ground.get('leader_basis_missing')
+                                                and row['n']==total and participants.get(row['wave'])==total)
+                if row['complete_population']:
+                    row['mean_ci95']=row['top2_ci95']=None
+
+        mark_complete_population(rows,participation,grounds,node,dimension,unit)
         if focus_wave:
             rows=[r for r in rows if r['canonical'] in eligible]
         rows=[r for r in rows if r['wave'] in selected]
@@ -747,6 +765,7 @@ def create_app(instance=None):
         child_results=[]
         for child in child_nodes:
             cr,cp,cg=results(pid,path=child['path'])
+            mark_complete_population(cr,cp,cg,child)
             n=cp.get(reference_wave,0)
             visible=n>=minimum
             if visible:
@@ -786,7 +805,9 @@ def create_app(instance=None):
         if node and node['path']!=total_path and not any(path==total_path for _,_,path in candidates):
             candidates.append(('total',(single_root['unit'] if single_root else 'Alle Organisationseinheiten'),total_path))
         for kind,label,path in candidates:
-            comp,_,_=results(pid,path=path)
+            comp,comp_participation,comp_grounds=results(pid,path=path)
+            comp_node=next((n for n in nodes if n['path']==path),None)
+            mark_complete_population(comp,comp_participation,comp_grounds,comp_node)
             comparisons.append(dict(kind=kind,label=label,rows=[r for r in comp if r['wave'] in selected and r['n']>=minimum and r['type']!='text']))
         display_unit=unit or (single_root['unit'] if single_root else 'Alle Organisationseinheiten')
         scope=node_id or (dimension+'|'+unit if dimension else '')

@@ -331,6 +331,8 @@ Mittelwerte: zweiseitiges punktweises 95%-t-Intervall mit n−1 Freiheitsgraden 
 
 Die Intervalle beruhen auf einem Modell unabhängiger Beobachtungen, nicht auf einer abgesicherten Zufallsauswahl aus der Belegschaft. Sie erfassen keine Verzerrung durch Nichtteilnahme. Bei einer angestrebten Vollerhebung dienen sie als optionale Analysehilfe; die Ergebnisse der Teilnehmenden sind deskriptiv bekannt. Es gibt keine Korrektur für endliche Grundmengen oder Mehrfachvergleiche. Überlappungen sind kein Signifikanztest. Für Zeit- und überlappende OE-Vergleiche wird keine Unabhängigkeit der verglichenen Gruppen behauptet.
 
+Vollständig erfasste Skalenfragen erhalten pro Frage, Welle und OE ein Sternchen am Wert und kein Konfidenzintervall. Voraussetzung sind eine eindeutig zugeordnete, bekannte Grundmenge, bestätigte eigene Leitungsanteile bei vorhandenen Kaderangaben und genau so viele Teilnehmende und gültige Antworten wie die bereinigte Grundmenge. Historische Prozentangaben ersetzen diese Prüfung nicht. Die Erklärung steht einmal unter «So liest du die Ergebnisse»; Charts, Tooltips und PNGs übernehmen nur die Markierung. Bei unvollständigen Antworten bleiben die bisherigen Intervalle unverändert.
+
 **Update:** App beenden, `instance` sichern, Programmdateien aktualisieren und einmal `INSTALL.bat` ausführen. Für die t-Verteilung wird neu SciPy installiert. Danach `START.bat` starten. Kein Neuimport und keine Datenbankänderung nötig.
 
 Validierung: 62 Tests bestanden, darunter numerische Referenzen, Grenzfälle, Ausschlüsse/Mindestfallzahlen, Schalter, Tooltips, Fehlerbalkenrichtung und PNG-Übernahme. Tatsächliche PNGs mit lokalen AFA-Daten gerendert und visuell geprüft; der vollständige Browser-Layouttest bleibt offen.
