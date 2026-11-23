@@ -814,7 +814,7 @@ def create_app(instance=None):
             from report_views import group_original_texts
             text_origin_nodes=[child for child,_ in child_results]
             text_disclosure=TextDisclosure(result_sources(pid),reference_wave,minimum,text_origin_nodes,include_children,leadership,
-                                           child_nodes,child_scope['path'] if child_scope else ())
+                                           scope=child_scope['path'] if child_scope else (),dimension=dimension,unit=unit)
             if text_disclosure.adhoc_node:text_origin_nodes.append(text_disclosure.adhoc_node)
             child_depth=len(child_nodes[0]['path']) if child_nodes and include_children else 0
             for theme, items in text_groups.items():

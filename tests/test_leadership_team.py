@@ -120,7 +120,7 @@ class LeadershipTeamTests(unittest.TestCase):
             for area in ('A','B','C'):
                 c.execute("INSERT INTO grounds VALUES(1,'2026','Bereich',?,5)",(area,))
                 c.execute("INSERT INTO ground_leaders VALUES(1,'2026','Bereich',?,1)",(area,))
-        shown,_=self.report()
+        shown,_=self.report(include_texts=1)
         hidden,payload=self.report(include_children=0,include_texts=1)
         participation=lambda text:text.split('id="participation"',1)[1].split('</section>',1)[0]
         self.assertEqual(participation(shown),participation(hidden))

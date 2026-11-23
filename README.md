@@ -341,19 +341,31 @@ Die Teilnahmeübersicht der direktunterstellten OEs und des Führungsteams bleib
 
 Bei Textantworten muss auch die Anzahl gültiger Führungsteam-Texte je Frage die Mindestfallzahl erreichen. Herkunftsangaben nennen nur «Führungsteam», ohne die einzelnen geleiteten OEs aufzuschlüsseln. Die bestehenden Schutzregeln für kleine Gruppen und ableitbare Restgruppen gelten weiter für Originaltexte, Belege, geprüfte Zusammenfassungen und Druckausgabe. Bestehende KI-Aufträge bleiben gültig; die Gruppierung wird erst bei der Berichtsausgabe angewendet.
 
-Für Freitexte können kleine direktunterstellte Einheiten als feste Gruppe «ad hoc»
-zusammengefasst werden. Massgebend ist die Teilnahme in der Bezugswelle nach dem
-Ausschluss der jeweils eigenen Leitung, unabhängig von einzelnen Textfragen und
-Nennungen. Erreicht diese gemeinsame Basis die Mindestfallzahl, können Originaltexte,
+Für Freitexte werden kleine Gruppen von unten nach oben als feste Gruppen «ad hoc»
+zusammengefasst. Massgebend ist die Teilnahme in der Bezugswelle, unabhängig von
+einzelnen Textfragen, Nennungen und Berichtsschaltern. Personen ohne tiefere
+Teamzuordnung werden einbezogen. Zu kleine Reste werden an die nächsthöhere Ebene
+weitergegeben, auch über mehrere Führungsstufen hinweg. Erreicht die gemeinsame
+Basis die Mindestfallzahl, können Originaltexte,
 geprüfte Zusammenfassungen und Belege daraus ausgegeben werden. Herkunft und Zahlen
 werden auf Themen-, Kernaussagen-, Nuancen- und Einzelaussagenebene aus den vorhandenen
 Quellen abgeleitet; Themen zählen Personen nur einmal. Die einzelnen kleinen OEs
-werden nicht als Textherkunft genannt. Bestehende Regeln für gemischte und geschützte
-Herkünfte bleiben bestehen. Der Fragenumfang und seine Mindestfallzahl gelten weiter.
+werden nicht als Textherkunft genannt. Der Fragenumfang und seine Mindestfallzahl
+gelten weiter. Ausreichend grosse Führungsteams bleiben eigene feste Gruppen;
+ihre Anzahl gültiger Texte je Frage muss weiterhin die Mindestfallzahl erreichen.
+Kleinere Leitungsgruppen können frühestens oberhalb der geleiteten OEs in die
+Restgruppen eingehen. Die eigene Leitung einer Wurzel-OE bleibt ausgeschlossen.
 
-Die Gruppe wird je Bericht und Welle ausschliesslich aus kleinen Geschwister-OEs
-gebildet. So überlappen ihre Mitglieder nicht mit anderen ad-hoc-Gruppen in
-untergeordneten Berichten. Numerische OE-Ergebnisse und Grundmengen bleiben
+Die Gruppenzuordnung wird für die gesamte Welle und Mindestfallzahl festgelegt.
+Die Gruppen sind überschneidungsfrei und werden in höheren Berichten nicht neu
+zusammengesetzt. Ein Bericht darf nur vollständige Gruppen zeigen. Beiträge aus
+einer übergeordnet gebildeten Gruppe fehlen in tieferen Berichten vollständig:
+auch in Belegen, Kernaussagen, Nuancen, Themenanzahlen und der Druckausgabe.
+Merkmal-/Einheitsfilter dürfen ebenfalls keine Teilgruppe offenlegen. Nicht
+ausreichende Restgruppen bleiben geschützt und können nicht durch eine einzelne
+gemeinsame Kernaussage mit einer grossen OE freigegeben werden. Im Bericht werden
+alle dort vollständig enthaltenen Ad-hoc-Gruppen gemeinsam als «ad hoc» angezeigt.
+Numerische OE-Ergebnisse und Grundmengen bleiben
 unverändert. Nur wenn im Bericht tatsächlich Texte aus der Gruppe erscheinen,
 ergänzt die Rücklauftabelle zuletzt «ad hoc (Freitext)» mit der gesamten Teilnehmerzahl
 dieser Gruppe; Einladungszahl und Rücklauf bleiben leer. Die Zeile ist eine Teilmenge
