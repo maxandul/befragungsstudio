@@ -167,6 +167,9 @@
   function overviewConfig(index, view, exporting = false) {
     const overview = payload.overviews[index], cards = overview.indices.map(i => payload.cards[i]);
     const top = metricFor(overview.indices[0]) === 'top2';
+    // Rotated squares and triangles extend beyond their radius at scale endpoints.
+    // Explicit scale limits otherwise cause Chart.js to clip them at the axis.
+    const markerPadding=Math.ceil((exporting ? 9 : 6)*Math.SQRT2+3);
     const series = view === 'history' ? [...payload.selected].reverse().map(wave=>({id:'wave-'+wave,label:wave,
         rows:cards.map(card=>card.rows.find(r=>r.wave===wave))}))
       : [{id:'selected',label:payload.unit,rows:cards.map(card=>card.rows.find(r=>r.wave===overview.reference_wave))},
@@ -183,6 +186,7 @@
     return {
       type:'scatter', plugins:[whiteBackground, valueLabels, completeMarkers],
       data:{labels,datasets:series.map((item,k) => ({id:item.id,label:item.label, ns:rows[k].map(r => r?.n),
+        clip:{left:markerPadding,right:markerPadding,top:markerPadding,bottom:markerPadding},
         completePopulation:rows[k].map(r=>!!r?.complete_population),
         data:rows[k].map((r,i) => ({x:r ? (top ? r.top2 : r.mean) : null,y:i})),
         borderColor:item.comparison ? (item.id==='parent' ? '#883e96' : '#485865') : palette[k % palette.length],
@@ -191,7 +195,7 @@
         pointRadius:exporting ? (k === 0 ? 9 : 7) : (k === 0 ? 6 : 5),showLine:false}))},
       options:{responsive:!exporting,maintainAspectRatio:false,animation:false,
         devicePixelRatio:exporting ? 1 : Math.min(window.devicePixelRatio || 1,2),
-        layout:{padding:{top:10,right:exporting ? 100 : 65,bottom:10}},
+        layout:{padding:{top:markerPadding,left:markerPadding,right:exporting ? 100 : 65,bottom:markerPadding}},
         plugins:{legend:{position:'bottom',labels:{font:{size:exporting ? 21 : 13},usePointStyle:true}},
           title:{display:exporting,text:[...wrap(payload.project+' · '+payload.unit,85),...wrap(overview.theme,85)],font:{size:30},color:'#172c3b'},
           subtitle:{display:true,text:[view === 'history' ? 'Zeitvergleich' : 'OE-Vergleich · '+overview.reference_wave,
