@@ -257,7 +257,7 @@ class OrganisationReportTests(unittest.TestCase):
         self.assertNotIn('← Zur App'.encode(),download.data)
         self.assertNotIn('BEFRAGUNGSSTUDIO · AUSWERTUNG'.encode(),download.data)
         self.assertNotIn(b'G\xc3\xbcltige Antworten:',download.data)
-        self.assertIn(b'Werte 4 (trifft zu) und 5 (trifft voll zu)',download.data)
+        self.assertIn(b'Werte 4 (trifft zu) oder 5 (trifft voll zu)',download.data)
 
     def test_ground_count_can_be_corrected_and_deleted_without_touching_answers(self):
         identity=dict(original_wave='2026',original_dimension='',original_unit='',original_total='5')
@@ -391,9 +391,9 @@ class OrganisationReportTests(unittest.TestCase):
             self.assertTrue(row['complete_population'])
             self.assertIsNone(row['mean_ci95'])
             self.assertIsNone(row['top2_ci95'])
-        self.assertEqual(response.text.count('<strong>* Vollständig erfasst:</strong>'),1)
+        self.assertEqual(response.text.count('<strong>Sternchen (*)</strong>'),1)
         methodology=response.text.split('<summary>So liest du die Ergebnisse</summary>',1)[1].split('<section class="report-section"',1)[0]
-        self.assertIn('<strong>* Vollständig erfasst:</strong>',methodology)
+        self.assertIn('<strong>Sternchen (*)</strong>',methodology)
         _,area=self.payload('oe='+self.node('Bereich','A')['id'])
         self.assertTrue(area['cards'][0]['comparisons'][0]['rows'][-1]['complete_population'])
         _,team=self.payload('oe='+self.node('Team','Gleich','A')['id'])
@@ -445,7 +445,7 @@ class OrganisationReportTests(unittest.TestCase):
         self.assertEqual((row['n'],row['abstentions'],row['missing']),(1,1,2))
         self.assertIn('Enthaltungen:',response.text)
         self.assertNotIn('Ohne auswertbare Antwort:',response.text)
-        self.assertIn('Die vorstehende Führungskraft wird aus ihrer eigenen OE ausgeschlossen',response.text)
+        self.assertIn('Die Antworten der Leitung der gewählten Organisationseinheit bleiben ausgeschlossen.',response.text)
 
     @unittest.skipUnless(shutil.which('node'),'Optionaler Entwicklungstest benötigt Node.js')
     def test_print_chart_snapshots_and_restore(self):

@@ -7,6 +7,7 @@ from text_analysis import digest
 from wave_analysis import normalized
 
 KINDS={'key':'Kernaussage','difference':'Abweichende Sichtweise','single':'Besonderer Hinweis','normal':'Weiteres Anliegen'}
+EDITOR_KINDS={'key':'Kernaussage (hervorheben)','normal':'Kernaussage','difference':'Nuance','single':'Einzelhinweis'}
 
 
 def statement_index(parts):
@@ -174,6 +175,9 @@ def register(app,db,project,job_for,is_current):
                                   (secrets.token_hex(16),jid,canonical,topic,body,kind,order,sources,rationale))
                 flash('Anliegen für diese Welle gespeichert. Die Quellen werden pro OE gefiltert.')
             else:raise ValueError('Unbekannte Aktion.')
+            if request.form.get('return_to')=='synthesis':
+                return redirect(url_for('synthesis_review',pid=pid,jid=jid,page=request.form.get('synthesis_page','1'),
+                                        _anchor='concern-'+cid if existing and action!='delete' else None))
             return redirect(url_for('text_concerns',pid=pid,jid=jid,question=canonical))
         search=request.args.get('search','').strip().casefold()
         rows=[s for s in index.values() if s['canonical']==canonical and (not search or search in (s['topic']+' '+s['text']).casefold())]
@@ -189,7 +193,7 @@ def register(app,db,project,job_for,is_current):
         items.sort(key=lambda c:(-c['person_count'],c['sort_order'],c['body'].casefold()))
         concern_locations={c['id']:i//50+1 for i,c in enumerate(items)}
         options=[{key:c[key] for key in ('id','revision','topic','body','kind','sort_order','rationale')} for c in items if c['valid']]
-        try:concern_page=max(1,int(request.args.get('concern_page','1')))
+        try:concern_page=max(1,int(request.args.get('concern_page',concern_locations.get(request.args.get('concern'),1))))
         except ValueError:raise ValueError('Ungültige Anliegenseite.') from None
         concern_pages=max(1,(len(items)+49)//50);concern_page=min(concern_page,concern_pages)
         concern_total=len(items)
@@ -198,7 +202,7 @@ def register(app,db,project,job_for,is_current):
             rows=rows[(page-1)*50:page*50],page=page,pages=pages,total=len(rows),search=request.args.get('search',''),
             concerns=items,concern_options=options,concern_locations=concern_locations,
             unassigned=sum(s['canonical']==canonical and ref not in occupied for ref,s in index.items()),concern_total=concern_total,concern_page=concern_page,concern_pages=concern_pages,
-            occupied=occupied,kinds=KINDS,stale=stale,ready=ready,tab='texts')
+            occupied=occupied,kinds=EDITOR_KINDS,editor_kinds=EDITOR_KINDS,stale=stale,ready=ready,tab='texts')
 
     def project_job(jid,eligible,aliases,disclosure=None):
         index,concerns=load(jid)

@@ -122,7 +122,7 @@ class CompactReportTests(unittest.TestCase):
                          r'<small class="concern-origin">Herkunft AFA · 2 Textantworten</small>')
         self.assertIn('Herkunft AFA · 1 Textantwort',html)
         guide=html.split('<summary>So liest du die Ergebnisse</summary>',1)[1].split('</details>',1)[0]
-        self.assertIn('<p><strong>Textantworten:</strong>',guide)
+        self.assertIn('<p><strong>Textantworten</strong>',guide)
         self.assertNotIn('<h3>Textantworten</h3>',guide)
         self.assertIn('<div class="concern-body">',html)
         self.assertNotIn('<p>\n<strong class="concern-label">',html)
@@ -133,8 +133,8 @@ class CompactReportTests(unittest.TestCase):
         self.assertIn('keine zusätzlichen Pflichtschritte',html)
         self.assertIn('keine Gewichtung',html)
         self.assertIn('Bereits zugeordnete Aussagen sind ausgegraut',html)
-        self.assertIn('Zum Anliegen',html)
-        self.assertLess(html.index('Berichtsanliegen ·'),html.index('Erweiterte Quellenprüfung und neue Bündelungen (optional)'))
+        self.assertIn('Zur Zusammenfassung',html)
+        self.assertLess(html.index('Kernaussagen und Nuancen ·'),html.index('Erweiterte Quellenprüfung und neue Bündelungen (optional)'))
 
 
 if __name__=='__main__':unittest.main()

@@ -1,0 +1,22 @@
+{% macro statement(c,ready=true,return_to='',page=1) %}
+<details class="text-editor-statement" id="concern-{{c.id}}">
+<summary><strong>{{editor_kinds[c.kind]}}</strong> · {{c.body[:160]}} <small>· {{c.person_count|default(c.count)}} Textantwortende{% if not c.valid %} · Quellen verändert{% endif %}</small></summary>
+{% if not c.valid %}<p class="notice">Die Quellen dieser Zusammenfassung wurden verändert. Bitte die Bündelung auflösen und anhand der aktuellen Aussagen neu zusammenstellen.</p>{% endif %}
+<form method="post" action="{{url_for('text_concerns',pid=p.id,jid=job.id,question=c.canonical)}}">
+<input type="hidden" name="csrf" value="{{session.csrf}}"><input type="hidden" name="concern" value="{{c.id}}"><input type="hidden" name="revision" value="{{c.revision}}">
+{% if return_to %}<input type="hidden" name="return_to" value="{{return_to}}"><input type="hidden" name="synthesis_page" value="{{page}}">{% endif %}
+<label>Thema<input name="topic" value="{{c.topic}}" maxlength="160" required></label>
+<label>Formulierung<textarea name="body" maxlength="4000" required>{{c.body}}</textarea></label>
+<div class="formgrid"><label>Einordnung<select name="kind">{% for key,label in editor_kinds.items() %}<option value="{{key}}" {{'selected' if c.kind==key}}>{{label}}</option>{% endfor %}</select></label><label>Reihenfolge innerhalb des Themas<input name="order" type="number" min="0" max="10000" value="{{c.sort_order}}"></label></div>
+<details><summary>Redaktionelle Begründung</summary><label>Begründung<textarea name="rationale" maxlength="2000">{{c.rationale}}</textarea></label></details>
+<label class="check"><input type="checkbox" name="supported"> Jede verknüpfte Quelle stützt die gesamte Formulierung.</label>
+<button name="action" value="edit" {{'disabled' if stale or not ready or not c.valid}}>Änderungen speichern</button>
+<details><summary>Bündelung auflösen</summary><p>Die gemeinsame Formulierung wird entfernt. Die zugehörigen Einzelaussagen bleiben erhalten und können neu gebündelt werden.</p><button name="action" value="delete" formnovalidate class="danger" {{'disabled' if stale or not ready}}>Bündelung auflösen</button></details>
+</form>
+<details class="text-editor-sources"><summary>Quellen und Originalantworten prüfen · {{c.source_count|default(c.references|length)}} Einzelaussagen</summary>
+<p>{% if c.total is defined %}{{c.count}} von {{c.total}} Textantwortenden dieser Frage{% else %}{{c.person_count}} unterschiedliche Textantwortende{% endif %}. Die Quellen bleiben bei der Bearbeitung der Formulierung erhalten.</p>
+{% for s in c.references[:50] %}<div class="source-question"><p>{{s.text}}</p><details><summary>Originalantwort vergleichen</summary><p class="verbatim">{{s.original}}</p></details></div>{% endfor %}
+{% if c.source_count|default(c.references|length)>50 %}<p>Weitere Quellen sind über die erweiterte Quellenprüfung zugänglich.</p>{% endif %}
+<a href="{{url_for('text_concerns',pid=p.id,jid=job.id,question=c.canonical,concern=c.id,_anchor='concern-'+c.id)}}">Quellen ergänzen oder neu bündeln</a>
+</details></details>
+{% endmacro %}
