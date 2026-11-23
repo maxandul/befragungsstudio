@@ -307,6 +307,8 @@ Unter «Grundmengen» steht bei jedem gespeicherten Eintrag «Bearbeiten». Anza
 
 Ein erneuter Seed-Lauf kann fehlende Grundmengen wieder aus der Mitarbeitendenbasis ergänzen. Manuelle Änderungen betreffen die im Bericht verwendeten Werte, nicht die gespeicherte Herkunft der ursprünglichen Berechnung.
 
+Die Zuordnung der Grundmengen im Bericht wird für jede Befragungswelle anhand des damals gültigen OE-Verzeichnisses und der Antwortpfade dieser Welle geprüft. Historische Pfade aus anderen Wellen bleiben auswählbar, blockieren aber keine eindeutige Grundmenge der aktuellen Welle. Bei mehreren gleichnamigen Einheiten innerhalb derselben Welle oder einem abweichenden ausgewählten Pfad erscheint «Zuordnung nicht eindeutig»; fehlende Grundmengen werden weiterhin mit «Nicht hinterlegt» bezeichnet.
+
 54 Tests bestanden, darunter Korrektur, Löschung, Kollisionen, Validierung, veraltete Browser-Tabs und Abgrenzung nach Projekt. Keine neuen Pakete, keine Datenbankänderung und kein Neuimport nötig. Der vollständige Browser-Layouttest bleibt in der Ausführungsumgebung eingeschränkt.
 
 ## Leitung der eigenen OE ausschliessen (Version 0.1.13)

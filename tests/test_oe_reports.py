@@ -58,7 +58,7 @@ class OrganisationReportTests(unittest.TestCase):
         response,payload=self.payload('oe='+team['id'])
         self.assertEqual(payload['cards'][0]['rows'][-1]['n'],2)
         self.assertEqual(payload['cards'][0]['rows'][-1]['mean'],1)
-        self.assertIn(b'Nicht hinterlegt',response.data)
+        self.assertIn(b'Zuordnung nicht eindeutig',response.data)
         self.assertEqual(self.client.get('/p/1/report?oe=unknown').status_code,400)
 
     def test_weighted_parent_children_and_suppression(self):
@@ -71,6 +71,30 @@ class OrganisationReportTests(unittest.TestCase):
         _,payload=self.payload('oe='+self.node('Bereich','A')['id'])
         self.assertEqual(payload['cards'][0]['comparisons'][0]['rows'][-1]['mean'],3.4)
         self.assertEqual(payload['cards'][0]['wording'],'Vollständiger Fragewortlaut')
+
+    def test_historical_parent_does_not_hide_current_ground(self):
+        # Bereich A belonged to another Amt in 2024. Both paths remain selectable.
+        old=[{**e,'Amt':'Alt'} if e['Bereich']=='A' else e for e in self.entries]
+        with self.db() as c:
+            c.execute("UPDATE answers SET raw=json_set(raw,'$.Amt','Alt') WHERE wave='2024' AND feedback IN ('0','1')")
+            c.execute('INSERT INTO organisation_history VALUES(?,?)',('2024-01-01',json.dumps(old)))
+            c.execute('INSERT INTO organisation_history VALUES(?,?)',('2026-01-01',json.dumps(self.entries)))
+        for query in ('', 'download=1'):
+            report,_=self.payload(query)
+            participation=report.text.split('id="participation"',1)[1].split('</section>',1)[0]
+            self.assertIn('<tr><td>A</td><td>2</td><td>2</td><td>100.0 %</td></tr>',participation)
+        report,_=self.payload('oe='+self.node('Bereich','A')['id'])
+        participation=report.text.split('id="participation"',1)[1].split('</section>',1)[0]
+        self.assertIn('<tr><td>2026</td><td>2</td><td>2</td><td>100.0 %',participation)
+        # The 2024 ground cannot be assigned to the selected 2026 path.
+        self.assertIn('<tr><td>2024</td><td>0</td><td>Zuordnung nicht eindeutig</td>',participation)
+
+    def test_current_wave_conflict_hides_child_ground_with_explicit_reason(self):
+        with self.db() as c:
+            c.execute("UPDATE answers SET raw=json_set(raw,'$.Amt','Anderes Amt') WHERE wave='2026' AND feedback='0'")
+        report,_=self.payload('oe='+self.node('Amt','AFA')['id'])
+        participation=report.text.split('id="participation"',1)[1].split('</section>',1)[0]
+        self.assertIn('<tr><td>A</td><td>n &lt; 2</td><td>Zuordnung nicht eindeutig</td>',participation)
 
     def test_disable_direct_oes_in_preview_and_exports(self):
         oe=self.node('Bereich','A')['id']

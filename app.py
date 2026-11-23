@@ -613,12 +613,14 @@ def create_app(instance=None):
             versions=[r[0] for r in c.execute('SELECT valid_from FROM organisation_history ORDER BY valid_from DESC')]
         return render_template('organisation.html',entries=entries,nodes=tree(entries),versions=versions,today=date.today().isoformat())
 
-    def report_tree(pid, date=''):
+    def report_tree(pid, date='', wave=None):
         with db() as c:
             entries=organisation_entries(c,date)
         records,_,mappings,aliases,_,_=result_sources(pid)
         observed={}
         for r in records:
+            if wave is not None and r['wave']!=wave:
+                continue
             key=(r['wave'],r['feedback'])
             if key not in observed:
                 observed[key]=mapped_dimensions(r,mappings,aliases)
@@ -657,6 +659,14 @@ def create_app(instance=None):
         selected=[w for w in available if w in selected]
         reference_wave=focus_wave or (selected[-1] if selected else '')
         nodes,reference_nodes=report_tree(pid,(dated.get(reference_wave) or '')[:10])
+        # Grundmengen gehören zu einer Welle. Frühere Antwortpfade dürfen die
+        # Zuordnung im aktuellen Organisationsstand nicht mehrdeutig machen.
+        wave_nodes={w:report_tree(pid,(dated.get(w) or '')[:10],wave=w)[0] for w in selected}
+
+        def ground_path_matches(wave, target):
+            paths=[n['path'] for n in wave_nodes[wave]
+                   if n['dimension']==target['dimension'] and n['unit']==target['unit']]
+            return paths==[target['path']]
         node_id=request.args.get('oe','')
         node=next((n for n in nodes if n['id']==node_id),None)
         if node_id and node is None:
@@ -686,9 +696,11 @@ def create_app(instance=None):
                 continue
             matches=[g for g in grounds if g['wave']==wave and g['dimension']==dimension and g['unit']==unit]
             total=matches[0]['total'] if matches else None
-            if node and sum(n['dimension']==dimension and n['unit']==unit for n in nodes)>1:
+            ambiguous=bool(node and not ground_path_matches(wave,node))
+            if ambiguous:
                 total=None  # Mehrdeutige Grundmengen dürfen nicht für Teilpfade verwendet werden.
             rates.append(dict(wave=wave,n=n,total=total,rate=100*n/total if total else None,
+                              ground_ambiguous=ambiguous,
                               leader_basis_missing=bool(matches and matches[0].get('leader_basis_missing')),
                               warning=total is not None and n>total))
         text_groups={}
@@ -731,11 +743,12 @@ def create_app(instance=None):
             if visible:
                 child_results.append((child,cr))
             child_ground=next((g for g in cg if g['wave']==reference_wave and g['dimension']==child['dimension'] and g['unit']==child['unit']),{})
-            unique_unit=sum(x['dimension']==child['dimension'] and x['unit']==child['unit'] for x in nodes)==1
+            unique_unit=ground_path_matches(reference_wave,child)
             if unique_unit and child_ground.get('inclusive_total')==0:
                 continue
             total=child_ground.get('total') if unique_unit else None
             child_rates.append(dict(unit=child['unit'],n=n if visible else None,total=total,
+                                    ground_ambiguous=not unique_unit,
                                     rate=100*n/total if visible and total else None,
                                     leader_basis_missing=child_ground.get('leader_basis_missing',False)))
         text_disclosure=None
