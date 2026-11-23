@@ -6,7 +6,8 @@ from organisation import oe_path
 
 
 class TextDisclosure:
-    def __init__(self, sources, wave, minimum, visible_children, include_children, leadership=None):
+    def __init__(self, sources, wave, minimum, visible_children, include_children, leadership=None,
+                 adhoc_children=(), scope=()):
         records, _, mappings, aliases, _, _ = sources
         self.minimum = minimum
         self.labels = {tuple(child['path']): child['unit'] for child in visible_children}
@@ -27,6 +28,28 @@ class TextDisclosure:
                 leaders.add(person)
         self.child_depth = len(next(iter(self.labels), ()))
         self.has_organisations = any(self.paths.values())
+        self._count_participants(leaders)
+        # A fixed partition of small sibling OEs, based on participation in the
+        # whole wave, not on who wrote a particular text or supported a statement.
+        # Small sibling cohorts are disjoint from cohorts in descendant reports.
+        self.adhoc_people=set()
+        self.adhoc_node=None
+        for child in adhoc_children:
+            path=tuple(child['path'])
+            if 0<self.participants[path]<minimum:
+                self.adhoc_people.update(person for person,origin in self.paths.items()
+                                         if origin[:len(path)]==path
+                                         and not (person in leaders and origin==path))
+        if len(self.adhoc_people)>=minimum:
+            path=tuple(scope)+(('__adhoc__','ad hoc'),)
+            self.adhoc_node=dict(unit='ad hoc',path=list(path))
+            self.labels[path]='ad hoc'
+            for person in self.adhoc_people:self.paths[person]=path
+            self._count_participants(leaders-self.adhoc_people)
+        else:
+            self.adhoc_people=set()
+
+    def _count_participants(self, leaders):
         self.participants = Counter()
         self.direct_participants = Counter(path for person, path in self.paths.items() if person not in leaders)
         for person, path in self.paths.items():
@@ -41,7 +64,8 @@ class TextDisclosure:
     def allows_detail(self, path, canonical=None):
         if path==self.team_path and canonical not in self.team_questions:
             return False
-        return (bool(path) or not self.has_organisations) and self.participants[path] >= self.minimum
+        capacity=self.direct_participants[path] if self.adhoc_node else self.participants[path]
+        return (bool(path) or not self.has_organisations) and capacity >= self.minimum
 
     def summarise(self, people, *, bundled=False, canonical=None):
         if not people or any(person not in self.paths for person in people):
@@ -50,6 +74,8 @@ class TextDisclosure:
             return None
         paths = {self.paths[person] for person in people}
         if all(self.allows_detail(path,canonical) for path in paths):
+            if self.adhoc_node and paths=={tuple(self.adhoc_node['path'])}:
+                return dict(origins=['ad hoc'])
             labels = {self.labels.get(path[:self.child_depth]) for path in paths}
             if self.include_children and None not in labels:
                 return dict(origins=sorted(labels, key=str.casefold))
@@ -61,7 +87,7 @@ class TextDisclosure:
         population = 0
         for path in paths:
             has_source_below = any(other != path and other[:len(path)] == path for other in paths)
-            population += (self.direct_participants if has_source_below else self.participants)[path]
+            population += (self.direct_participants if self.adhoc_node or has_source_below else self.participants)[path]
         if population < self.minimum:
             return None
         return dict(pooled=True, origins=[], show_count=self.pooled_count_is_safe(people,canonical))
@@ -75,7 +101,7 @@ class TextDisclosure:
         paths = set(source_counts)
         if len(paths) < 2 or len({path[:-1] for path in paths}) != 1:
             return False
-        capacity = {path: self.participants[path] for path in paths}
+        capacity = {path: (self.direct_participants if self.adhoc_node else self.participants)[path] for path in paths}
         if any(source_counts[path] > limit for path, limit in capacity.items()):
             return False
         total_capacity = sum(capacity.values())
