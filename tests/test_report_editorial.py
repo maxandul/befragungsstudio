@@ -78,7 +78,7 @@ class ReportEditorialTests(unittest.TestCase):
         self.assertIn('Herkunft A, B · 3 Textantworten',single[0])
         self.assertNotIn('Herkunft Nord',html)
         area=self.client.get('/p/1/report?'+self.query+'&profile=oe&download=1').text
-        self.assertIn('Herkunft Nord · 2 Textantworten',area)
+        self.assertIn('Herkunft Führungsteam, Nord · 2 Textantworten',area)
         self.assertNotIn('Herkunft A, B',area)
         for suffix in ('','&include_children=0'):
             filtered=self.client.get(root+'&min_n=2&print_mode=full&download=1'+suffix).text

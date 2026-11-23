@@ -252,7 +252,8 @@ def register(app,db,project,report_data,result_sources):
         if not jobs:return {}
         sources=result_sources(pid)
         eligible={tuple(r['key']) for r in ta.collect(sources,ctx['reference_wave'],ctx['dimension'],ctx['unit'],
-                  ctx['node']['path'] if ctx['node'] else [],minimum=ctx['minimum'])}
+                  ctx['node']['path'] if ctx['node'] else [],minimum=ctx['minimum'])
+                  if not disclosure or disclosure.allows_source(tuple(r['key'][:2]),r['canonical'])}
         output={};claimed=set()
         for job in jobs:
             if not is_current(pid,job):continue

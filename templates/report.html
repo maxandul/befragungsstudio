@@ -120,6 +120,7 @@ blockquote{margin:16px 0;padding:12px 20px;border-left:4px solid #0070b4;backgro
 <p><strong>Zustimmung:</strong> Der Anteil positiver Antworten – auf der Skala von 1 bis 5 die Werte 4 (trifft zu) und 5 (trifft voll zu). Beispiel: 8 von 10 Antworten sind positiv, die Zustimmung beträgt 80 %. Enthaltungen werden dabei nicht mitgerechnet.</p>
 <p><strong>Enthaltungen:</strong> Gezählt werden Antwortoptionen wie «Keine Antwort» oder «Kann ich noch nicht beurteilen».</p>
 <p><strong>Wer ist einbezogen?</strong> Die vorstehende Führungskraft wird aus ihrer eigenen OE ausgeschlossen. Führungskräfte unterstellter Einheiten bleiben im übergeordneten Ergebnis enthalten. Das gilt für Zahlen, Textantworten und Rücklauf.</p>
+{% if leadership %}<p><strong>Führungsteam:</strong> Diese zusätzliche Vergleichsgruppe umfasst die Führungskräfte der unmittelbar unterstellten OEs. Ihre Antworten sind zugleich im Gesamtergebnis der ausgewählten OE enthalten. Die Gruppe wird je Frage erst ab {{minimum}} gültigen Antworten angezeigt. Textantworten werden gemeinsam als «Führungsteam» ausgewiesen; die einzelnen geführten OEs werden dabei nicht genannt.</p>{% endif %}
 
 <p><strong>Diagramme lesen:</strong> Jede Zeile der Themenübersicht zeigt eine Frage. Farben und Symbole unterscheiden Wellen und Einheiten. Mit einem Klick auf einen Eintrag in der Legende lässt sich die entsprechende Gruppe aus- und einblenden. Die Anzahl gültiger Antworten (n) und der vollständige Fragetext stehen in den Tooltips (Datenpunkte mit der Maus berührer) und in den Einzelfragen. Leere Stellen bedeuten: nicht erhoben, keine gültige Antwort oder zu wenige Antworten für die Ausgabe.</p>
 {% if include_summaries %}
@@ -133,7 +134,7 @@ Wenn eine Anzahl angegeben ist, zeigt sie, in wie vielen Textantworten das jewei
 <section class="report-section" id="participation"><h2>Teilnahme und Rücklauf</h2><div class="table-wrap"><table><tr><th>Welle</th><th>Feedbacks</th><th>Eingeladen</th><th>Rücklauf</th></tr>
 {% for r in rates %}<tr><td>{{r.wave}}</td><td>{{participation.count(r)}}</td><td>{{participation.invited(r)}}</td><td>{{participation.rate(r)}}</td></tr>{% endfor %}</table></div>
 {% if child_rates %}
-<h3>Direktunterstellte Einheiten · {{reference_wave}}</h3>
+<h3>Direktunterstellte Einheiten{% if leadership %} und Führungsteam{% endif %} · {{reference_wave}}</h3>
 <div class="table-wrap"><table>
 <tr><th>Einheit</th><th>Teilnehmende</th><th>Eingeladen</th><th>Rücklauf</th></tr>
 {% for r in child_rates %}
@@ -158,7 +159,7 @@ Wenn eine Anzahl angegeben ist, zeigt sie, in wie vielen Textantworten das jewei
 <div class="topic-grid">{% for card in theme_cards %}{% set card_index=card.index %}<article data-question-type="{{card.rows[0].type}}" id="q{{card_index+1}}"{% if card.rows[0].type!='scale' and card.rows[-1].counts|length>6 %} style="grid-column:1/-1"{% endif %}><h3>{{card.label}}</h3>{% if card.wording!=card.label %}<p>{{card.wording}}</p>{% endif %}
 <div class="chart-container"{% if card.rows[0].type!='scale' %} style="height:{{160+(card.rows[-1].counts|length)*50}}px"{% endif %}><canvas id="chart-{{card_index}}" role="img" aria-label="{{card.wording}}"></canvas></div>
 <p><small>Enthaltungen: {% for r in card.rows %}{{r.wave}}: {{r.abstentions}}{{' · ' if not loop.last}}{% endfor %}{% if card.rows|selectattr('invalid')|list %}<br>Nicht zuordenbare Antworten (bitte Daten prüfen): {% for r in card.rows %}{{r.wave}}: {{r.invalid}}{{' · ' if not loop.last}}{% endfor %}{% endif %}</small></p>
-{% if card.children and card.rows[0].type=='scale' %}<h4>Direktunterstellte Einheiten · {{reference_wave}}</h4><div class="chart-container child-chart"><canvas id="children-{{card_index}}" role="img" aria-label="Vergleich der direktunterstellten Einheiten: {{card.wording}}"></canvas></div>{% endif %}
+{% if card.children and card.rows[0].type=='scale' %}<h4>Direktunterstellte Einheiten{% if leadership %} und Führungsteam{% endif %} · {{reference_wave}}</h4><div class="chart-container child-chart"><canvas id="children-{{card_index}}" role="img" aria-label="Vergleich der direktunterstellten Einheiten{% if leadership %} und des Führungsteams{% endif %}: {{card.wording}}"></canvas></div>{% endif %}
 <div class="downloads">PNG herunterladen:
 {% for layout,label in [('wide','Ganze Folie'),('half','Halbfolie'),('compact','Kompakt')] %}<button type="button" data-png="{{layout}}" data-index="{{card_index}}">{{label}}</button>{% endfor %}{% if card.children and card.rows[0].type=='scale' %}<button type="button" data-png="wide" data-index="{{card_index}}" data-view="children">OE-Vergleich</button>{% endif %}</div>
 <noscript>Für die Grafiken und PNG-Downloads aktiviere JavaScript.</noscript>{% for r in theme_texts if r.text_parent==card.canonical %}{{ text_detail(r,profile!='gl',true) }}{% endfor %}</article>{% endfor %}</div>{% set rendered=theme_cards|map(attribute='canonical')|list %}{% for r in theme_texts if r.text_parent not in rendered %}{{ text_detail(r,profile!='gl',true) }}{% endfor %}</details>{% endif %}{% for r in theme_texts %}{{text_print(r)}}{% endfor %}</section>{% endfor %}
