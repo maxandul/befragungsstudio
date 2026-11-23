@@ -1,0 +1,22 @@
+{% macro count(row, minimum=none) -%}
+{%- if minimum is not none and row.n is none -%}n &lt; {{minimum}}
+{%- elif row.rate_mode=='published' -%}–
+{%- else -%}{{row.n}}
+{%- endif -%}
+{%- endmacro %}
+{% macro invited(row) -%}
+{%- if row.rate_mode -%}–
+{%- elif row.total is not none -%}{{row.total}}
+{%- elif row.ground_ambiguous -%}Zuordnung nicht eindeutig
+{%- elif row.leader_basis_missing -%}Leitungsanteil der Grundmenge fehlt
+{%- else -%}Nicht hinterlegt
+{%- endif -%}
+{%- endmacro %}
+{% macro rate(row, minimum=none) -%}
+{%- if minimum is not none and row.n is none -%}n &lt; {{minimum}}
+{%- elif row.rate is not none -%}{{'%.1f %%'|format(row.rate)}}
+{%- else -%}–
+{%- endif -%}
+{%- if row.warning %} · Grundmenge prüfen{% endif -%}
+{%- if row.rate_note %}<br><small>{{row.rate_note}}</small>{% endif -%}
+{%- endmacro %}
