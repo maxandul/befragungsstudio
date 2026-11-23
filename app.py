@@ -763,6 +763,7 @@ def create_app(instance=None):
             group.sort(key=lambda row:available.index(row['wave']))
         child_rates=[]
         child_results=[]
+        leadership=None
         for child in child_nodes:
             cr,cp,cg=results(pid,path=child['path'])
             mark_complete_population(cr,cp,cg,child)
@@ -780,19 +781,32 @@ def create_app(instance=None):
                                     rate=100*n/total if visible and total else None,
                                     leader_basis_missing=child_ground.get('leader_basis_missing',False)),
                                     participation_policies.get((reference_wave,child['dimension'],child['unit'])),visible=visible))
+        if child_nodes:
+            from report_groups import leadership_team
+            team,team_rows,team_people,team_n=leadership_team(
+                result_sources(pid),child_nodes,reference_wave,child_scope['path'] if child_scope else ())
+            if team_n>=minimum:
+                leadership=dict(node=team,people=team_people,
+                                text_questions={r['canonical'] for r in team_rows if r['type']=='text' and r['n']>=minimum})
+                child_results.append((team,team_rows))
+                child_rates.append(dict(unit=team['unit'],n=team_n,total=None,rate=None,
+                                        rate_mode='omit',rate_note=''))
         text_disclosure=None
         if group_text_paths:
             from report_text_privacy import TextDisclosure
             from report_views import group_original_texts
             text_origin_nodes=[child for child,_ in child_results]
-            text_disclosure=TextDisclosure(result_sources(pid),reference_wave,minimum,text_origin_nodes,include_children)
+            text_disclosure=TextDisclosure(result_sources(pid),reference_wave,minimum,text_origin_nodes,include_children,leadership)
             child_depth=len(child_nodes[0]['path']) if child_nodes else 0
             for theme, items in text_groups.items():
                 for item in items:
                     safe_by_child={}
-                    for path,texts in item.pop('texts_by_path').items():
-                        if text_disclosure.allows_detail(path):
-                            safe_by_child.setdefault(path[:child_depth],[]).extend(texts)
+                    item.pop('texts_by_path')
+                    for person,text in item.pop('texts_by_person').items():
+                        path=text_disclosure.paths[person]
+                        if (text_disclosure.allows_source(person,item['canonical'])
+                                and text_disclosure.allows_detail(path,item['canonical'])):
+                            safe_by_child.setdefault(path[:child_depth],[]).append(text)
                     item['report_texts']=[text for texts in safe_by_child.values() for text in texts]
                     item['text_origins']=group_original_texts(safe_by_child,text_origin_nodes) if child_depth else []
                 safe_texts={(item['canonical'],text) for item in items for text in item['report_texts']}
@@ -834,7 +848,7 @@ def create_app(instance=None):
         return dict(p=p,grouped=grouped,rates=rates,minimum=minimum,hidden=hidden,
                     dimension=dimension,unit=unit,selected=selected,available=available,focus_wave=focus_wave,
                     nodes=nodes,node=node,node_id=node_id,display_unit=display_unit,single_root=single_root,child_rates=child_rates,child_results=child_results,
-                    include_children=include_children,text_disclosure=text_disclosure,
+                    include_children=include_children,text_disclosure=text_disclosure,leadership=leadership,
                     batch_nodes=[n for n in nodes if not node or n['path'][:len(node['path'])]==node['path']],
                     comparisons=comparisons,reference_wave=reference_wave,notes=notes,scope=scope,
                     text_groups=text_groups,include_texts=include_texts,include_summaries=include_summaries,afa=afa,
@@ -858,7 +872,7 @@ def create_app(instance=None):
             ctx['text_groups']={theme:rows for theme,rows in ctx['text_groups'].items() if rows}
         cards=[]
         for canonical,rows in ctx['grouped'].items():
-            children=[dict(unit=child['unit'],**next(r for r in cr if r['canonical']==canonical and r['wave']==ctx['reference_wave']))
+            children=[dict(unit=child['unit'],group_kind=child.get('group_kind','oe'),**next(r for r in cr if r['canonical']==canonical and r['wave']==ctx['reference_wave']))
                       for child,cr in ctx['child_results'] if any(r['canonical']==canonical and r['wave']==ctx['reference_wave'] and r['n']>=ctx['minimum'] for r in cr)]
             comparisons=[dict(kind=comp['kind'],label=comp['label'],rows=[r for r in comp['rows'] if r['canonical']==canonical]) for comp in ctx['comparisons']]
             cards.append(dict(canonical=canonical,label=rows[-1]['label'],wording=rows[-1]['wording'],theme=rows[-1]['theme'] or 'Weitere Fragen',rows=rows,children=children,comparisons=comparisons))

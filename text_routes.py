@@ -153,7 +153,7 @@ def register(app, db, project, report_data, result_sources):
                     output[canonical]=[]
                     for topic in q['themen']:
                         people={tuple(by_id[ref]['key'][:2]) for ref in topic['quellen']}
-                        attribution=disclosure.summarise(people,bundled=True) if disclosure else {}
+                        attribution=disclosure.summarise(people,bundled=True,canonical=canonical) if disclosure else {}
                         if attribution is not None:
                             output[canonical].append(dict(topic,people=people,denominator=denominators.get(canonical,0),**attribution))
         return output

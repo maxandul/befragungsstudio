@@ -42,7 +42,7 @@ def project_concerns(index,concerns,eligible,aliases,disclosure=None):
         visible=[index[ref] for ref in refs if tuple(index[ref]['key']) in eligible]
         if not visible:continue
         people={tuple(v['key'][:2]) for v in visible}
-        attribution=disclosure.summarise(people,bundled=True) if disclosure else {}
+        attribution=disclosure.summarise(people,bundled=True,canonical=c['canonical']) if disclosure else {}
         if attribution is None:
             continue
         topic=aliases.get(c['topic'],c['topic'])
@@ -57,7 +57,7 @@ def project_concerns(index,concerns,eligible,aliases,disclosure=None):
                 nuance['people'].add(tuple(source['key'][:2]))
         details=[]
         for nuance in nuances.values():
-            origin=disclosure.summarise(nuance['people'],bundled=True) if disclosure else {}
+            origin=disclosure.summarise(nuance['people'],bundled=True,canonical=c['canonical']) if disclosure else {}
             if origin is None:
                 continue
             if origin.get('pooled') and attribution.get('show_count') and nuance['people']!=people:
@@ -71,14 +71,14 @@ def project_concerns(index,concerns,eligible,aliases,disclosure=None):
     for ref,s in index.items():
         if ref in assigned or tuple(s['key']) not in eligible:continue
         person=tuple(s['key'][:2])
-        if disclosure and disclosure.summarise({person}) is None:
+        if disclosure and disclosure.summarise({person},canonical=s['canonical']) is None:
             continue
         topic=aliases.get(s['topic'],s['topic'])
         key=(s['canonical'],normalized(topic),normalized(s['text']))
         item=ungrouped.setdefault(key,dict(canonical=s['canonical'],topic=topic,text=s['text'],people=set()))
         item['people'].add(person)
     for s in ungrouped.values():
-        attribution=disclosure.summarise(s['people']) if disclosure else {}
+        attribution=disclosure.summarise(s['people'],canonical=s['canonical']) if disclosure else {}
         add(s['canonical'],s['topic'],dict(text=s['text'],kind='normal',order=100,reviewed=False,
             details=[],count=len(s['people']),people=s['people'],**attribution))
     output={}
