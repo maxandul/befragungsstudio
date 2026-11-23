@@ -5,7 +5,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
   const row=(wave,mean,n=5)=>({type:'scale',minimum:1,maximum:5,wave,mean,top2:mean*20,n});
   const payload={project:'Test',unit:'Bereich',selected:['2024','2026'],reference_wave:'2026',
     cards:[{label:'Frage A',wording:'Vollständiger Wortlaut A',rows:[row('2024',3),row('2026',4)],children:[{unit:'Team',...row('2026',5)}]},
-      {label:'Frage B',wording:'Vollständiger Wortlaut B',rows:[row('2024',2)],children:[]}],
+      {label:'Frage B',wording:'Vollständiger Wortlaut B',rows:[row('2024',1)],children:[]}],
     overviews:[{theme:'Thema',indices:[0,1],minimum:1,maximum:5,reference_wave:'2026'}]};
   payload.cards[0].comparisons=[{kind:'parent',label:'Übergeordnete OE: Amt',rows:[row('2026',3.5,20)]},
     {kind:'total',label:'Test · gesamt',rows:[row('2026',3.8,30)]}];
@@ -33,13 +33,25 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
   const history=overview('history');
   assert.equal(history.data.datasets[0].label,'2026');
   assert.equal(history.data.datasets[0].data[1].x,null);
-  assert.equal(history.data.datasets[1].data[1].x,2);
+  assert.equal(history.data.datasets[1].data[1].x,1);
   const children=overview('children');
   assert.equal(children.data.datasets[0].data[1].x,null);
   assert.equal(children.data.datasets[1].data[1].x,null);
   assert.equal(children.options.scales.x.min,1);
   assert.equal(children.options.scales.x.max,5);
   assert.equal(children.options.scales.y.reverse,false);
+  // Endpoints stay on the scale; the complete rotated symbols may extend beyond it.
+  const checkMarkerRoom=config=>{
+    for(const ds of config.data.datasets){
+      const needed=ds.pointRadius*Math.SQRT2+1;
+      for(const side of ['left','right','top','bottom'])assert.ok(ds.clip[side]>=needed);
+      assert.ok(config.options.layout.padding.left>=ds.clip.left);
+      assert.ok(config.options.layout.padding.right>=ds.clip.right);
+    }
+  };
+  checkMarkerRoom(history);checkMarkerRoom(children);
+  assert.equal(history.data.datasets[1].data[1].x,history.options.scales.x.min);
+  assert.equal(children.data.datasets[1].data[0].x,children.options.scales.x.max);
   assert.equal(children.data.datasets.find(ds=>ds.id==='parent').data[0].x,3.5);
   assert.equal(children.data.datasets.find(ds=>ds.id==='parent').data[1].x,null);
   assert.equal(children.data.datasets.find(ds=>ds.id==='total').ns[0],30);
@@ -59,6 +71,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
   assert.equal(downloads.length,1);
   assert.equal(exported.options.scales.x.min,0);
   assert.equal(exported.options.scales.x.max,100);
+  checkMarkerRoom(exported);
   assert.equal(exported.data.datasets[0].data[0].x,80);
   assert.equal(exported.data.datasets[1].hidden,true);
   assert.equal(exported.data.datasets.find(ds=>ds.id==='parent').hidden,true);
@@ -68,5 +81,10 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
   assert.equal(exported.data.datasets.every(ds=>ds.data.every(point=>Number.isFinite(point.y))),true);
   assert.match(exported.data.labels[0].join(' '),/Vollständiger Wortlaut A/);
   assert.match(exported.data.labels[1].join(' '),/n: – \/ –/);
+  // Mean PNGs use the same endpoint protection as percentage PNGs.
+  elements['report-metric'].value='mean';events.metric();await events.png();
+  checkMarkerRoom(configurations.at(-1).config);
+  assert.equal(configurations.at(-1).config.options.scales.x.min,1);
+  assert.equal(configurations.at(-1).config.options.scales.x.max,5);
   console.log('Themenexport: Metrik, fehlende aktuelle Werte, n und Legendenauswahl geprüft.');
 })().catch(error=>{console.error(error);process.exitCode=1;});
