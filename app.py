@@ -685,7 +685,7 @@ def create_app(instance=None):
         child_scope=node or (single_root if not dimension else None)
         child_parent=child_scope['id'] if child_scope else ''
         child_nodes=[]
-        if reference_wave and include_children and (node or not dimension):
+        if reference_wave and (node or not dimension):
             child_nodes=[n for n in reference_nodes if n['parent']==child_parent]
         group_text_paths=group_text_origins
         rows,participation,grounds=results(pid,dimension,unit,node['path'] if node else (),group_text_paths=group_text_paths)
@@ -764,6 +764,7 @@ def create_app(instance=None):
         child_rates=[]
         child_results=[]
         leadership=None
+        leadership_rate=None
         leadership_total=0
         leadership_basis_complete=True
         for child in child_nodes:
@@ -771,7 +772,7 @@ def create_app(instance=None):
             mark_complete_population(cr,cp,cg,child)
             n=cp.get(reference_wave,0)
             visible=n>=minimum
-            if visible:
+            if visible and include_children:
                 child_results.append((child,cr))
             child_ground=next((g for g in cg if g['wave']==reference_wave and g['dimension']==child['dimension'] and g['unit']==child['unit']),{})
             unique_unit=ground_path_matches(reference_wave,child)
@@ -793,24 +794,27 @@ def create_app(instance=None):
             from report_groups import leadership_team
             team,team_rows,team_people,team_n=leadership_team(
                 result_sources(pid),child_nodes,reference_wave,child_scope['path'] if child_scope else ())
-            if team_n>=minimum:
-                team_total=leadership_total if leadership_basis_complete else None
+            team_total=leadership_total if leadership_basis_complete else None
+            team_visible=team_n>=minimum
+            if team_n or team_total:
+                leadership_rate=dict(unit=team['unit'],n=team_n if team_visible else None,total=team_total,
+                                     rate=100*team_n/team_total if team_visible and team_total else None,
+                                     rate_mode='',rate_note='',leader_basis_missing=not leadership_basis_complete,
+                                     warning=team_visible and team_total is not None and team_n>team_total)
+                child_rates.append(leadership_rate)
+            if team_visible and include_children:
                 mark_complete_population(team_rows,{reference_wave:team_n},
                                          [dict(wave=reference_wave,dimension='',unit='',total=team_total)])
                 leadership=dict(node=team,people=team_people,
                                 text_questions={r['canonical'] for r in team_rows if r['type']=='text' and r['n']>=minimum})
                 child_results.append((team,team_rows))
-                child_rates.append(dict(unit=team['unit'],n=team_n,total=team_total,
-                                        rate=100*team_n/team_total if team_total else None,
-                                        rate_mode='',rate_note='',leader_basis_missing=not leadership_basis_complete,
-                                        warning=team_total is not None and team_n>team_total))
         text_disclosure=None
         if group_text_paths:
             from report_text_privacy import TextDisclosure
             from report_views import group_original_texts
             text_origin_nodes=[child for child,_ in child_results]
             text_disclosure=TextDisclosure(result_sources(pid),reference_wave,minimum,text_origin_nodes,include_children,leadership)
-            child_depth=len(child_nodes[0]['path']) if child_nodes else 0
+            child_depth=len(child_nodes[0]['path']) if child_nodes and include_children else 0
             for theme, items in text_groups.items():
                 for item in items:
                     safe_by_child={}
@@ -861,7 +865,7 @@ def create_app(instance=None):
         return dict(p=p,grouped=grouped,rates=rates,minimum=minimum,hidden=hidden,
                     dimension=dimension,unit=unit,selected=selected,available=available,focus_wave=focus_wave,
                     nodes=nodes,node=node,node_id=node_id,display_unit=display_unit,single_root=single_root,child_rates=child_rates,child_results=child_results,
-                    include_children=include_children,text_disclosure=text_disclosure,leadership=leadership,
+                    include_children=include_children,text_disclosure=text_disclosure,leadership=leadership,leadership_rate=leadership_rate,
                     batch_nodes=[n for n in nodes if not node or n['path'][:len(node['path'])]==node['path']],
                     comparisons=comparisons,reference_wave=reference_wave,notes=notes,scope=scope,
                     text_groups=text_groups,include_texts=include_texts,include_summaries=include_summaries,afa=afa,

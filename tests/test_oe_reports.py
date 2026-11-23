@@ -151,11 +151,15 @@ class OrganisationReportTests(unittest.TestCase):
         with zipfile.ZipFile(io.BytesIO(batch.data)) as archive:
             packaged=archive.read(archive.namelist()[0])
         for html in (preview.data,download.data,packaged):
-            self.assertNotIn(b'Direktunterstellte Einheiten',html)
+            participation=html.split(b'id="participation"',1)[1].split(b'</section>',1)[0]
+            self.assertIn(b'Direktunterstellte Einheiten',participation)
+            self.assertIn(b'<tr><td>Gleich</td><td>2</td>',participation)
+            self.assertNotIn(b'class="chart-container child-chart"',html)
             self.assertNotIn(b'class="text-answer-oe"',html)
             self.assertIn(b'Vertraulicher Text 0',html)
         settings=self.client.get('/p/1/results?'+query)
         self.assertIn(b'<option value="0" selected>Weglassen</option>',settings.data)
+        self.assertIn('Ergebnisse direktunterstellter OEs anzeigen',settings.text)
 
     def test_ruecklauf_omits_units_with_zero_invited(self):
         with self.db() as c:
