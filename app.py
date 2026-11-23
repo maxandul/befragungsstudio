@@ -764,6 +764,8 @@ def create_app(instance=None):
         child_rates=[]
         child_results=[]
         leadership=None
+        leadership_total=0
+        leadership_basis_complete=True
         for child in child_nodes:
             cr,cp,cg=results(pid,path=child['path'])
             mark_complete_population(cr,cp,cg,child)
@@ -775,6 +777,12 @@ def create_app(instance=None):
             unique_unit=ground_path_matches(reference_wave,child)
             if unique_unit and child_ground.get('inclusive_total')==0:
                 continue
+            leaders=child_ground.get('leaders')
+            if (not unique_unit or leaders is None or leaders<0
+                    or leaders>child_ground.get('inclusive_total',-1)):
+                leadership_basis_complete=False
+            else:
+                leadership_total+=leaders
             total=child_ground.get('total') if unique_unit else None
             child_rates.append(apply_participation_policy(dict(unit=child['unit'],n=n if visible else None,total=total,
                                     ground_ambiguous=not unique_unit,
@@ -786,11 +794,16 @@ def create_app(instance=None):
             team,team_rows,team_people,team_n=leadership_team(
                 result_sources(pid),child_nodes,reference_wave,child_scope['path'] if child_scope else ())
             if team_n>=minimum:
+                team_total=leadership_total if leadership_basis_complete else None
+                mark_complete_population(team_rows,{reference_wave:team_n},
+                                         [dict(wave=reference_wave,dimension='',unit='',total=team_total)])
                 leadership=dict(node=team,people=team_people,
                                 text_questions={r['canonical'] for r in team_rows if r['type']=='text' and r['n']>=minimum})
                 child_results.append((team,team_rows))
-                child_rates.append(dict(unit=team['unit'],n=team_n,total=None,rate=None,
-                                        rate_mode='omit',rate_note=''))
+                child_rates.append(dict(unit=team['unit'],n=team_n,total=team_total,
+                                        rate=100*team_n/team_total if team_total else None,
+                                        rate_mode='',rate_note='',leader_basis_missing=not leadership_basis_complete,
+                                        warning=team_total is not None and team_n>team_total))
         text_disclosure=None
         if group_text_paths:
             from report_text_privacy import TextDisclosure

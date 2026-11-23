@@ -67,7 +67,7 @@ class LeadershipTeamTests(unittest.TestCase):
         self.assertEqual(card['rows'][-1]['n'],16) # Only the own root head is excluded.
         self.assertEqual(card['rows'][-1]['mean'],(3*5+3*1+9*2+1)/16)
         self.assertNotIn('Führungsteam',[r['unit'] for r in self.card(payload,'other')['children']])
-        self.assertIn('<tr><td>Führungsteam</td><td>3</td><td>–</td><td>–</td></tr>',html)
+        self.assertIn('<tr><td>Führungsteam</td><td>3</td><td>Leitungsanteil der Grundmenge fehlt</td><td>–</td></tr>',html)
         _,hidden=self.report(include_children=0)
         self.assertEqual(self.card(hidden)['children'],[])
         _,small=self.report(min_n=4)
@@ -86,6 +86,49 @@ class LeadershipTeamTests(unittest.TestCase):
         self.assertNotIn('Führungsteam',[r['unit'] for r in self.card(payload)['children']])
         _,previous=self.report(focus_wave='2025')
         self.assertIn('Führungsteam',[r['unit'] for r in self.card(previous)['children']])
+
+    def test_invited_team_uses_confirmed_leader_counts_and_marks_complete_answers(self):
+        with self.db() as c:
+            for area,count in [('A',2),('B',1),('C',1)]:
+                c.execute("INSERT INTO grounds VALUES(1,'2026','Bereich',?,6)",(area,))
+                c.execute("INSERT INTO ground_leaders VALUES(1,'2026','Bereich',?,?)",(area,count))
+        html,payload=self.report()
+        self.assertIn('<tr><td>Führungsteam</td><td>3</td><td>4</td><td>75.0 %</td></tr>',html)
+        team=next(r for r in self.card(payload)['children'] if r['unit']=='Führungsteam')
+        self.assertFalse(team['complete_population'])
+        self.assertIsNotNone(team['top2_ci95'])
+        with self.db() as c:
+            c.execute("UPDATE ground_leaders SET total=1 WHERE unit='A'")
+        html,payload=self.report(min_n=1)
+        self.assertIn('<tr><td>Führungsteam</td><td>3</td><td>3</td><td>100.0 %</td></tr>',html)
+        team=next(r for r in self.card(payload)['children'] if r['unit']=='Führungsteam')
+        self.assertTrue(team['complete_population'])
+        self.assertIsNone(team['mean_ci95'])
+        self.assertIsNone(team['top2_ci95'])
+        other=next(r for r in self.card(payload,'other')['children'] if r['unit']=='Führungsteam')
+        self.assertEqual(other['n'],2)
+        self.assertFalse(other['complete_population'])
+        self.assertIsNotNone(other['mean_ci95'])
+
+    def test_missing_or_ambiguous_basis_never_uses_partial_sum_or_published_rate(self):
+        with self.db() as c:
+            for area in ('A','B','C'):
+                c.execute("INSERT INTO grounds VALUES(1,'2026','Bereich',?,6)",(area,))
+                c.execute("INSERT INTO ground_leaders VALUES(1,'2026','Bereich',?,1)",(area,))
+            c.execute("DELETE FROM ground_leaders WHERE unit='C'")
+            c.execute("INSERT INTO participation_policies VALUES(1,'2026','Bereich','C','published',100,'Historisch')")
+        html,payload=self.report()
+        self.assertIn('<tr><td>Führungsteam</td><td>3</td><td>Leitungsanteil der Grundmenge fehlt</td><td>–</td></tr>',html)
+        team=next(r for r in self.card(payload)['children'] if r['unit']=='Führungsteam')
+        self.assertFalse(team['complete_population'])
+        with self.db() as c:
+            c.execute("INSERT INTO ground_leaders VALUES(1,'2026','Bereich','C',1)")
+            c.execute("INSERT INTO organisation VALUES('other-A',?)",(json.dumps(dict(OE_Kürzel='other-A',Amt='Other',Bereich='A')),))
+            c.execute("INSERT INTO answers SELECT project,wave,'foreign',source,answer,date,? FROM answers WHERE feedback='A-head' AND wave='2026'",
+                      (json.dumps(dict(Amt='Other',Bereich='A',Kadertyp='100')),))
+        root=next(n for n in self.nodes if n['dimension']=='Amt')
+        html,payload=self.report(oe=root['id'])
+        self.assertIn('<tr><td>Führungsteam</td><td>3</td><td>Leitungsanteil der Grundmenge fehlt</td><td>–</td></tr>',html)
 
     def test_texts_use_collective_origin_and_require_enough_valid_answers(self):
         html,_=self.report(include_texts=1,profile='oe',download=1)
