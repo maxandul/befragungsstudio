@@ -79,13 +79,13 @@
       const text = fmt(v, options.percent ? 1 : 2) + (options.percent ? ' %' : '') + (ds.completePopulation?.[i] ? '*' : '');
       const ci=chart.options.plugins.confidenceIntervals?.enabled ? ds.ci95?.[i] : null;
       if (chart.config.type === 'line') {ctx.textAlign = 'center';const y=ci ? Math.max(chart.chartArea.top+8,chart.scales.y.getPixelForValue(ci[1])-14) : point.y-22;ctx.fillText(text,point.x,y);}
-      else {ctx.textAlign = 'left';ctx.fillStyle=options.edge ? '#0070b4' : '#18394f';const x=ci ? Math.min(chart.chartArea.right,chart.scales.x.getPixelForValue(ci[1]))+9 : point.x+9;ctx.fillText(text, options.edge ? chart.chartArea.right+12 : x, point.y);}
+      else {ctx.textAlign = 'left';const x=ci ? Math.min(chart.chartArea.right,chart.scales.x.getPixelForValue(ci[1]))+9 : point.x+9;ctx.fillText(text,x,point.y);}
     }); ctx.restore();
   }};
   const completeMarkers={id:'completeMarkers',afterDatasetsDraw(chart){
     const ctx=chart.ctx;ctx.save();ctx.font='bold 16px Arial, sans-serif';
     chart.data.datasets.forEach((ds,k)=>{
-      if(k===0 || !chart.isDatasetVisible(k))return; // First series includes * in its value label.
+      if((k===0 && chart.options.plugins.valueLabels!==false) || !chart.isDatasetVisible(k))return;
       ctx.fillStyle=ds.borderColor;
       chart.getDatasetMeta(k).data.forEach((point,i)=>{
         const value=ds.data[i];
@@ -195,13 +195,13 @@
         pointRadius:exporting ? (k === 0 ? 9 : 7) : (k === 0 ? 6 : 5),showLine:false}))},
       options:{responsive:!exporting,maintainAspectRatio:false,animation:false,
         devicePixelRatio:exporting ? 1 : Math.min(window.devicePixelRatio || 1,2),
-        layout:{padding:{top:markerPadding,left:markerPadding,right:exporting ? 100 : 65,bottom:markerPadding}},
+        layout:{padding:{top:markerPadding,left:markerPadding,right:28,bottom:markerPadding}},
         plugins:{legend:{position:'bottom',labels:{font:{size:exporting ? 21 : 13},usePointStyle:true}},
           title:{display:exporting,text:[...wrap(payload.project+' · '+payload.unit,85),...wrap(overview.theme,85)],font:{size:30},color:'#172c3b'},
           subtitle:{display:true,text:[view === 'history' ? 'Zeitvergleich' : 'OE-Vergleich · '+overview.reference_wave,
             top ? 'Zustimmung (%)' : `Mittelwert · Skala ${overview.minimum}–${overview.maximum}`,
             ...(exporting ? ['n je Frage in Reihenfolge der Legende · – = kein freigegebenes Ergebnis'] : [])],font:{size:exporting ? 20 : 13}},
-          valueLabels:{fontSize:exporting ? 21 : 13,percent:top,edge:true},
+          valueLabels:false,
           tooltip:{enabled:!exporting,callbacks:{title:items => cards[items[0].dataIndex].wording || cards[items[0].dataIndex].label,
             label:ctx => `${ctx.dataset.label}: ${fmt(ctx.parsed.x,top ? 1 : 2)}${top ? ' %' : ''}${ctx.dataset.completePopulation?.[ctx.dataIndex] ? '*' : ''} · n=${ctx.dataset.ns[ctx.dataIndex]}`}}},
         scales:{x:{min:top ? 0 : overview.minimum,max:top ? 100 : overview.maximum,
