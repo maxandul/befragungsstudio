@@ -84,11 +84,10 @@ class ReportEditorialTests(unittest.TestCase):
             filtered=self.client.get(root+'&min_n=2&print_mode=full&download=1'+suffix).text
             self.assertIn('Geprüft q',filtered)
             self.assertIn('<summary>Thema · Zusammenarbeit',filtered)
-            self.assertRegex(filtered,r'Geprüft q</span>\s*<small class="concern-origin">Herkunft AFA · Anzahl Textantworten aus Anonymitätsgründen ausgeblendet</small>')
+            self.assertRegex(filtered,r'Geprüft q</span>\s*<small class="concern-origin">Herkunft ad hoc · 2 Textantworten</small>')
             self.assertIn('Zum Schutz kleiner Gruppen',filtered)
             self.assertNotIn('Aussage person-b',filtered)
             self.assertNotIn('Herkunft B',filtered)
-            self.assertNotIn('3 Textantworten',filtered)
         self.assertNotIn('Genannt in',self.client.get(root+'&include_summaries=0').text)
 
     def test_small_unit_single_is_withheld_and_single_section_is_last(self):
@@ -102,7 +101,7 @@ class ReportEditorialTests(unittest.TestCase):
         self.assertIn('Gemeinsames Anliegen',html)
         self.assertIn('Einzelaussagen',html)
         self.assertIn('Aussage person-a',html)
-        self.assertNotIn('Aussage person-b',html)
+        self.assertIn('Aussage person-b',html)  # The small residual now joins a fixed cohort.
         self.assertLess(html.index('Gemeinsames Anliegen'),html.index('<h4>Einzelaussagen'))
         self.assertNotIn('n &lt; 2)',html)
 
@@ -118,10 +117,9 @@ class ReportEditorialTests(unittest.TestCase):
         source=lambda name: ('2026',name)
         self.assertIsNone(disclosure.summarise({source('A0'),source('B0')},bundled=True))
         self.assertIsNone(disclosure.summarise({source('A0'),source('A1')},bundled=True))
-        self.assertEqual(disclosure.summarise({source('A0'),source('C0')},bundled=True),
-                         dict(pooled=True,origins=[],show_count=False))
+        self.assertIsNone(disclosure.summarise({source('A0'),source('C0')},bundled=True))
 
-    def test_protected_total_needs_room_for_multiple_distributions(self):
+    def test_fixed_cohort_counts_never_depend_on_statement_support(self):
         from report_text_privacy import TextDisclosure
 
         records=[dict(wave='2026',feedback=f'{group}{n}',raw=dict(Amt='AFA',Bereich=group))
@@ -130,9 +128,11 @@ class ReportEditorialTests(unittest.TestCase):
         disclosure=TextDisclosure((records,{},mappings,[],[],[]),'2026',5,[],True)
         people=set(disclosure.paths)
         safe=people-{('2026','A3'),('2026','B3'),('2026','B2')}
-        self.assertTrue(disclosure.summarise(safe,bundled=True)['show_count'])
-        self.assertFalse(disclosure.summarise(people,bundled=True)['show_count'])
-        self.assertFalse(disclosure.summarise(safe-{('2026','A2')},bundled=True)['show_count'])
+        for selected in (safe,people,safe-{('2026','A2')}):
+            self.assertEqual(disclosure.summarise(selected,bundled=True),dict(origins=['ad hoc']))
+        lower=TextDisclosure((records,{},mappings,[],[],[]),'2026',5,[],True,
+                             scope=[('Amt','AFA'),('Bereich','A')])
+        self.assertIsNone(lower.summarise({('2026','A0')},bundled=True))
 
     def test_profiles_and_deterministic_print_content(self):
         _,url,index=self.ready();self.create(url,index)

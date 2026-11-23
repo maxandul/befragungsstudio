@@ -40,7 +40,8 @@ def project_concerns(index,concerns,eligible,aliases,disclosure=None):
     for c in concerns:
         if not valid_concern(c,index):continue
         refs=json.loads(c['sources']);assigned.update(refs)
-        visible=[index[ref] for ref in refs if tuple(index[ref]['key']) in eligible]
+        visible=[index[ref] for ref in refs if tuple(index[ref]['key']) in eligible
+                 and (not disclosure or disclosure.allows_source(tuple(index[ref]['key'][:2]),c['canonical']))]
         if not visible:continue
         people={tuple(v['key'][:2]) for v in visible}
         attribution=disclosure.summarise(people,bundled=True,canonical=c['canonical']) if disclosure else {}

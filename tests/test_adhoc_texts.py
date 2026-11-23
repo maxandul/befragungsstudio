@@ -68,8 +68,7 @@ class AdHocTextTests(unittest.TestCase):
 
     def test_origins_and_distinct_counts_at_all_levels_without_changing_the_import(self):
         sources=self.sources()
-        children=[self.node('Bereich',area) for area in ('A','B')]
-        disclosure=TextDisclosure(sources,'2026',5,[],True,adhoc_children=children,scope=[('Amt','AFA')])
+        disclosure=TextDisclosure(sources,'2026',5,[],True,scope=[('Amt','AFA')])
         self.assertEqual(len(disclosure.adhoc_people),5)
         index={str(i):dict(canonical='txt',key=['2026',str(i),'txt'],topic='Thema',
                            text='Nuance A' if i<2 else 'Nuance B',hash='h'+str(i)) for i in range(5)}
@@ -100,20 +99,22 @@ class AdHocTextTests(unittest.TestCase):
         report,_=self.payload('min_n=5&include_evidence=0')
         self.assertNotIn('<td>ad hoc (Freitext)</td>',report.text)
 
-    def test_small_residual_at_parent_is_not_exposed_by_the_new_cohort(self):
+    def test_direct_parent_residual_joins_the_same_fixed_cohort(self):
         with self.db() as c:
             raw=json.dumps(dict(Amt='AFA'))
             for source,answer in [('q','3'),('txt','Privater Resthinweis')]:
                 c.execute("INSERT INTO answers VALUES(1,'2026','direct',?,?,'2026-10-01',?)",(source,answer,raw))
         report,_=self.payload('min_n=5&include_texts=1')
-        self.assertNotIn('Privater Resthinweis',report.text)
-        self.assertIn('<td>ad hoc (Freitext)</td><td>5</td>',report.text)
-        children=[self.node('Bereich',area) for area in ('A','B')]
-        disclosure=TextDisclosure(self.sources(),'2026',5,[],True,adhoc_children=children,scope=[('Amt','AFA')])
-        self.assertIsNone(disclosure.summarise({('2026','direct')}))
+        self.assertIn('Privater Resthinweis',report.text)
+        self.assertIn('<td>ad hoc (Freitext)</td><td>6</td>',report.text)
+        disclosure=TextDisclosure(self.sources(),'2026',5,[],True,scope=[('Amt','AFA')])
+        self.assertEqual(disclosure.summarise({('2026','direct')}),dict(origins=['ad hoc']))
         combined=disclosure.summarise(disclosure.adhoc_people|{('2026','direct')},bundled=True)
-        self.assertTrue(combined['pooled'])
-        self.assertFalse(combined['show_count'])
+        self.assertEqual(combined,dict(origins=['ad hoc']))
+        for area in ('A','B'):
+            lower,_=self.payload('min_n=5&include_texts=1&oe='+self.node('Bereich',area)['id'])
+            self.assertNotIn('Privater Resthinweis',lower.text)
+            self.assertNotIn('Vertraulicher Text',lower.text)
 
     def test_approved_summaries_reuse_existing_sources_and_only_display_safe_cohort(self):
         records=ta.collect(self.sources(),'2026',canonicals=['txt'],exclude_leaders=False)
