@@ -151,17 +151,18 @@ class LeadershipTeamTests(unittest.TestCase):
         html,payload=self.report(oe=root['id'])
         self.assertIn('<tr><td>Führungsteam</td><td>3</td><td>Leitungsanteil der Grundmenge fehlt</td><td>–</td></tr>',html)
 
-    def test_texts_use_collective_origin_and_require_enough_valid_answers(self):
+    def test_texts_use_collective_origin_and_participation_threshold(self):
         html,_=self.report(include_texts=1,profile='oe',download=1)
         self.assertIn('<summary>Führungsteam <span class="answer-count">3 Beiträge</span>',html)
         for area in ('A','B','C'):self.assertIn('Text '+area+'-head',html)
         with self.db() as c:
             c.execute("UPDATE answers SET answer='Keine Antwort' WHERE wave='2026' AND feedback='C-head' AND source='text'")
         html,_=self.report(include_texts=1,profile='oe')
-        for area in ('A','B','C'):self.assertNotIn('Text '+area+'-head',html)
-        self.assertNotIn('<summary>Führungsteam <span',html)
+        for area in ('A','B'):self.assertIn('Text '+area+'-head',html)
+        self.assertNotIn('Text C-head',html)
+        self.assertIn('<summary>Führungsteam <span class="answer-count">2 Beiträge</span>',html)
 
-    def test_reviewed_summaries_use_team_origin_and_cannot_bypass_text_threshold(self):
+    def test_reviewed_summaries_use_team_origin_and_participation_threshold(self):
         path=[('Amt','Amt')]
         people={('2026',area+'-head') for area in ('A','B','C')}
         node=dict(unit='Führungsteam',path=[*path,('__leadership_team__','Führungsteam')])
@@ -175,8 +176,13 @@ class LeadershipTeamTests(unittest.TestCase):
         self.assertEqual(entry['origins'],['Führungsteam'])
         self.assertEqual(entry['count'],3)
         self.assertNotIn('A',entry['origins'])
-        disclosure.team_questions=set()
-        self.assertEqual(project_concerns(index,[],{tuple(s['key']) for s in index.values()},{},disclosure),{})
+        # A report-local question threshold must not suppress an otherwise safe cohort.
+        disclosure=TextDisclosure((records,{},mappings,[],[],[]),'2026',3,[node],True,
+                                  dict(node=node,people=people,text_questions=set()))
+        sparse={key:value for key,value in index.items() if key=='A-head'}
+        projected=project_concerns(sparse,[],{tuple(s['key']) for s in sparse.values()},{},disclosure)
+        self.assertEqual(projected['text'][0]['statements'][0]['count'],1)
+        self.assertEqual(projected['text'][0]['statements'][0]['origins'],['Führungsteam'])
 
     def test_approved_wave_report_reuses_sources_with_safe_leadership_attribution(self):
         with self.db() as c:

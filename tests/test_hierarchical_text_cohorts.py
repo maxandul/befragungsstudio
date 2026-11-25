@@ -71,11 +71,12 @@ class HierarchicalTextCohorts(unittest.TestCase):
         self.assertTrue(all(self.disclosure().allows_source(p, 'text') for p in heads))
         for n in range(5):
             self.assertFalse(self.disclosure((('Amt', 'AFA'), ('Bereich', 'Operations'), ('Abteilung', str(n)))).active)
-        # A switch cannot turn a question with too few leadership texts into a safe one.
+        # Sparse text contributions do not change participation-based membership.
         self.records[int(next(iter(heads))[1])]['answer'] = 'Keine Antwort'
         for include_children in (False, True):
             disclosure = self.disclosure(include_children=include_children)
-            self.assertTrue(all(not disclosure.allows_source(p, 'text') for p in heads))
+            self.assertTrue(all(disclosure.allows_source(p, 'text') for p in heads))
+            self.assertEqual(disclosure.partition.cohorts, self.disclosure().partition.cohorts)
 
     def test_aliases_and_waves_determine_membership_before_the_report_selection(self):
         a = self.add(2, Bereich='Support', Team='Old')

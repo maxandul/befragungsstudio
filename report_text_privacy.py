@@ -10,7 +10,8 @@ class TextPartition:
 
     Membership uses participation, never text contents, report scope or switches.
     A leader belongs at least one level above their own OE. Sufficiently large
-    sibling leadership teams remain separate and keep their per-question rule.
+    sibling leadership teams remain separate. All cohorts use participation counts,
+    including when only a few members contribute to a particular text question.
     """
     def __init__(self, origins, leaders, minimum):
         self.cohorts = {}
@@ -63,18 +64,14 @@ class TextPartition:
 class TextDisclosure:
     def __init__(self, sources, wave, minimum, visible_children, include_children, leadership=None,
                  scope=(), dimension='', unit=''):
-        records, questions, mappings, aliases, _, exclusions = sources
+        records, _, mappings, aliases, _, _ = sources
         self.minimum = minimum
         self.scope = tuple(scope)
         self.labels = {tuple(child['path']): child['unit'] for child in visible_children}
         self.child_depth = len(next(iter(self.labels), ()))
         self.include_children = include_children
-        self.team_people = leadership['people'] if leadership else set()
-        self.team_path = tuple(leadership['node']['path']) if leadership else None
-        self.team_questions = leadership['text_questions'] if leadership else set()
         origins = {}
         leaders = set()
-        writers = defaultdict(set)
         for record in records:
             if record['wave'] != wave:
                 continue
@@ -83,17 +80,10 @@ class TextDisclosure:
             raw = record['raw']
             if str(raw.get('Kadertyp (subject)', raw.get('Kadertyp', ''))).strip() == '100':
                 leaders.add(person)
-            question = questions.get(record.get('source'), {})
-            answer = str(record.get('answer', '')).strip()
-            if (question.get('type') == 'text' and question.get('include', 1)
-                    and (record.get('source'), wave) not in exclusions
-                    and answer and answer not in (question.get('missing') or '').splitlines()):
-                writers[question['canonical']].add(person)
 
         self.partition = TextPartition(origins, leaders, minimum)
         self.active = set()
         self.adhoc_people = set()
-        self.leadership_questions = {}
         for path, people in self.partition.cohorts.items():
             kind = self.partition.kinds[path]
             anchor = path[:-1] if kind != 'ordinary' else path
@@ -109,10 +99,6 @@ class TextDisclosure:
             self.active.add(path)
             if kind == 'adhoc':
                 self.adhoc_people.update(people)
-            elif kind == 'leadership':
-                self.leadership_questions[path] = {
-                    canonical for canonical, respondents in writers.items()
-                    if len(people & respondents) >= minimum}
 
         self.adhoc_node = None
         if self.adhoc_people:
@@ -131,19 +117,11 @@ class TextDisclosure:
 
     def allows_source(self, person, canonical):
         cohort = self.partition.membership.get(person)
-        if cohort not in self.active:
-            return False
-        if person in self.team_people and canonical not in self.team_questions:
-            return False
-        return (self.partition.kinds[cohort] != 'leadership'
-                or canonical in self.leadership_questions[cohort]
-                or cohort == self.team_path and canonical in self.team_questions)
+        # Participation fixes safe membership for the entire wave. Sparse text
+        # responses do not make a leadership cohort smaller than other cohorts.
+        return cohort in self.active
 
     def allows_detail(self, path, canonical=None):
-        if path == self.team_path and canonical not in self.team_questions:
-            return False
-        if path in self.leadership_questions and canonical not in self.leadership_questions[path]:
-            return path == self.team_path and canonical in self.team_questions
         return self.direct_participants[path] >= self.minimum
 
     def summarise(self, people, *, bundled=False, canonical=None):
