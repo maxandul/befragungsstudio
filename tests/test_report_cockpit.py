@@ -69,7 +69,7 @@ class ReportCockpitTests(unittest.TestCase):
         response=self.submit('package',report_oe=[a,b])
         self.assertEqual(response.status_code,307)
         archive=self.client.post(response.location,data=dict(csrf=self.csrf,report_oe=[a,b]))
-        self.assertEqual(zipfile.ZipFile(io.BytesIO(archive.data)).namelist(),['01_A.html','02_B.html'])
+        self.assertEqual(zipfile.ZipFile(io.BytesIO(archive.data)).namelist(),['2026_10_Puls_A.html','2026_10_Puls_B.html'])
         self.assertEqual(self.submit('save',oe=a,report_oe=[b],preset_name='Ausserhalb').status_code,400)
         restricted=self.submit('package',oe=a,report_oe=[b])
         self.assertEqual(self.client.post(restricted.location,data=dict(csrf=self.csrf,report_oe=[b])).status_code,400)

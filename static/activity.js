@@ -54,7 +54,9 @@
       const blobUrl = URL.createObjectURL(await response.blob());
       const a = document.createElement('a');
       a.href = blobUrl;
-      a.download = /filename="?([^";]+)"?/i.exec(disposition)?.[1] || 'Download';
+      const utf8 = /(?:^|;)\s*filename\*=UTF-8''([^;]+)/i.exec(disposition);
+      const plain = /(?:^|;)\s*filename=(?:"([^"]*)"|([^;]+))/i.exec(disposition);
+      a.download = utf8 ? decodeURIComponent(utf8[1]) : plain?.[1] || plain?.[2] || 'Download';
       a.click();
       setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
     } catch (error) {

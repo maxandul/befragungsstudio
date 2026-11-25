@@ -218,7 +218,7 @@ class ReportEditorialTests(unittest.TestCase):
         self.assertEqual(response.status_code,200)
         with zipfile.ZipFile(io.BytesIO(response.data)) as z:
             self.assertEqual(len(z.namelist()),2)
-            a_html=z.read('01_A.html').decode();b_html=z.read('02_B.html').decode()
+            a_html=z.read('2026_10_Puls_A.html').decode();b_html=z.read('2026_10_Puls_B.html').decode()
             self.assertIn('Aussage person-a',a_html);self.assertNotIn('Aussage person-b',a_html)
             self.assertIn('Aussage person-b',b_html);self.assertNotIn('Aussage person-a',b_html)
             self.assertNotIn('Zur App',a_html)

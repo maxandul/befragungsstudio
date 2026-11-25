@@ -209,3 +209,5 @@ Unter «Berichtsgestaltung» öffnen Vorschau, HTML und PNG-ZIP den Bericht mit 
 Eine benannte Konfiguration speichert die Berichtsoptionen, Wellen, OE und die Paket-Auswahl für das Projekt. Beim nächsten Öffnen erscheint die zuletzt gespeicherte Konfiguration. Unter einem anderen Namen lässt sich eine Variante speichern.
 
 «Berichtstexte bearbeiten» öffnet die Redaktion für den gewählten Umfang und die Bezugswelle. Neben dem Themenkommentar lässt sich die freigegebene Textanalyse aufklappen. Originalzitate werden separat ausgewählt. «Alle Berichtstexte und Belege speichern» übernimmt die Abschnitte zusammen.
+
+Einzelne HTML-Berichte und die HTML-Dateien im Berichtspaket heissen `JJJJ_MM_Puls_OE.html`. Massgebend ist die Bezugswelle oder bei eigener Wellenauswahl die letzte ausgewählte Welle in der Berichtsreihenfolge. Enthält der Wellenname keinen Monat, wird der Monat der ersten datierten Antwort verwendet. Ohne bestimmbare Zeitangabe steht `0000` für das fehlende Jahr und `00` für den fehlenden Monat. Bei gleichen Dateinamen im ZIP erhalten die betroffenen Berichte separate nummerierte Ordner.

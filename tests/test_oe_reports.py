@@ -173,6 +173,23 @@ class OrganisationReportTests(unittest.TestCase):
         self.assertIn(b'<option value="0" selected>Weglassen</option>',settings.data)
         self.assertIn('Ergebnisse direktunterstellter OEs anzeigen',settings.text)
 
+    def test_download_names_follow_the_wave_across_preview_download_and_package(self):
+        from werkzeug.http import parse_options_header
+        unit='Zürich; B&V'
+        oe=tree([{'Amt':'AFA','Bereich':unit}])[-1]['id']
+        with self.db() as c:
+            c.execute("UPDATE answers SET wave='Juli 2026',date='2026-06-19',raw=json_set(raw,'$.Bereich',?) WHERE wave='2026'",(unit,))
+        for scope in ('focus_wave=Juli+2026','wave=2024&wave=Juli+2026'):
+            url='/p/1/report?'+scope+'&oe='+oe
+            expected='2026_07_Puls_'+unit+'.html'
+            for suffix,mode in (('','inline'),('&download=1','attachment')):
+                response=self.client.get(url+suffix)
+                disposition,options=parse_options_header(response.headers['Content-Disposition'])
+                self.assertEqual((disposition,options['filename']),(mode,expected))
+            package=self.client.post('/p/1/reports.zip?'+scope,data=dict(csrf=self.csrf,report_oe=[oe]))
+            with zipfile.ZipFile(io.BytesIO(package.data)) as archive:
+                self.assertEqual(archive.namelist(),[expected])
+
     def test_package_reuses_shared_comparisons_and_matches_individual_downloads(self):
         teams=[self.node('Team','Gleich',area)['id'] for area in ('A','B')]
         root_path=self.node('Amt','AFA')['path']
@@ -186,7 +203,7 @@ class OrganisationReportTests(unittest.TestCase):
                 root_calls=[call for call in aggregates.call_args_list if call.args[7]==root_path]
                 self.assertEqual(len(root_calls),1)
             with zipfile.ZipFile(io.BytesIO(package.data)) as archive:
-                self.assertEqual(archive.namelist(),['01_Gleich.html','02_Gleich.html'])
+                self.assertEqual(archive.namelist(),['01/2026_10_Puls_Gleich.html','02/2026_10_Puls_Gleich.html'])
                 for name,node_id in zip(archive.namelist(),teams):
                     single=self.client.get(f'/p/1/report?{query}&download=1&oe={node_id}')
                     self.assertEqual(single.status_code,200)
