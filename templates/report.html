@@ -56,41 +56,7 @@ blockquote{margin:16px 0;padding:12px 20px;border-left:4px solid #0070b4;backgro
  .methodology details{display:none}.hint{padding:3mm}.report-header .hint{background:#fff}
 }
 </style></head>
-{% macro text_meta(entry) -%}
-{% set count = entry.count if not entry.pooled or entry.show_count else none -%}
-{% set origin = (entry.origins|default([])|join(', ')) or display_unit -%}
-{% if count or origin %}<small class="concern-origin">
-{%- if origin %}Herkunft {{origin}}{% endif -%}
-{%- if count and origin %} · {% endif -%}
-{%- if count %}{{count}} {{'Textantwort' if count==1 else 'Textantworten'}}{% elif entry.pooled and not entry.show_count %} · Anzahl Textantworten aus Anonymitätsgründen ausgeblendet{% endif -%}
-</small>{% endif %}
-{%- endmacro %}
-{% macro concern_entry(s, printed=false) %}
-{% set expandable = s.details and not printed %}
-<li>
-{% if expandable %}<details class="qual-nuances"><summary>{% else %}<div class="concern-body">{% endif %}
-<strong class="concern-label">{{s.kind_label}}</strong> <span class="concern-text">{{s.text}}</span>
-{{text_meta(s)}}
-{% if expandable %}</summary>{% else %}</div>{% endif %}
-{% if s.details and (not printed or print_mode=='full') %}
-<ul aria-label="Nuancen">{% for nuance in s.details %}<li><strong class="concern-label">Nuance</strong> <span class="concern-text">{{nuance.text}}</span> {{text_meta(nuance)}}</li>{% endfor %}</ul>
-{% endif %}
-{% if expandable %}</details>{% endif %}
-</li>
-{% endmacro %}
-{% macro concern_topics(views, printed=false) %}
-{% for t in views %}
-{% set entries=t.main if printed and print_mode=='compact' else t.all %}
-{% if entries %}
-{% if printed %}<h4>{% else %}<details class="qual-topic"><summary>{% endif %}
-{{- 'Thema · ' if t.title != 'Einzelaussagen' }}{{t.title}}
-{{text_meta(t)}}
-{% if printed %}</h4>{% else %}</summary>{% endif %}
-<ul class="concern-list">{% for s in entries %}{{concern_entry(s,printed)}}{% endfor %}</ul>
-{% if not printed %}</details>{% endif %}
-{% endif %}
-{% endfor %}
-{% endmacro %}
+{% from 'report_text_blocks.html' import concern_topics with context %}
 {% macro original_answers(texts) %}<ol class="text-answer-list">{% for text in texts %}<li><p>{{text}}</p></li>{% endfor %}</ol>{% endmacro %}
 {% macro text_detail(r,show_summary=true,show_raw=true) %}
 {% set views=text_views.get(r.canonical,[]) %}

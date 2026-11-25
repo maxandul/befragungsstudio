@@ -1,21 +1,21 @@
 # Berichte insgesamt oder zu einer Bezugswelle
 
-Unter «Ergebnisse und Berichte» lässt sich der Berichtsumfang auswählen:
+Unter «Berichtsgestaltung» lässt sich der Berichtsumfang auswählen:
 
 - **Gesamtauswertung:** alle eingeschalteten Fragen der ausgewählten Vergleichswellen.
 - **Bezugswelle:** nur eingeschaltete Fragen, die in dieser Welle erhoben wurden. Für diese Fragen werden alle vorhandenen Vergleichswerte aus dieser und früheren Wellen einbezogen. Spätere Wellen werden nicht angezeigt. Fragen werden anhand der konfigurierten Verknüpfungen über unterschiedliche Quell-IDs hinweg erkannt.
 
 Eine Bezugswelle ist kein reiner Datumsfilter: Sie bestimmt den Fragenumfang, während der Zeitverlauf erhalten bleibt. Beispiel: Eine Frage wurde in Welle 1 und 2 gestellt, eine andere nur in Welle 1. Der Bericht zu Welle 2 enthält die erste Frage mit beiden Messzeitpunkten. Die zweite Frage erscheint nur in der Gesamtauswertung oder im Bericht zu Welle 1.
 
-Die Reihenfolge ergibt sich aus den Antwortdaten der Wellen. Die Häkchen unter «Vergleichswellen für die Gesamtauswertung» gelten nur ohne Bezugswelle. Globale Frageausschlüsse und Ausschlüsse einzelner Quellfragen je Welle werden berücksichtigt. Eine Frage, die in der Bezugswelle vollständig ausgeschlossen ist, erscheint auch nicht mit historischen Ergebnissen im Bericht zu dieser Welle.
+Die Reihenfolge ergibt sich aus den Antwortdaten der Wellen. Die Häkchen unter «Vergleichswellen bei eigener Wellenauswahl» gelten nur ohne Bezugswelle. Globale Frageausschlüsse und Ausschlüsse einzelner Quellfragen je Welle werden berücksichtigt. Eine Frage, die in der Bezugswelle vollständig ausgeschlossen ist, erscheint auch nicht mit historischen Ergebnissen im Bericht zu dieser Welle.
 
 Segmentfilter und Mindestfallzahl gelten weiterhin für jeden dargestellten Messzeitpunkt. Liegt eine Frage in der Bezugswelle unter der Mindestfallzahl, können ausreichend grosse historische Stichproben weiterhin gezeigt werden; die geschützten Ergebnisse bleiben ausgeblendet. Vollständige Freitexte sind standardmässig nicht Teil der Weitergabeberichte; die explizite Freigabe ist unten beschrieben.
 
-Die Auswahl gilt für die Ergebnisansicht, Berichtsvorschau, heruntergeladene HTML-Berichte und PNG-/ZIP-Exporte. Der Berichtskopf nennt die Bezugswelle; Charts zeigen die tatsächlich dargestellten Zeitpunkte. Der Rücklauf wird für die einbezogenen Vergleichswellen dargestellt.
+Die Auswahl gilt für die Berichtsvorschau, heruntergeladene HTML-Berichte und PNG-/ZIP-Exporte. Der Berichtskopf nennt die Bezugswelle; Charts zeigen die tatsächlich dargestellten Zeitpunkte. Der Rücklauf wird für die einbezogenen Vergleichswellen dargestellt.
 
 ## OE-Berichte und thematische Besprechungsgrundlage
 
-Unter «Ergebnisse & Berichte» ersetzt eine Auswahl nach Organisationspfad die bisherigen Freitextfelder Merkmal/Einheit. Die Vorschau öffnet in einem neuen Tab und bietet einen Link zurück zur App. HTML-Downloads bleiben eigenständig nutzbar.
+Unter «Berichtsgestaltung» ersetzt eine Auswahl nach Organisationspfad die bisherigen Freitextfelder Merkmal/Einheit. Die Vorschau öffnet in einem neuen Tab und bietet einen Link zurück zur App. HTML-Downloads bleiben eigenständig nutzbar.
 
 Das gemeinsame OE-Verzeichnis unter «Organisation» unterstützt vollständige CSV-/XLSX-Importe und das Anlegen/Bearbeiten einzelner Einträge. Die ausgefüllten Ebenen bilden den Pfad Amt → Bereich → RAV-Gruppe → Abteilung → RAV → Team; leere Zwischenebenen werden übersprungen. Ein Import ersetzt den vollständigen Verzeichnisstand ab dem angegebenen Datum. Änderungen am selben Gültigkeitsdatum ersetzen diesen Stand; spätere Stände gelten bis zur nächsten Änderung. Die vorhandene Liste wird bei der ersten Änderung als Ausgangsstand erhalten. Das Verzeichnis ändert weder Antwortzuordnungen noch gespeicherte Grundmengen. Beim Import gilt weiterhin die erste Tabelle.
 
@@ -201,3 +201,11 @@ Belegen und KI-Zusammenfassungen. Zahlenantworten behalten ihre Mindestfallzahle
 Kleine Führungsteams werden weiterhin mit vollständiger, wellenweit fester
 Mitgliedschaft unter «ad hoc» gebündelt; die gemeinsame übergeordnete Ebene und
 der Ausschluss aus der jeweils eigenen OE bleiben verbindlich.
+
+## Einstellungen und Berichtstexte wiederverwenden
+
+Unter «Berichtsgestaltung» öffnen Vorschau, HTML und PNG-ZIP den Bericht mit der aktuell sichtbaren Auswahl. Im Berichtspaket erhält jede angehakte OE einen eigenen Bericht. Die Suche im OE-Baum behält bereits gesetzte Häkchen bei.
+
+Eine benannte Konfiguration speichert die Berichtsoptionen, Wellen, OE und die Paket-Auswahl für das Projekt. Beim nächsten Öffnen erscheint die zuletzt gespeicherte Konfiguration. Unter einem anderen Namen lässt sich eine Variante speichern.
+
+«Berichtstexte bearbeiten» öffnet die Redaktion für den gewählten Umfang und die Bezugswelle. Neben dem Themenkommentar lässt sich die freigegebene Textanalyse aufklappen. Originalzitate werden separat ausgewählt. «Alle Berichtstexte und Belege speichern» übernimmt die Abschnitte zusammen.

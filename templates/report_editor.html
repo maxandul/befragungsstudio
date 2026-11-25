@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% from 'report_text_blocks.html' import concern_topics with context %}
+{% block content %}
+<p><a href="{{url_for('view_results',pid=p.id)}}?{{request.query_string.decode()}}">Zur Berichtsgestaltung</a></p>
+<h2>Berichtstexte · {{display_unit}}</h2>
+<p>Bezugswelle {{reference_wave or '–'}} · Mindestfallzahl {{minimum}}. Die Redaktion gilt für diesen Berichtsumfang.</p>
+<p>Die Textauswertung bündelt Rückmeldungen der Welle. Hier sehen Sie die für diese OE freigegebenen Themen, Kernaussagen, Nuancen und Einzelaussagen. Eigene Einordnungen und nächste Schritte ergänzen Sie in den Textfeldern.</p>
+<a href="{{url_for('text_analysis',pid=p.id,focus_wave=reference_wave)}}" target="_blank" rel="noopener">Textauswertung der Welle öffnen</a>
+{% if not text_views.values()|select|list %}<p class="hint">Für diese Berichtsauswahl liegt keine freigegebene Textanalyse vor.</p>{% endif %}
+<form method="post" action="{{url_for('report_notes',pid=p.id)}}?{{request.query_string.decode()}}">
+<input type="hidden" name="csrf" value="{{session.csrf}}"><input type="hidden" name="scope" value="{{scope}}"><input type="hidden" name="reference_wave" value="{{reference_wave}}"><input type="hidden" name="bulk" value="1">
+{% for title in note_themes %}{% set i=loop.index0 %}
+<section class="panel editor-section"><h3>{{title}}</h3>
+<input type="hidden" name="theme" value="{{title}}"><input type="hidden" name="revision_{{i}}" value="{{revision(notes.get(title,''), evidence.get(title,[]))}}">
+{% for row in text_groups.get(title,[]) %}{% if text_views.get(row.canonical) %}
+<details><summary>Geprüfte Textanalyse · {{row.label}}</summary>{{concern_topics(text_views[row.canonical])}}</details>
+{% endif %}{% endfor %}
+<label>{{'Erkenntnisse formulieren' if loop.first else 'Massnahmen, Zuständigkeiten und Termine' if loop.last else 'Redaktionelle Einordnung'}}<textarea rows="4" name="body_{{i}}">{{notes.get(title,'')}}</textarea></label>
+{% if stale_evidence.get(title,0) %}<p class="hint">{{stale_evidence[title]}} bisher ausgewählte Belege sind nicht mehr verfügbar. Beim Speichern wird die Auswahl aktualisiert.</p>{% endif %}
+{% if evidence_options.get(title) %}<details class="editor-quotes"><summary>Originalzitate auswählen · {{evidence_options[title]|length}} verfügbar</summary>
+{% for token,option in evidence_options[title].items() %}<label class="check"><input type="checkbox" name="evidence_{{i}}" value="{{token}}" {{'checked' if token in evidence.get(title,[])}}><span><strong>{{option.label}}</strong><br>{{option.text}}</span></label>{% endfor %}</details>{% endif %}
+</section>{% endfor %}
+<button>Alle Berichtstexte und Belege speichern</button></form>
+{% if afa %}<details class="panel"><summary>Themenzuordnung für Puls AFA</summary><p>Ergänzt leere Themen anhand des AFA-Themenvorschlags. Eigene Zuordnungen lassen sich unter «Fragen» bearbeiten.</p><form method="post" action="{{url_for('report_themes',pid=p.id)}}?{{request.query_string.decode()}}"><input type="hidden" name="csrf" value="{{session.csrf}}"><button>AFA-Themenvorschlag übernehmen</button></form></details>{% endif %}
+{% endblock %}

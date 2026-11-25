@@ -48,6 +48,10 @@ class ReportEditorialTests(unittest.TestCase):
         self.assertNotIn('Aussage person-b',html)
         self.assertNotIn('Aussage leader-a',html)
         self.assertNotIn('mail@example.org',html)
+        editor=self.client.get('/p/1/report/editor?'+self.query+'&include_summaries=0').text
+        self.assertIn('Gemeinsames Anliegen',editor)
+        self.assertNotIn('Aussage person-b',editor)
+        self.assertNotIn('Aussage leader-a',editor)
         # A team with no supporting source must not see this concern.
         with self.db() as c:
             c.execute("UPDATE answers SET raw=REPLACE(raw,'\"A\"','\"C\"') WHERE wave='2026' AND feedback='person-a'")

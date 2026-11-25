@@ -63,12 +63,12 @@ class OrganisationReportTests(unittest.TestCase):
         self.assertIn(b'Zuordnung nicht eindeutig',response.data)
         self.assertEqual(self.client.get('/p/1/report?oe=unknown').status_code,400)
 
-    def test_editor_aggregates_only_selected_oe_and_preview_keeps_comparisons(self):
+    def test_cockpit_skips_aggregation_and_preview_keeps_comparisons(self):
         query='oe='+self.node('Bereich','A')['id']
         with patch('app.aggregate', wraps=aggregate) as aggregates:
             editor=self.client.get('/p/1/results?'+query)
             self.assertEqual(editor.status_code,200)
-            self.assertEqual(aggregates.call_count,1)
+            self.assertEqual(aggregates.call_count,0)
         _,preview=self.payload(query)
         self.assertTrue(preview['cards'][0]['children'])
         self.assertTrue(preview['cards'][0]['comparisons'])
@@ -98,7 +98,7 @@ class OrganisationReportTests(unittest.TestCase):
             self.assertIn('<tr><td>2026</td><td>2</td><td>2</td><td>100.0 %',report.text)
         settings=self.client.get('/p/1/results?oe='+area)
         self.assertEqual(settings.status_code,200)
-        self.assertIn('90.0 %',settings.text)
+        self.assertNotIn('90.0 %',settings.text)
         report=self.client.get('/p/1/report?focus_wave=2024&oe='+self.node('Amt','AFA')['id'])
         self.assertIn('<tr><td>A</td><td>–</td><td>–</td><td>90.0 %',report.text)
         suppressed=self.client.get('/p/1/report?focus_wave=2024&min_n=3&oe='+self.node('Amt','AFA')['id'])
@@ -273,7 +273,9 @@ class OrganisationReportTests(unittest.TestCase):
         self.assertIn(b'name="oe"',r.data)
         self.assertNotIn(b'name="dimension"',r.data)
         self.assertIn(b'target="_blank"',r.data)
-        self.assertIn(b'Textantworten sichten',r.data)
+        self.assertIn(b'Berichtstexte bearbeiten',r.data)
+        self.assertNotIn(b'Ergebnisse auf einen Blick',r.data)
+        self.assertNotIn(b'Teilnahme und R',r.data)
         self.assertEqual(self.client.get('/organisation').status_code,200)
 
     def test_theme_proposal_preserves_existing_assignments(self):
@@ -613,8 +615,8 @@ class OrganisationReportTests(unittest.TestCase):
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
 
     def evidence_token(self,query='',text=None):
-        page=self.client.get('/p/1/results?focus_wave=2026&'+query).data.decode()
-        tokens=re.findall(r'name="evidence" value="([a-f0-9]{64})"',page)
+        page=self.client.get('/p/1/report/editor?focus_wave=2026&'+query).data.decode()
+        tokens=re.findall(r'name="evidence_\d+" value="([a-f0-9]{64})"',page)
         self.assertTrue(tokens)
         return tokens[0]
 
@@ -660,7 +662,7 @@ class OrganisationReportTests(unittest.TestCase):
         response,_=self.payload('include_evidence=1')
         self.assertNotIn(b'Vertraulicher Text 0',response.data)
         self.assertNotIn('Geänderter Text'.encode(),response.data)
-        page=self.client.get('/p/1/results?focus_wave=2026').data
+        page=self.client.get('/p/1/report/editor?focus_wave=2026').data
         self.assertIn(b'bisher ausgew',page)
         self.assertEqual(self.save_evidence([token],body='Nicht speichern').status_code,400)
         with self.db() as c:
@@ -673,8 +675,8 @@ class OrganisationReportTests(unittest.TestCase):
     def test_evidence_html_is_escaped_and_duplicate_quotes_are_single_choices(self):
         with self.db() as c:
             c.execute("UPDATE answers SET answer='<script>Zitat</script>' WHERE wave='2026' AND source='txt'")
-        page=self.client.get('/p/1/results?focus_wave=2026').data.decode()
-        tokens=re.findall(r'name="evidence" value="([a-f0-9]{64})"',page)
+        page=self.client.get('/p/1/report/editor?focus_wave=2026').data.decode()
+        tokens=re.findall(r'name="evidence_\d+" value="([a-f0-9]{64})"',page)
         self.assertEqual(len(tokens),1)
         self.save_evidence(tokens)
         # Die Referenzen überleben einen erneuten App-Start ohne neue Duplikate.
