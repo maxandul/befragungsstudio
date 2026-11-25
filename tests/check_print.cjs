@@ -4,7 +4,7 @@ const events={},details=[{open:false},{open:true}],images=[],sizes=[];
 for(const detail of details){detail.classList={add(){},remove(){},contains(){return false;}};detail.querySelector=()=>null;}
 const parent={classList:{add(){},remove(){}},appendChild(img){img.parentElement=this;images.push(img);}};
 const chart={canvas:{closest(){return null;},getAttribute(){return 'Zeitvergleich';},toDataURL(){return 'data:image/png;base64,chart';},parentElement:parent},resize(...size){sizes.push(size);},update(){}};
-const sandbox={window:{addEventListener(name,fn){events[name]=fn;}},charts:new Map([['overview-history-0',chart]]),document:{body:{dataset:{profile:'oe',printMode:'full'}},querySelectorAll(){return details;},createElement(){return {remove(){this.removed=true;}};}}};
+const sandbox={syncSection(){},window:{addEventListener(name,fn){events[name]=fn;}},charts:new Map([['overview-history-0',chart]]),document:{body:{dataset:{profile:'oe',printMode:'full'}},querySelectorAll(){return details;},createElement(){return {remove(){this.removed=true;}};}}};
 vm.createContext(sandbox);
 vm.runInContext(source.slice(source.indexOf('  let printDetails='),source.indexOf('  async function start()')),sandbox);
 events.beforeprint();

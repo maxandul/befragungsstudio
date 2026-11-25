@@ -238,23 +238,49 @@
     const overview=payload.overviews[index], label=overview.theme.replace(/[^a-zA-Z0-9äöüÄÖÜ_-]+/g,'_').slice(0,60);
     return `Thema_${index+1}_${label}_${metricFor(overview.indices[0])}_${view}.png`;
   }
+  const questionSections = new Map();
+  function releaseChart(key) {
+    const chart=charts.get(key);
+    if (!chart) return;
+    rememberVisibility(key);
+    chart.destroy();
+    charts.delete(key);
+  }
   function draw(index) {
-    const canvas = document.getElementById(`chart-${index}`);
+    releaseChart(index);
+    releaseChart('child-'+index);
     const metric = metricFor(index);
-    rememberVisibility(index);
-    if (charts.has(index)) charts.get(index).destroy();
+    const canvas = document.getElementById(`chart-${index}`);
     charts.set(index, new Chart(canvas, applyVisibility(index,config(payload.cards[index], metric))));
     const childCanvas=document.getElementById(`children-${index}`);
-    if(childCanvas){const key='child-'+index;if(charts.has(key))charts.get(key).destroy();charts.set(key,new Chart(childCanvas,config(payload.cards[index],metric,'screen','children')));}
+    if (childCanvas) {
+      const key='child-'+index;
+      charts.set(key,new Chart(childCanvas,applyVisibility(key,config(payload.cards[index],metric,'screen','children'))));
+    }
+  }
+  function syncSection(detail, full=true) {
+    for (const index of questionSections.get(detail) || []) {
+      if (!detail.open) {
+        releaseChart(index);
+        releaseChart('child-'+index);
+      } else if (!charts.has(index) && (full || payload.cards[index].rows[0].type!=='scale')) {
+        draw(index);
+      }
+    }
+  }
+  function redrawOpenQuestions() {
+    for (let i=0;i<payload.cards.length;i++) {
+      if (charts.has(i)) draw(i);
+    }
   }
   async function png(index, layout, view = 'history') {
     if (document.fonts) await document.fonts.ready;
     const canvas = document.createElement('canvas'), size = sizes[layout];
     canvas.width = size[0]; canvas.height = size[1];
     const metric = metricFor(index);
-    const cfg=config(payload.cards[index], metric, layout, view);
-    const current=charts.get(index);
-    if(view==='history' && current?.isDatasetVisible)cfg.data.datasets.forEach((ds,i)=>{ds.hidden=!current.isDatasetVisible(i);});
+    const key=view==='children' ? 'child-'+index : index;
+    rememberVisibility(key);
+    const cfg=applyVisibility(key,config(payload.cards[index], metric, layout, view));
     const chart = new Chart(canvas, cfg);
     try {
       chart.update('none');
@@ -337,7 +363,7 @@
   let printDetails=[],printImages=[];
   function finishPrint() {
     printImages.forEach(img=>{img.parentElement?.classList.remove('print-chart-ready');img.remove();});printImages=[];
-    printDetails.forEach(([detail,open])=>{detail.open=open;detail.classList.remove('print-hide');});printDetails=[];
+    printDetails.forEach(([detail,open])=>{detail.open=open;detail.classList.remove('print-hide');syncSection(detail);});printDetails=[];
     charts.forEach(chart=>{chart.resize();chart.update('none');});
   }
   function preparePrint() {
@@ -349,6 +375,7 @@
       const hasChoice=detail.querySelector('article:not([data-question-type="scale"])');
       detail.open=isMethod || full || Boolean(hasChoice);
       if(!detail.open)detail.classList.add('print-hide');
+      if(detail.open)syncSection(detail,full);
     });
     charts.forEach((chart,key)=>{
       const canvas=chart.canvas;if(!canvas)return;
@@ -366,11 +393,24 @@
     try {
       if (typeof Chart === 'undefined') throw new Error('Die eingebettete Chartbibliothek wurde nicht geladen.');
       Chart.defaults.font.family = 'Arial, sans-serif';
-      payload.cards.forEach((card, i) => {draw(i); document.getElementById(`metric-${i}`)?.addEventListener('change', () => draw(i));});
+      payload.cards.forEach((card, i) => {
+        const section=document.getElementById(`chart-${i}`).closest('.question-details');
+        if (section) {
+          if (!questionSections.has(section)) {
+            questionSections.set(section,[]);
+            section.addEventListener('toggle',()=>syncSection(section));
+          }
+          questionSections.get(section).push(i);
+        }
+        if (!section || section.open) draw(i);
+        document.getElementById(`metric-${i}`)?.addEventListener('change', () => {
+          if (charts.has(i)) draw(i);
+        });
+      });
       drawOverviews();
-      for (const id of ['report-metric','show-comparisons','show-parent','show-total']) document.getElementById(id)?.addEventListener('change',()=>{payload.cards.forEach((card,i)=>draw(i));drawOverviews();});
+      for (const id of ['report-metric','show-comparisons','show-parent','show-total']) document.getElementById(id)?.addEventListener('change',()=>{redrawOpenQuestions();drawOverviews();});
       document.getElementById('show-ci')?.addEventListener('change',()=>{
-        payload.cards.forEach((card,i)=>draw(i));
+        redrawOpenQuestions();
         const note=document.getElementById('ci-note');if(note)note.hidden=!intervalsEnabled();
       });
       document.querySelectorAll('[data-topic]').forEach(button=>button.addEventListener('click',async()=>{
