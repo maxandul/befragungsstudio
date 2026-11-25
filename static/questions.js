@@ -24,6 +24,7 @@
     buttons.forEach(b=>b.disabled=true);
     status.classList.remove('save-error');
     status.textContent='Speichere Änderungen …';
+    const done=window.studioActivity('Änderungen werden gespeichert …');
     try {
       // Buttons namens "action" überdecken form.action im DOM. Attribut explizit lesen.
       const saveUrl=form.getAttribute('action') || location.href;
@@ -59,7 +60,7 @@
         });
       }
     }catch(error){status.textContent=error instanceof TypeError ? 'Die Verbindung zum Server ist fehlgeschlagen. Prüfen Sie, ob das CMD-Fenster noch läuft. Änderungen bleiben im Formular.' : error.message;status.classList.add('save-error');}
-    finally{buttons.forEach(b=>b.disabled=false);}
+    finally{done();buttons.forEach(b=>b.disabled=false);}
   });
   const saved=sessionStorage.getItem(key);
   if(saved){

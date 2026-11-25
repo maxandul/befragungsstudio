@@ -5,11 +5,12 @@ import secrets
 import hashlib
 import sqlite3
 from pathlib import Path
+from urllib.parse import quote, urlencode
 from werkzeug.exceptions import HTTPException
 
 from flask import (Flask, abort, flash, redirect, render_template, request, send_file, jsonify,
                    session, url_for, g)
-from core import read_table, normalize, content_hash, aggregate, mapped_dimensions
+from core import read_table, normalize, content_hash, aggregate, respondent_dimensions
 from organisation import tree
 
 ROOT = Path(__file__).resolve().parent
@@ -21,6 +22,7 @@ DEFAULT_MISSING = 'Keine Antwort\nKeine Anmerkung\nKann ich noch nicht beurteile
 
 def create_app(instance=None):
     app = Flask(__name__)
+    report_icon='data:image/svg+xml,'+quote((ROOT/'static/favicon.svg').read_text(encoding='utf-8'))
     data_dir = Path(instance or ROOT / 'instance')
     data_dir.mkdir(parents=True, exist_ok=True)
     key = data_dir / 'secret.key'
@@ -95,22 +97,10 @@ def create_app(instance=None):
             abort(404)
         return dict(p)
 
-    def context(pid):
-        p = project(pid)
-        with db() as c:
-            waves = [r[0] for r in c.execute('SELECT DISTINCT wave FROM answers WHERE project=? ORDER BY wave', (pid,))]
-            columns = set()
-            for r in c.execute('SELECT DISTINCT raw FROM answers WHERE project=?', (pid,)):
-                columns.update(json.loads(r[0]))
-        return dict(p=p, waves=waves, columns=sorted(columns), dimensions=DIMENSIONS, types=TYPES)
-
     def result_sources(pid):
         if getattr(g,'result_project',None)==pid:
             return g.result_sources
         with db() as c:
-            records = [dict(r) for r in c.execute('SELECT * FROM answers WHERE project=?', (pid,))]
-            for r in records:
-                r['raw'] = json.loads(r['raw'])
             qs = {r['source']: dict(r) for r in c.execute('SELECT * FROM questions WHERE project=?', (pid,))}
             setting=c.execute('SELECT missing FROM question_settings WHERE project=?',(pid,)).fetchone()
             common_missing=setting[0] if setting else DEFAULT_MISSING
@@ -127,14 +117,20 @@ def create_app(instance=None):
             aliases = [dict(r) for r in c.execute("SELECT * FROM aliases WHERE project=? ORDER BY (wave != '*'),id", (pid,))]
             grounds = [dict(r) for r in c.execute('SELECT * FROM grounds WHERE project=?', (pid,))]
             exclusions={(r['source'],r['wave']) for r in c.execute('SELECT source,wave FROM question_exclusions WHERE project=?',(pid,))}
+            # Keep only the raw fields consumed by reports and text jobs. Import data stays intact.
+            fields={m['source'] for m in mappings} | {'Question','Kadertyp','Kadertyp (subject)','Survey ID'}
+            records=[]
+            for row in c.execute('SELECT wave,feedback,source,answer,raw FROM answers WHERE project=?',(pid,)):
+                record=dict(row)
+                raw=json.loads(record['raw'])
+                record['raw']={field:raw[field] for field in fields if field in raw}
+                records.append(record)
+        g.report_dimensions=None
         g.result_project=pid
         g.result_sources=(records,qs,mappings,aliases,grounds,exclusions)
         return g.result_sources
 
-    def results(pid, dimension='', unit='', path=(), group_text_paths=False):
-        records,qs,mappings,aliases,grounds,exclusions=result_sources(pid)
-        rows,participation=aggregate(records,qs,mappings,aliases,dimension,unit,exclusions,path,exclude_leaders=True,
-                                     group_text_paths=group_text_paths)
+    def adjusted_grounds(pid, records, grounds):
         role_waves={r['wave'] for r in records if 'Kadertyp (subject)' in r['raw'] or 'Kadertyp' in r['raw']}
         with db() as c:
             leader_totals={(r['wave'],r['dimension'],r['unit']):r['total'] for r in c.execute('SELECT * FROM ground_leaders WHERE project=?',(pid,))}
@@ -148,7 +144,7 @@ def create_app(instance=None):
             if row['wave'] in role_waves:
                 row['total']=row['total']-leaders if leaders is not None and leaders<=row['total'] else None
             adjusted.append(row)
-        return rows,participation,adjusted
+        return adjusted
 
     @app.before_request
     def protect():
@@ -224,11 +220,11 @@ def create_app(instance=None):
 
     @app.route('/p/<int:pid>')
     def overview(pid):
-        ctx = context(pid)
+        p = project(pid)
         with db() as c:
             imports = c.execute('SELECT * FROM imports WHERE project=? ORDER BY id DESC', (pid,)).fetchall()
             counts = c.execute('SELECT wave,COUNT(DISTINCT feedback) n,COUNT(*) answers FROM answers WHERE project=? GROUP BY wave', (pid,)).fetchall()
-        return render_template('overview.html', **ctx, imports=imports, counts=counts, tab='overview')
+        return render_template('overview.html', p=p, imports=imports, counts=counts, tab='overview')
 
     @app.post('/p/<int:pid>/upload')
     def upload(pid):
@@ -307,7 +303,7 @@ def create_app(instance=None):
 
     @app.route('/p/<int:pid>/questions', methods=['GET','POST'])
     def questions(pid):
-        ctx = context(pid)
+        p = project(pid)
         with db() as c:
             qs = [dict(r) for r in c.execute('SELECT * FROM questions WHERE project=? ORDER BY theme,sort_order,label,source', (pid,))]
             groups={}
@@ -421,11 +417,10 @@ def create_app(instance=None):
                     w['reason']=exclusions.get((source,w['wave']),'')
                     w['value']=json.dumps([source,w['wave']])
             originals={}
-            for r in c.execute('SELECT source,raw FROM answers WHERE project=?',(pid,)):
-                raw=json.loads(r['raw'])
-                text=raw.get('Question','')
-                if text:
-                    originals.setdefault(r['source'],set()).add(text)
+            for source,wording in c.execute("""SELECT DISTINCT source,json_extract(raw,'$.Question')
+                    FROM answers WHERE project=?""",(pid,)):
+                if wording:
+                    originals.setdefault(source,set()).add(wording)
             cards=[]
             for key, members in groups.items():
                 q=dict(members[0])
@@ -433,12 +428,12 @@ def create_app(instance=None):
                 q['source_waves']={m['source']:wave_sources.get(m['source'],[]) for m in members}
                 q['originals']={m['source']:sorted(originals.get(m['source'],[])) for m in members}
                 cards.append(q)
-        return render_template('questions.html', **ctx, cards=cards, common_missing=common_missing,
+        return render_template('questions.html', p=p, types=TYPES, cards=cards, common_missing=common_missing,
                                parent_choices=[q for q in cards if q['type']!='text'],tab='questions')
 
     @app.route('/p/<int:pid>/segments', methods=['GET','POST'])
     def segments(pid):
-        ctx = context(pid)
+        p = project(pid)
         with db() as c:
             if request.method == 'POST':
                 f=request.form
@@ -460,13 +455,17 @@ def create_app(instance=None):
                 flash('Zuordnung gespeichert.')
                 return redirect(url_for('segments',pid=pid,wave=f['wave'],dimension=dim,
                                         source=f['source'] if f['action']=='mapping' else ''))
+            waves=[r[0] for r in c.execute('SELECT DISTINCT wave FROM answers WHERE project=? ORDER BY wave',(pid,))]
+            columns=set()
+            for row in c.execute('SELECT raw FROM answers WHERE project=?',(pid,)):
+                columns.update(json.loads(row[0]))
             mappings=c.execute('SELECT * FROM mappings WHERE project=?',(pid,)).fetchall()
             aliases=c.execute('SELECT * FROM aliases WHERE project=?',(pid,)).fetchall()
-        scope=request.args.get('wave') or (ctx['waves'][0] if ctx['waves'] else '*')
+        scope=request.args.get('wave') or (waves[0] if waves else '*')
         selected_dimension=request.args.get('dimension','Bereich')
         dimension_options=list(dict.fromkeys([*DIMENSIONS,*[r['dimension'] for r in mappings],
                                               *[r['dimension'] for r in aliases],selected_dimension]))
-        return render_template('segments.html', **ctx, mappings=mappings,aliases=aliases,tab='segments',
+        return render_template('segments.html', p=p, waves=waves, columns=sorted(columns), mappings=mappings,aliases=aliases,tab='segments',
                                scope=scope,selected_source=request.args.get('source',''),
                                selected_dimension=selected_dimension,dimension_options=dimension_options,
                                mapping_rules=[dict(r) for r in mappings])
@@ -504,8 +503,9 @@ def create_app(instance=None):
 
     @app.route('/p/<int:pid>/grounds', methods=['GET','POST'])
     def grounds(pid):
-        ctx=context(pid)
+        p=project(pid)
         with db() as c:
+            waves=[r[0] for r in c.execute('SELECT DISTINCT wave FROM answers WHERE project=? ORDER BY wave',(pid,))]
             if request.method=='POST':
                 f=request.form
                 action=f.get('action','save')
@@ -536,7 +536,7 @@ def create_app(instance=None):
                     if total<0:
                         raise ValueError('Die Grundmenge darf nicht negativ sein.')
                     wave,dim,unit=(f.get(field,'').strip() for field in ('wave','dimension','unit'))
-                    if wave not in ctx['waves'] and (not original or wave!=original[0]):
+                    if wave not in waves and (not original or wave!=original[0]):
                         raise ValueError('Bitte eine vorhandene Erhebung auswählen.')
                     if bool(dim)!=bool(unit):
                         raise ValueError('Für eine Einheit sind Merkmal und Wert gemeinsam anzugeben.')
@@ -571,7 +571,7 @@ def create_app(instance=None):
                 snapshot['details']=json.loads(row['details'])
                 snapshot['oes']=[dict(r) for r in c.execute('SELECT code,total FROM population_oe WHERE project=? AND wave=? ORDER BY code',(pid,row['wave']))]
                 snapshots.append(snapshot)
-        return render_template('grounds.html',**ctx,grounds=grounds,snapshots=snapshots,tab='grounds')
+        return render_template('grounds.html',p=p,waves=waves,grounds=grounds,snapshots=snapshots,tab='grounds')
 
     def organisation_entries(c, date=''):
         version=c.execute('SELECT entries FROM organisation_history WHERE valid_from<=? ORDER BY valid_from DESC LIMIT 1',
@@ -618,17 +618,9 @@ def create_app(instance=None):
             versions=[r[0] for r in c.execute('SELECT valid_from FROM organisation_history ORDER BY valid_from DESC')]
         return render_template('organisation.html',entries=entries,nodes=tree(entries),versions=versions,today=date.today().isoformat())
 
-    def report_tree(pid, date='', wave=None):
+    def report_tree(observed, date=''):
         with db() as c:
             entries=organisation_entries(c,date)
-        records,_,mappings,aliases,_,_=result_sources(pid)
-        observed={}
-        for r in records:
-            if wave is not None and r['wave']!=wave:
-                continue
-            key=(r['wave'],r['feedback'])
-            if key not in observed:
-                observed[key]=mapped_dimensions(r,mappings,aliases)
         amts={d['Amt'] for d in observed.values() if d.get('Amt')}
         if amts:
             entries=[e for e in entries if e.get('Amt') in amts]
@@ -663,10 +655,15 @@ def create_app(instance=None):
                 raise ValueError('Eine ausgewählte Welle ist nicht vorhanden.')
         selected=[w for w in available if w in selected]
         reference_wave=focus_wave or (selected[-1] if selected else '')
-        nodes,reference_nodes=report_tree(pid,(dated.get(reference_wave) or '')[:10])
+        records,questions,mappings,aliases,grounds,exclusions=result_sources(pid)
+        if g.report_dimensions is None:
+            g.report_dimensions=respondent_dimensions(records,mappings,aliases)
+        dimensions=g.report_dimensions
+        grounds=adjusted_grounds(pid,records,grounds)
+        nodes,reference_nodes=report_tree(dimensions,(dated.get(reference_wave) or '')[:10])
         # Grundmengen gehören zu einer Welle. Frühere Antwortpfade dürfen die
         # Zuordnung im aktuellen Organisationsstand nicht mehrdeutig machen.
-        wave_nodes={w:report_tree(pid,(dated.get(w) or '')[:10],wave=w)[0] for w in selected}
+        wave_nodes={w:report_tree({k:d for k,d in dimensions.items() if k[0]==w},(dated.get(w) or '')[:10])[0] for w in selected}
 
         def ground_path_matches(wave, target):
             paths=[n['path'] for n in wave_nodes[wave]
@@ -688,7 +685,14 @@ def create_app(instance=None):
         if reference_wave and (node or not dimension):
             child_nodes=[n for n in reference_nodes if n['parent']==child_parent]
         group_text_paths=group_text_origins
-        rows,participation,grounds=results(pid,dimension,unit,node['path'] if node else (),group_text_paths=group_text_paths)
+        selected_waves=set(selected)
+        selected_records=[r for r in records if r['wave'] in selected_waves]
+
+        def scoped_results(data, dimension='', unit='', path=(), group_text_paths=False):
+            return aggregate(data,questions,mappings,aliases,dimension,unit,exclusions,path,
+                             exclude_leaders=True,group_text_paths=group_text_paths,dimensions=dimensions)
+
+        rows,participation=scoped_results(selected_records,dimension,unit,node['path'] if node else (),group_text_paths)
 
         def mark_complete_population(items, participants, population, target=None, dim='', name=''):
             # Use actual, leader-adjusted counts, never displayed historical rates.
@@ -767,14 +771,26 @@ def create_app(instance=None):
         leadership_rate=None
         leadership_total=0
         leadership_basis_complete=True
+        # A path may omit hierarchy levels. Bucket by the child's own dimension,
+        # then apply the complete path to distinguish identical names in different branches.
+        child_buckets={(child['dimension'],child['unit']):[] for child in child_nodes}
+        child_dimensions={dim for dim,_ in child_buckets}
+        for r in selected_records:
+            if r['wave']!=reference_wave or not child_buckets:
+                continue
+            dims=dimensions[(reference_wave,r['feedback'])]
+            for dim in child_dimensions:
+                bucket=child_buckets.get((dim,dims.get(dim)))
+                if bucket is not None:
+                    bucket.append(r)
         for child in child_nodes:
-            cr,cp,cg=results(pid,path=child['path'])
-            mark_complete_population(cr,cp,cg,child)
+            cr,cp=scoped_results(child_buckets[(child['dimension'],child['unit'])],path=child['path'])
+            mark_complete_population(cr,cp,grounds,child)
             n=cp.get(reference_wave,0)
             visible=n>=minimum
             if visible and include_children:
                 child_results.append((child,cr))
-            child_ground=next((g for g in cg if g['wave']==reference_wave and g['dimension']==child['dimension'] and g['unit']==child['unit']),{})
+            child_ground=next((g for g in grounds if g['wave']==reference_wave and g['dimension']==child['dimension'] and g['unit']==child['unit']),{})
             unique_unit=ground_path_matches(reference_wave,child)
             if unique_unit and child_ground.get('inclusive_total')==0:
                 continue
@@ -793,7 +809,7 @@ def create_app(instance=None):
         if child_nodes:
             from report_groups import leadership_team
             team,team_rows,team_people,team_n=leadership_team(
-                result_sources(pid),child_nodes,reference_wave,child_scope['path'] if child_scope else ())
+                result_sources(pid),child_nodes,reference_wave,child_scope['path'] if child_scope else (),dimensions)
             team_total=leadership_total if leadership_basis_complete else None
             team_visible=team_n>=minimum
             if team_n or team_total:
@@ -846,9 +862,9 @@ def create_app(instance=None):
         if node and node['path']!=total_path and not any(path==total_path for _,_,path in candidates):
             candidates.append(('total',(single_root['unit'] if single_root else 'Alle Organisationseinheiten'),total_path))
         for kind,label,path in candidates:
-            comp,comp_participation,comp_grounds=results(pid,path=path)
+            comp,comp_participation=scoped_results(selected_records,path=path)
             comp_node=next((n for n in nodes if n['path']==path),None)
-            mark_complete_population(comp,comp_participation,comp_grounds,comp_node)
+            mark_complete_population(comp,comp_participation,grounds,comp_node)
             comparisons.append(dict(kind=kind,label=label,rows=[r for r in comp if r['wave'] in selected and r['n']>=minimum and r['type']!='text']))
         display_unit=unit or (single_root['unit'] if single_root else 'Alle Organisationseinheiten')
         scope=node_id or (dimension+'|'+unit if dimension else '')
@@ -889,6 +905,11 @@ def create_app(instance=None):
 
     @app.route('/p/<int:pid>/report')
     def report(pid):
+        if request.args.get('preparing')=='1':
+            args=request.args.to_dict(flat=False)
+            args.pop('preparing')
+            destination=url_for('report',pid=pid)+'?'+urlencode(args,doseq=True)
+            return render_template('preparing.html',destination=destination)
         ctx=report_data(pid,group_text_origins=True)
         ctx['text_summaries']=approved_summaries(pid,ctx)
         from report_views import prepare_text_views
@@ -925,7 +946,7 @@ def create_app(instance=None):
         payload=dict(project=ctx['p']['name'],unit=ctx['display_unit'],
                      focus_wave=ctx['focus_wave'],cards=cards,overviews=overviews,
                      selected=ctx['selected'],reference_wave=ctx['reference_wave'])
-        html=render_template('report.html',**ctx,cards=cards,chart_library=chart_library,
+        html=render_template('report.html',**ctx,report_icon=report_icon,cards=cards,chart_library=chart_library,
                              chart_renderer=chart_renderer,chart_payload=payload,
                              auto_zip=request.args.get('zip')=='1',themes=themes,overviews=overviews,
                              standalone=bool(request.args.get('download')),
@@ -939,7 +960,6 @@ def create_app(instance=None):
     def report_package(pid):
         import re
         import zipfile
-        from urllib.parse import urlencode
         ctx=report_data(pid)
         selected=list(dict.fromkeys(request.form.getlist('report_oe')))
         path=ctx['node']['path'] if ctx['node'] else []

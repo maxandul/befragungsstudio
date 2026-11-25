@@ -76,7 +76,8 @@ class TextDisclosure:
             if record['wave'] != wave:
                 continue
             person = (wave, record['feedback'])
-            origins.setdefault(person, oe_path(mapped_dimensions(record, mappings, aliases)))
+            if person not in origins:
+                origins[person]=oe_path(mapped_dimensions(record, mappings, aliases))
             raw = record['raw']
             if str(raw.get('Kadertyp (subject)', raw.get('Kadertyp', ''))).strip() == '100':
                 leaders.add(person)

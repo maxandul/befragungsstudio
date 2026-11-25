@@ -71,6 +71,7 @@
     url.search=new URLSearchParams({wave:wave.value,source:source.value,dimension:dimensionValue(),original:original.value,target:target.value,clear:clear.checked?'1':'0'});
     document.querySelectorAll('input[type=hidden][name=wave]').forEach(input=>input.value=wave.value);
     byId('preview-error').hidden=true;
+    const done=window.studioActivity('Segmentvorschau wird geladen …');
     try{
       const response=await fetch(url,{headers:{Accept:'application/json'},credentials:'same-origin',cache:'no-store'});
       const result=await response.json();
@@ -78,6 +79,7 @@
       if(!response.ok)throw new Error(result.error||'Vorschau konnte nicht geladen werden.');
       data=result;render();
     }catch(error){if(mine!==requestNumber)return;byId('preview-error').textContent=error.message;byId('preview-error').hidden=false;}
+    finally{done();}
   }
   const later=()=>{clearTimeout(timer);timer=setTimeout(refresh,300);};
   function syncAliasTarget(){
