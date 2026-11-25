@@ -7,7 +7,8 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
   const complete={...row,wave:'2027',complete_population:true,mean_ci95:null,top2_ci95:null};
   const payload={project:'Test',unit:'Bereich',cards:[{label:'Frage',rows:[row,complete],
     children:[{...row,unit:'Team'},{...complete,unit:'Vollständig'}],comparisons:[{kind:'parent',label:'Amt',rows:[row,complete]}]}]};
-  const elements={'chart-data':{textContent:JSON.stringify(payload)},'export-status':{},'chart-0':{},'children-0':{},
+  const section={open:false,addEventListener(name,fn){events[name]=fn;}};
+  const elements={'chart-data':{textContent:JSON.stringify(payload)},'export-status':{},'chart-0':{closest:()=>section},'children-0':{},
     'report-metric':{value:'mean',addEventListener(name,fn){events.metric=fn;}},
     'show-ci':{checked:false,addEventListener(name,fn){events.ci=fn;}},'ci-note':{hidden:true},'all-charts':{addEventListener(){}}};
   const buttons=['history','children'].map(view=>({dataset:{index:'0',png:'wide',view},addEventListener(n,fn){events[view]=fn;}}));
@@ -24,6 +25,14 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
     document,window:{devicePixelRatio:1},Chart,Intl,Map,Promise,Blob,setTimeout:()=>0,
     URL:{createObjectURL:()=> 'blob:test',revokeObjectURL(){}}
   });
+  assert.equal(configs.length,0);
+  elements['show-ci'].checked=true;events.ci();
+  elements['show-ci'].checked=false;events.ci();
+  assert.equal(configs.length,0);
+  section.open=true;events.toggle();
+  assert.equal(configs.length,2);
+  events.toggle();
+  assert.equal(configs.length,2);
   const current=id=>configs.filter(r=>r.canvas===elements[id]).at(-1).config;
   assert.equal(current('chart-0').options.plugins.confidenceIntervals.enabled,false);
   current('chart-0').data.datasets[1].hidden=true;
@@ -76,5 +85,15 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
   assert.equal(elements['ci-note'].hidden,true);
   assert.doesNotMatch(names.at(-1),/_ci95\.png$/);
   assert.equal(configs.at(-1).config.options.plugins.confidenceIntervals.enabled,false);
+  section.open=false;events.toggle();
+  const count=configs.length;
+  elements['report-metric'].value='mean';events.metric();
+  assert.equal(configs.length,count);
+  await events.history();
+  assert.equal(configs.length,count+1);
+  assert.equal(configs.at(-1).config.data.datasets[1].hidden,true);
+  section.open=true;events.toggle();
+  assert.equal(current('chart-0').data.datasets[1].hidden,true);
+  assert.equal(current('chart-0').data.datasets[0].data[0],4);
   console.log('Konfidenzintervalle: Schalter, Schutz, Zeichenrichtung, Tooltip und Export geprüft.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

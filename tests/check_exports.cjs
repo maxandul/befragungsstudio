@@ -11,7 +11,7 @@ const path = require('node:path');
   const elements = {
     'chart-data': {textContent:JSON.stringify(payload)},
     'export-status': {textContent:''},
-    'chart-0': {},
+    'chart-0': {closest:()=>null},
     'metric-0': {value:'top2',addEventListener(){}},
     'all-charts': {disabled:false,addEventListener(name,fn){events.all=fn;}}
   };

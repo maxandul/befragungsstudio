@@ -12,7 +12,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
   payload.cards[1].comparisons=[{kind:'parent',label:'Übergeordnete OE: Amt',rows:[row('2024',3,20)]}];
   const elements={'chart-data':{textContent:JSON.stringify(payload)},'export-status':{},
     'report-metric':{value:'mean',addEventListener(name,fn){events.metric=fn;}},
-    'all-charts':{addEventListener(){}},'chart-0':{},'chart-1':{},
+    'all-charts':{addEventListener(){}},'chart-0':{closest:()=>null},'chart-1':{closest:()=>null},
     'overview-history-0':{},'overview-children-0':{}};
   for(const kind of ['parent','total'])elements['show-'+kind]={checked:true,addEventListener(name,fn){events[kind]=fn;}};
   const button={dataset:{topic:'0',topicView:'children'},addEventListener(name,fn){events.png=fn;}};
