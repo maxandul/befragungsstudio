@@ -31,7 +31,7 @@ async function run(renew) {
   };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/questions.js'),'utf8'),{
     document,FormData,fetch,location:{pathname:'/p/1/questions',href:'http://127.0.0.1:5051/p/1/questions'},
-    window:{addEventListener(){}},sessionStorage:{getItem(){return null;}},TypeError
+    window:{addEventListener(){},studioActivity(){return ()=>{};}},sessionStorage:{getItem(){return null;}},TypeError
   });
   await events.submit({preventDefault(){},submitter:{name:'action',value:'save'}});
   assert.equal(status.textContent,'Gespeichert');

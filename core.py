@@ -197,7 +197,23 @@ def number(value):
         return None
 
 
-def oe_leaders(records, mappings=(), aliases=(), dimension='', unit='', path=()):
+def respondent_dimensions(records, mappings, aliases):
+    """Validate every row, reusing the resolved dimensions for identical mapping inputs."""
+    fields=tuple(dict.fromkeys(m['source'] for m in mappings))
+    resolved={}
+    people={}
+    for r in records:
+        signature=(r['wave'],tuple(str(r['raw'].get(field,'')).strip() for field in fields))
+        if signature not in resolved:
+            resolved[signature]=mapped_dimensions(r,mappings,aliases)
+        dims=resolved[signature]
+        person=(r['wave'],r['feedback'])
+        if people.setdefault(person,dims)!=dims:
+            raise ValueError('Widersprüchliche Segmentmerkmale innerhalb eines Fragebogens.')
+    return people
+
+
+def oe_leaders(records, mappings=(), aliases=(), dimension='', unit='', path=(), dimensions=None):
     """Kadertyp 100 am exakten OE-Pfad; unterstellte Leitungen bleiben enthalten."""
     from organisation import LEVELS
     leaders=set()
@@ -205,7 +221,7 @@ def oe_leaders(records, mappings=(), aliases=(), dimension='', unit='', path=())
         raw=r['raw']
         if str(raw.get('Kadertyp (subject)',raw.get('Kadertyp',''))).strip()!='100':
             continue
-        dims=mapped_dimensions(r,mappings,aliases)
+        dims=dimensions[(r['wave'],r['feedback'])] if dimensions is not None else mapped_dimensions(r,mappings,aliases)
         full=[(d,dims[d]) for d,_ in LEVELS if dims.get(d)]
         direct=(full==list(path)) if path else (
             bool(full) and full[-1]==(dimension,unit) if dimension else len(full)<=1)
@@ -214,21 +230,20 @@ def oe_leaders(records, mappings=(), aliases=(), dimension='', unit='', path=())
     return leaders
 
 
-def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit='', exclusions=(), path=(), exclude_leaders=False, group_text_paths=False):
+def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit='', exclusions=(), path=(), exclude_leaders=False, group_text_paths=False, dimensions=None):
     from organisation import oe_path
 
     exclusions=set(exclusions)
     by_question = defaultdict(dict)
     participation = defaultdict(set)
-    dim_cache = {}
-    leaders=oe_leaders(records,mappings,aliases,dimension,unit,path) if exclude_leaders else set()
+    if iter(records) is records:
+        records=list(records)
+    if dimensions is None:
+        dimensions=respondent_dimensions(records,mappings,aliases)
+    leaders=oe_leaders(records,mappings,aliases,dimension,unit,path,dimensions) if exclude_leaders else set()
     for r in records:
         cache_key = (r['wave'], r['feedback'])
-        dims = mapped_dimensions(r, mappings, aliases)
-        # Inkonsistente Merkmale innerhalb eines Fragebogens müssen vor Bericht behoben werden.
-        if cache_key in dim_cache and dim_cache[cache_key] != dims:
-            raise ValueError('Widersprüchliche Segmentmerkmale innerhalb eines Fragebogens.')
-        dim_cache[cache_key] = dims
+        dims = dimensions[cache_key]
         if path and not all(dims.get(d) == u for d,u in path):
             continue
         if dimension and dims.get(dimension) != unit:
@@ -286,7 +301,7 @@ def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit=''
             elif q['type'] == 'text':
                 texts.append(value)
                 if group_text_paths:
-                    dims = dim_cache[(wave, r['feedback'])]
+                    dims = dimensions[(wave, r['feedback'])]
                     texts_by_path[oe_path(dims)].append(value)
                     texts_by_person[(wave,r['feedback'])]=value
             else:

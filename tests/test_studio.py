@@ -14,6 +14,18 @@ from core import read_table,normalize,aggregate,parse_rules,segment_preview
 
 
 class StudioTests(unittest.TestCase):
+    def test_shared_dimension_lookup_checks_each_answer_and_respects_wave_aliases(self):
+        from core import respondent_dimensions
+        mappings=[dict(wave='*',source='Teamcode',dimension='Team')]
+        aliases=[dict(wave='2026',source='A',target='B',dimension='Team')]
+        rows=[dict(wave=wave,feedback='1',raw={'Teamcode':team,'Question':wording})
+              for wave,team,wording in [('2025','A','F1'),('2026','A','F1'),('2026',' B ','F2')]]
+        self.assertEqual(respondent_dimensions(rows,mappings,aliases),
+                         {('2025','1'):{'Team':'A'},('2026','1'):{'Team':'B'}})
+        rows.append(dict(wave='2026',feedback='1',raw={'Teamcode':'C'}))
+        with self.assertRaisesRegex(ValueError,'Widersprüchliche Segmentmerkmale'):
+            respondent_dimensions(rows,mappings,aliases)
+
     def test_segment_dimensions_are_complete_unique_and_extensible(self):
         from html.parser import HTMLParser
         class Selects(HTMLParser):
