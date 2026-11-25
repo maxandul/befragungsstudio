@@ -398,8 +398,7 @@ Fragenausschlüssen, Fehlwerten, vollständigem OE-Pfad und Leitungsausschluss.
 4. **Inhaltlich prüfen:** Themen und Aussagen neben den Originalen sichten und redigieren.
    Auch nicht ausgewertete Antworten prüfen. Titel und Aussagen lassen sich bearbeiten.
    Quellenkorrekturen benötigen in dieser ersten Version einen neuen Auftrag.
-5. **Freigeben:** Unter Ergebnisse & Berichte «Geprüfte Textzusammenfassungen im Bericht
-   anzeigen» aktivieren. Zusammenfassungen erscheinen bei der jeweiligen Textfrage,
+5. **Freigeben:** Unter «Berichtsgestaltung» die geprüfte Textanalyse aktivieren. Zusammenfassungen erscheinen bei der jeweiligen Textfrage,
    unabhängig davon, ob vollständige Originaltexte ebenfalls ausgewählt sind.
    Für einen erneuten HTML-Export ist keine neue KI-Auswertung erforderlich.
 
@@ -539,7 +538,7 @@ benötigen die beschriebene Prüfung. Quellen und Nuancen werden vor der Bericht
 nach dem exakten OE-Pfad und Leitungsausschluss gefiltert. Unpassende Quellen gelangen
 auch nicht in die aufklappbaren Vertiefungen oder Drucktexte.
 
-Unter **Ergebnisse & Berichte** stehen zwei Vorlagen bereit:
+Unter **Berichtsgestaltung** stehen zwei Vorlagen bereit:
 
 - **GL kompakt:** Nach den Übersichts-Charts erscheinen pro Textfrage höchstens drei
   wiederkehrende Anliegen mit jeweils mindestens zwei Textantwortenden. Massgebend ist
@@ -790,7 +789,7 @@ Rückgaben bei erhaltener Redaktion.
 
 ## Nächste Schritte im Bericht (Version 0.1.23)
 
-Unter «Ergebnisse & Berichte» → «Berichtstexte und Gesamtsynthese» steht das freie
+Unter «Berichtsgestaltung» → «Berichtstexte bearbeiten» steht das freie
 Textfeld «Nächste Schritte» für Massnahmen, Zuständigkeiten und Termine bereit.
 Der gespeicherte Inhalt gilt für die ausgewählte OE und Welle. Er erscheint am
 Berichtsende vor den Berechnungshinweisen, mit einem Link im Inhaltsverzeichnis.

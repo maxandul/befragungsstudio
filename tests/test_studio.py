@@ -183,14 +183,14 @@ class StudioTests(unittest.TestCase):
         with sqlite3.connect(Path(self.temp.name)/'studio.sqlite3') as c:
             self.assertEqual(c.execute('SELECT COUNT(DISTINCT canonical) FROM questions').fetchone()[0],1)
             self.assertEqual(c.execute('SELECT missing FROM question_settings').fetchone()[0],'Keine Antwort\nKeine Ahnung')
-        r=self.client.get('/p/1/results?min_n=1')
-        self.assertIn(b'4.50',r.data)
+        r=self.client.get('/p/1/report?min_n=1')
+        self.assertIn(b'"mean": 4.5',r.data)
         self.assertIn(b'Gemeinsame Frage',r.data)
         with sqlite3.connect(Path(self.temp.name)/'studio.sqlite3') as c:
             c.execute('UPDATE answers SET answer=? WHERE feedback=?',('Keine Ahnung','b'))
-        r=self.client.get('/p/1/results?min_n=1')
-        self.assertIn(b'4.00',r.data)
-        self.assertNotIn(b'4.50',r.data)
+        r=self.client.get('/p/1/report?min_n=1')
+        self.assertIn(b'"mean": 4.0',r.data)
+        self.assertNotIn(b'"mean": 4.5',r.data)
         f=self.question_form()
         # Das echte Formular enthält nur eine Karte pro gemeinsamer Frage.
         f['group_key']=['new'];f['split_source']='old'
@@ -281,10 +281,10 @@ class StudioTests(unittest.TestCase):
             self.assertEqual(r.status_code,302,r.data)
         self.post(f'/p/{pid}/segments',dict(action='mapping',wave='*',dimension='Bereich',source='Bereich'))
         self.post(f'/p/{pid}/grounds',dict(wave='Puls 2026',dimension='Bereich',unit='AI',total='4'))
-        r=self.client.get(f'/p/{pid}/results?dimension=Bereich&unit=AI&min_n=1')
+        r=self.client.get(f'/p/{pid}/report?dimension=Bereich&unit=AI&min_n=1')
         self.assertEqual(r.status_code,200,r.data)
         self.assertIn(b'50.0 %',r.data)
-        self.assertIn(b'4.00',r.data)
+        self.assertIn(b'"mean": 4.0',r.data)
         suppressed=self.client.get(f'/p/{pid}/report?min_n=5')
         self.assertNotIn(b'<canvas id="chart-',suppressed.data)
         r=self.client.get(f'/p/{pid}/report?min_n=1&download=1')

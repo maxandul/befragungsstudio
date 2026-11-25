@@ -12,6 +12,7 @@ from werkzeug.exceptions import HTTPException
 from flask import (Flask, abort, flash, redirect, render_template, request, send_file, jsonify,
                    session, url_for, g)
 from core import read_table, normalize, content_hash, aggregate
+from report_cockpit import display_options, editorial_values
 from organisation import tree
 from segment_preview import SegmentPreviews
 from survey_sources import SurveySources, install_source_revisions
@@ -24,21 +25,26 @@ DEFAULT_MISSING = 'Keine Antwort\nKeine Anmerkung\nKann ich noch nicht beurteile
 
 
 @dataclass
-class ReportSelection:
-    """Inputs for one wave selection. A ZIP shares them across its OE reports."""
+class ReportOutline:
     project: dict
     available: list
     focus_wave: str
     selected: list
     reference_wave: str
-    eligible: set
     minimum: int
     sources: tuple
     dimensions: dict
-    selected_records: list
-    grounds: list
     nodes: list
     reference_nodes: list
+    dated: dict
+
+
+@dataclass
+class ReportSelection(ReportOutline):
+    """Inputs for one wave selection. A ZIP shares them across its OE reports."""
+    eligible: set
+    selected_records: list
+    grounds: list
     wave_nodes: dict
     participation_policies: dict
     comparison_rows: dict = field(default_factory=dict)
@@ -628,34 +634,41 @@ def create_app(instance=None):
         nodes=tree(entries,observed.values())
         return nodes,tree(entries) if entries else nodes
 
-    def prepare_report_selection(pid):
+    def report_outline(pid,args):
         p=project(pid)
         with db() as c:
             dated={r[0]:r[1] for r in c.execute('SELECT wave,MIN(NULLIF(date,\'\')) FROM answers WHERE project=? GROUP BY wave',(pid,))}
         available=sorted(dated,key=lambda w:(dated.get(w) or '9999',w))
-        focus_wave=request.args.get('focus_wave','').strip()
+        focus_wave=args.get('focus_wave','').strip()
         if focus_wave and focus_wave not in available:
             raise ValueError('Die ausgewählte Bezugswelle ist nicht vorhanden.')
-        eligible=set()
         if focus_wave:
+            selected=available[:available.index(focus_wave)+1]
+        else:
+            selected=args.getlist('wave') or available
+            if any(w not in available for w in selected):
+                raise ValueError('Eine ausgewählte Welle ist nicht vorhanden.')
+        selected=[w for w in available if w in selected]
+        reference_wave=focus_wave or (selected[-1] if selected else '')
+        sources,dimensions=survey_snapshot(pid)
+        nodes,reference_nodes=report_tree(dimensions,(dated.get(reference_wave) or '')[:10])
+        return ReportOutline(p,available,focus_wave,selected,reference_wave,max(1,int(args.get('min_n',p['min_n']))),
+                             sources,dimensions,nodes,reference_nodes,dated)
+
+    def prepare_report_selection(pid):
+        outline=report_outline(pid,request.args)
+        selected,dimensions,dated=outline.selected,outline.dimensions,outline.dated
+        records,_,_,_,grounds,_=outline.sources
+        grounds=adjusted_grounds(pid,records,grounds)
+        eligible=set()
+        if outline.focus_wave:
             # Die Bezugswelle bestimmt den Fragenumfang unabhängig von Segment und Fallzahl.
             # Globale und wellenspezifische Ausschlüsse gelten auch für die Fragenauswahl.
             with db() as c:
                 eligible={r[0] for r in c.execute('''SELECT DISTINCT q.canonical
                     FROM answers a JOIN questions q ON q.project=a.project AND q.source=a.source
                     LEFT JOIN question_exclusions e ON e.project=a.project AND e.source=a.source AND e.wave=a.wave
-                    WHERE a.project=? AND a.wave=? AND q.include=1 AND e.source IS NULL''',(pid,focus_wave))}
-            selected=available[:available.index(focus_wave)+1]
-        else:
-            selected=request.args.getlist('wave') or available
-            if any(w not in available for w in selected):
-                raise ValueError('Eine ausgewählte Welle ist nicht vorhanden.')
-        selected=[w for w in available if w in selected]
-        reference_wave=focus_wave or (selected[-1] if selected else '')
-        sources,dimensions=survey_snapshot(pid)
-        records,_,_,_,grounds,_=sources
-        grounds=adjusted_grounds(pid,records,grounds)
-        nodes,reference_nodes=report_tree(dimensions,(dated.get(reference_wave) or '')[:10])
+                    WHERE a.project=? AND a.wave=? AND q.include=1 AND e.source IS NULL''',(pid,outline.focus_wave))}
         # Grundmengen gehören zu einer Welle. Frühere Antwortpfade dürfen die
         # Zuordnung im aktuellen Organisationsstand nicht mehrdeutig machen.
         wave_nodes={w:report_tree({k:d for k,d in dimensions.items() if k[0]==w},(dated.get(w) or '')[:10])[0] for w in selected}
@@ -665,21 +678,15 @@ def create_app(instance=None):
                                     for r in c.execute('SELECT * FROM participation_policies WHERE project=?',(pid,))}
         selected_waves=set(selected)
         selected_records=[r for r in records if r['wave'] in selected_waves]
-        return ReportSelection(
-            project=p, available=available, focus_wave=focus_wave, selected=selected,
-            reference_wave=reference_wave, eligible=eligible,
-            minimum=max(1,int(request.args.get('min_n',p['min_n']))),
-            sources=sources, dimensions=dimensions, selected_records=selected_records,
-            grounds=grounds, nodes=nodes, reference_nodes=reference_nodes,
-            wave_nodes=wave_nodes, participation_policies=participation_policies,
-        )
+        return ReportSelection(**vars(outline),eligible=eligible,selected_records=selected_records,
+                               grounds=grounds,wave_nodes=wave_nodes,participation_policies=participation_policies)
 
-    def report_scope(nodes):
-        dimension=request.args.get('dimension','').strip()
-        unit=request.args.get('unit','').strip()
+    def report_scope(nodes,args):
+        dimension=args.get('dimension','').strip()
+        unit=args.get('unit','').strip()
         if bool(dimension)!=bool(unit):
             raise ValueError('Merkmal und Einheit bitte gemeinsam auswählen oder beide leer lassen.')
-        node_id=request.args.get('oe','')
+        node_id=args.get('oe','')
         node=next((n for n in nodes if n['id']==node_id),None)
         if node_id and node is None:
             raise ValueError('Die ausgewählte Organisationseinheit ist nicht vorhanden.')
@@ -687,7 +694,7 @@ def create_app(instance=None):
             dimension,unit=node['dimension'],node['unit']
         return node,dimension,unit
 
-    def report_data(pid, group_text_origins=False, with_comparisons=True, selection=None):
+    def report_data(pid, group_text_origins=False, with_comparisons=True, selection=None, for_editor=False):
         if selection is None:
             selection=prepare_report_selection(pid)
         p=selection.project
@@ -698,7 +705,7 @@ def create_app(instance=None):
         grounds=selection.grounds
         nodes,reference_nodes=selection.nodes,selection.reference_nodes
         selected_records=selection.selected_records
-        node,dimension,unit=report_scope(nodes)
+        node,dimension,unit=report_scope(nodes,request.args)
         node_id=node['id'] if node else ''
 
         def ground_path_matches(wave, target):
@@ -764,13 +771,9 @@ def create_app(instance=None):
         for r in rows:
             if r['type']=='text' and r['wave']==reference_wave and r['n']>=minimum:
                 text_groups.setdefault(r['theme'] or 'Weitere Fragen',[]).append(r)
-        profile=request.args.get('profile','gl')
-        print_mode=request.args.get('print_mode','full' if profile=='oe' and 'profile' in request.args else 'compact')
-        if profile not in ('gl','oe') or print_mode not in ('compact','full'):
-            raise ValueError('Bitte eine vorhandene Berichtsvorlage und Druckansicht wählen.')
-        include_summaries=request.args.get('include_summaries')=='1' or (
-            'profile' in request.args and 'text_options_set' not in request.args and 'include_summaries' not in request.args)
-        include_evidence=request.args.get('include_evidence')=='1'
+        options=display_options(request.args)
+        profile,print_mode=options['profile'],options['print_mode']
+        include_summaries,include_evidence=options['include_summaries'],options['include_evidence']
         evidence_options={}
         for theme,items in text_groups.items():
             options={}
@@ -870,7 +873,7 @@ def create_app(instance=None):
                         person=source_key[:2]
                         if not text_disclosure.allows_source(person,item['canonical']):
                             continue
-                        if include_summaries and questions[source_key[2]]['type']=='text':
+                        if (include_summaries or for_editor) and questions[source_key[2]]['type']=='text':
                             summary_sources.add(source_key)
                         path=text_disclosure.paths[person]
                         if text_disclosure.allows_detail(path,item['canonical']):
@@ -905,16 +908,7 @@ def create_app(instance=None):
         root_scope=bool(single_root and ((not node and not dimension) or (node and node['id']==single_root['id'])))
         if root_scope:scope=single_root['id']
         with db() as c:
-            # The former overall view and the sole top OE share the same editorial scope.
-            notes={r['theme']:r['body'] for r in c.execute('SELECT theme,body FROM report_notes WHERE project=? AND scope=? AND wave=?',(pid,'' if root_scope else scope,reference_wave))}
-            own_notes={r['theme']:r['body'] for r in c.execute('SELECT theme,body FROM report_notes WHERE project=? AND scope=? AND wave=?',(pid,scope,reference_wave))}
-            notes.update(own_notes)
-            evidence={}
-            if root_scope:
-                for row in c.execute('SELECT theme,token FROM report_evidence WHERE project=? AND scope=? AND wave=?',(pid,'',reference_wave)):
-                    if row['theme'] not in own_notes:evidence.setdefault(row['theme'],[]).append(row['token'])
-            for row in c.execute('SELECT theme,token FROM report_evidence WHERE project=? AND scope=? AND wave=?',(pid,scope,reference_wave)):
-                evidence.setdefault(row['theme'],[]).append(row['token'])
+            notes,evidence=editorial_values(c,pid,scope,reference_wave,root_scope)
         selected_evidence={theme:[option for token,option in options.items() if token in evidence.get(theme,[])]
                            for theme,options in evidence_options.items()}
         stale_evidence={theme:len(set(tokens)-set(evidence_options.get(theme,{}))) for theme,tokens in evidence.items()}
@@ -926,15 +920,11 @@ def create_app(instance=None):
                     nodes=nodes,node=node,node_id=node_id,display_unit=display_unit,single_root=single_root,child_rates=child_rates,child_results=child_results,
                     include_children=include_children,text_disclosure=text_disclosure,summary_sources=summary_sources,leadership=leadership,leadership_rate=leadership_rate,
                     batch_nodes=[n for n in nodes if not node or n['path'][:len(node['path'])]==node['path']],
-                    comparisons=comparisons,reference_wave=reference_wave,notes=notes,scope=scope,
+                    comparisons=comparisons,reference_wave=reference_wave,notes=notes,scope=scope,root_scope=root_scope,
                     text_groups=text_groups,include_texts=include_texts,include_summaries=include_summaries,afa=afa,
                     profile=profile,print_mode=print_mode,explicit_profile='profile' in request.args,
                     include_evidence=include_evidence,evidence_options=evidence_options,evidence=evidence,
                     selected_evidence=selected_evidence,stale_evidence=stale_evidence,note_themes=note_themes)
-
-    @app.route('/p/<int:pid>/results')
-    def view_results(pid):
-        return render_template('results.html',**report_data(pid,with_comparisons=False),tab='results')
 
     @app.route('/p/<int:pid>/report')
     def report(pid, selection=None):
@@ -994,7 +984,7 @@ def create_app(instance=None):
         import re
         import zipfile
         selection=prepare_report_selection(pid)
-        scope,_,_=report_scope(selection.nodes)
+        scope,_,_=report_scope(selection.nodes,request.args)
         selected=list(dict.fromkeys(request.form.getlist('report_oe')))
         path=scope['path'] if scope else []
         allowed={n['id']:n for n in selection.nodes if not path or n['path'][:len(path)]==path}
@@ -1033,23 +1023,6 @@ def create_app(instance=None):
         flash('AFA-Themenvorschlag übernommen. Eigene Themen bleiben erhalten; Anpassungen sind unter «Fragen» möglich.')
         return redirect(url_for('view_results',pid=pid)+'?'+request.query_string.decode())
 
-    @app.post('/p/<int:pid>/report/notes')
-    def report_notes(pid):
-        ctx=report_data(pid,with_comparisons=False)
-        theme=request.form.get('theme','')
-        tokens=set(request.form.getlist('evidence'))
-        if not tokens.issubset(ctx['evidence_options'].get(theme,{})):
-            raise ValueError('Ein ausgewählter Textbeleg ist für diese OE, Welle und dieses Thema nicht mehr verfügbar. Bitte die Ansicht neu laden und die Auswahl prüfen.')
-        with db() as c:
-            c.execute('INSERT INTO report_notes VALUES(?,?,?,?,?) ON CONFLICT(project,scope,wave,theme) DO UPDATE SET body=excluded.body',
-                      (pid,ctx['scope'],ctx['reference_wave'],theme,request.form.get('body','').strip()))
-            c.execute('DELETE FROM report_evidence WHERE project=? AND scope=? AND wave=? AND theme=?',
-                      (pid,ctx['scope'],ctx['reference_wave'],theme))
-            c.executemany('INSERT INTO report_evidence VALUES(?,?,?,?,?)',
-                          [(pid,ctx['scope'],ctx['reference_wave'],theme,token) for token in sorted(tokens)])
-        flash('Berichtstext gespeichert.')
-        return redirect(url_for('view_results',pid=pid)+'?'+request.query_string.decode())
-
     @app.route('/p/<int:pid>/charts.zip')
     def charts(pid):
         # PNGs und ZIP entstehen im Browser. Der bisherige Einstieg bleibt erhalten.
@@ -1057,6 +1030,9 @@ def create_app(instance=None):
 
     from text_routes import register
     approved_summaries=register(app,db,project,report_data,result_sources)
+
+    from report_cockpit import register as register_cockpit
+    register_cockpit(app,db,project,report_outline,report_scope,report_data,approved_summaries)
 
     return app
 

@@ -15,3 +15,11 @@
 @keyframes studio-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.activity::before{animation:none}}
 @media print{.activity{display:none}}
+
+.design-actions{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem}
+.oe-branches{list-style:none;padding-left:1rem;border-left:1px solid var(--line)}
+.oe-branches>li{margin:.4rem 0}.oe-branches summary{font-size:.9rem;color:var(--dark)}
+.oe-choice .check{margin:.15rem 0}.oe-choice small{margin-left:.4rem;font-weight:normal}
+#report-package>summary,.editor-section>summary{font-weight:700;color:var(--dark)}
+.editor-section textarea{width:100%}.editor-section .qual-topic{margin:.5rem 0}
+.editor-quotes .check{display:flex;align-items:baseline;gap:.6rem}.editor-quotes span{white-space:pre-line;overflow-wrap:anywhere}

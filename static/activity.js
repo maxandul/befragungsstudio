@@ -79,7 +79,8 @@
   document.addEventListener('submit', event => {
     if (event.defaultPrevented) return;
     const form = event.target;
-    if (form.hasAttribute('data-attachment')) {
+    if (event.submitter?.formTarget === '_blank') return;
+    if (form.hasAttribute('data-attachment') || event.submitter?.hasAttribute('data-attachment')) {
       event.preventDefault();
       download(form.getAttribute('action'), {method:'POST', body:new FormData(form, event.submitter)});
     } else if (!window.navigation) navigate();
