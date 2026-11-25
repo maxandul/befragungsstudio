@@ -5,7 +5,7 @@
 
 .preview-change{background:#edf5fa;font-weight:700}
 
-.ground-editor[open]{min-width:260px;padding:12px;background:#f7f9fb;border:1px solid var(--line);border-radius:6px}.danger{background:#fff;color:#9a2c24;border-color:#be655d}.danger:hover{background:#fff0ee;color:#7e211b}
+.danger{background:#fff;color:#9a2c24;border-color:#be655d}.danger:hover{background:#fff0ee;color:#7e211b}
 .verbatim{white-space:pre-wrap;overflow-wrap:anywhere}details>summary{cursor:pointer}details .verbatim{background:var(--light);padding:16px;border-left:3px solid var(--blue)}
 .text-editor-question{margin:28px 0}.text-editor-topic{margin:18px 0;padding:16px;border:1px solid var(--line);border-left:4px solid var(--blue);border-radius:8px;background:#f7f9fb}.text-editor-topic>summary{font-weight:700;color:var(--blue)}.text-editor-statement{margin:14px 0;padding:16px;background:white;border:1px solid var(--line);border-radius:6px;scroll-margin-top:20px}.text-editor-statement>summary{line-height:1.6}.text-editor-statement[open]>summary{margin-bottom:16px}.text-editor-statement small{font-weight:400}.text-editor-sources{margin-top:16px}.text-editor-sources>.source-question{margin:12px 0}
 
