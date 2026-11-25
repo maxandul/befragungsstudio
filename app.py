@@ -12,6 +12,7 @@ from flask import (Flask, abort, flash, redirect, render_template, request, send
                    session, url_for, g)
 from core import read_table, normalize, content_hash, aggregate
 from organisation import tree
+from segment_preview import SegmentPreviews
 from survey_sources import SurveySources, install_source_revisions
 
 ROOT = Path(__file__).resolve().parent
@@ -99,6 +100,7 @@ def create_app(instance=None):
             abort(404)
         return dict(p)
 
+    segment_previews=SegmentPreviews(db)
     source_cache=SurveySources(db,DEFAULT_MISSING)
 
     def survey_snapshot(pid, wave=None):
@@ -438,16 +440,13 @@ def create_app(instance=None):
                 return redirect(url_for('segments',pid=pid,wave=f['wave'],dimension=dim,
                                         source=f['source'] if f['action']=='mapping' else ''))
             waves=[r[0] for r in c.execute('SELECT DISTINCT wave FROM answers WHERE project=? ORDER BY wave',(pid,))]
-            columns=set()
-            for row in c.execute('SELECT raw FROM answers WHERE project=?',(pid,)):
-                columns.update(json.loads(row[0]))
             mappings=c.execute('SELECT * FROM mappings WHERE project=?',(pid,)).fetchall()
             aliases=c.execute('SELECT * FROM aliases WHERE project=?',(pid,)).fetchall()
         scope=request.args.get('wave') or (waves[0] if waves else '*')
         selected_dimension=request.args.get('dimension','Bereich')
         dimension_options=list(dict.fromkeys([*DIMENSIONS,*[r['dimension'] for r in mappings],
                                               *[r['dimension'] for r in aliases],selected_dimension]))
-        return render_template('segments.html', p=p, waves=waves, columns=sorted(columns), mappings=mappings,aliases=aliases,tab='segments',
+        return render_template('segments.html', p=p, waves=waves, columns=segment_previews.column_names(pid), mappings=mappings,aliases=aliases,tab='segments',
                                scope=scope,selected_source=request.args.get('source',''),
                                selected_dimension=selected_dimension,dimension_options=dimension_options,
                                mapping_rules=[dict(r) for r in mappings])
@@ -455,20 +454,7 @@ def create_app(instance=None):
     @app.get('/p/<int:pid>/segments/preview')
     def preview_segments(pid):
         project(pid)
-        from core import segment_preview
-        scope=request.args.get('wave','*')
-        with db() as c:
-            query='SELECT wave,feedback,raw FROM answers WHERE project=?'
-            args=[pid]
-            if scope!='*':
-                query+=' AND wave=?'
-                args.append(scope)
-            records=[]
-            for row in c.execute(query,args):
-                records.append(dict(wave=row['wave'],feedback=row['feedback'],raw=json.loads(row['raw'])))
-            mappings=[dict(r) for r in c.execute("SELECT * FROM mappings WHERE project=? ORDER BY (wave != '*'),id",(pid,))]
-            aliases=[dict(r) for r in c.execute("SELECT * FROM aliases WHERE project=? ORDER BY (wave != '*'),id",(pid,))]
-        return jsonify(segment_preview(records,mappings,aliases,wave=scope,
+        return jsonify(segment_previews.preview(pid, wave=request.args.get('wave','*'),
                        source=request.args.get('source',''),dimension=request.args.get('dimension',''),
                        original=request.args.get('original',''),target=request.args.get('target','').strip(),
                        clear=request.args.get('clear')=='1'))

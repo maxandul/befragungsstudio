@@ -9,18 +9,25 @@ from core import respondent_dimensions
 
 def install_source_revisions(c):
     """Track committed source changes, including those made by external seed scripts."""
-    c.execute('CREATE TABLE IF NOT EXISTS survey_revisions(project INTEGER PRIMARY KEY, revision INTEGER NOT NULL)')
-    for table in ('answers','questions','question_settings','question_exclusions','mappings','aliases','grounds'):
+    install_revisions(c,'survey_revision',('answers','questions','question_settings','question_exclusions','mappings','aliases','grounds'))
+    # Saved aliases and new mappings can reuse column statistics from the same answers.
+    install_revisions(c,'segment_revision',('answers',))
+
+
+def install_revisions(c, prefix, sources):
+    table_name=prefix+'s'
+    c.execute(f'CREATE TABLE IF NOT EXISTS {table_name}(project INTEGER PRIMARY KEY, revision INTEGER NOT NULL)')
+    for table in sources:
         for operation, owner in [('INSERT','NEW'),('DELETE','OLD'),('UPDATE','NEW')]:
             # The table names and operations below are fixed application constants.
-            c.execute(f"""CREATE TRIGGER IF NOT EXISTS survey_revision_{table}_{operation}
+            c.execute(f"""CREATE TRIGGER IF NOT EXISTS {prefix}_{table}_{operation}
                 AFTER {operation} ON {table} BEGIN
-                  INSERT INTO survey_revisions VALUES({owner}.project,1)
+                  INSERT INTO {table_name} VALUES({owner}.project,1)
                   ON CONFLICT(project) DO UPDATE SET revision=revision+1;
                 END""")
-        c.execute(f"""CREATE TRIGGER IF NOT EXISTS survey_revision_{table}_move
+        c.execute(f"""CREATE TRIGGER IF NOT EXISTS {prefix}_{table}_move
             AFTER UPDATE OF project ON {table} WHEN OLD.project != NEW.project BEGIN
-              INSERT INTO survey_revisions VALUES(OLD.project,1)
+              INSERT INTO {table_name} VALUES(OLD.project,1)
               ON CONFLICT(project) DO UPDATE SET revision=revision+1;
             END""")
 
