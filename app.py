@@ -4,6 +4,7 @@ import json
 import secrets
 import hashlib
 import sqlite3
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import quote, urlencode
@@ -13,6 +14,7 @@ from flask import (Flask, abort, flash, redirect, render_template, request, send
                    session, url_for, g)
 from core import read_table, normalize, content_hash, aggregate
 from report_cockpit import display_options, editorial_values
+from report_filenames import report_filename, wave_period
 from organisation import tree
 from segment_preview import SegmentPreviews
 from survey_sources import SurveySources, install_source_revisions
@@ -48,6 +50,10 @@ class ReportSelection(ReportOutline):
     wave_nodes: dict
     participation_policies: dict
     comparison_rows: dict = field(default_factory=dict)
+
+    def filename(self, unit):
+        period=wave_period(self.reference_wave,self.dated.get(self.reference_wave))
+        return report_filename(period,unit)
 
 
 def create_app(instance=None):
@@ -933,6 +939,8 @@ def create_app(instance=None):
             args.pop('preparing')
             destination=url_for('report',pid=pid)+'?'+urlencode(args,doseq=True)
             return render_template('preparing.html',destination=destination)
+        if selection is None:
+            selection=prepare_report_selection(pid)
         ctx=report_data(pid,group_text_origins=True,selection=selection)
         ctx['text_summaries']=approved_summaries(pid,ctx)
         from report_views import prepare_text_views
@@ -974,14 +982,11 @@ def create_app(instance=None):
                              auto_zip=request.args.get('zip')=='1',themes=themes,overviews=overviews,
                              standalone=bool(request.args.get('download')),
                              app_url=request.url_root.rstrip('/')+url_for('view_results',pid=pid)+'?'+request.query_string.decode())
-        if request.args.get('download'):
-            return send_file(io.BytesIO(html.encode()),mimetype='text/html',as_attachment=True,
-                             download_name=f'Pulsbericht_{pid}.html')
-        return html
+        return send_file(io.BytesIO(html.encode()),mimetype='text/html',as_attachment=bool(request.args.get('download')),
+                         download_name=selection.filename(ctx['display_unit']))
 
     @app.post('/p/<int:pid>/reports.zip')
     def report_package(pid):
-        import re
         import zipfile
         selection=prepare_report_selection(pid)
         scope,_,_=report_scope(selection.nodes,request.args)
@@ -995,6 +1000,8 @@ def create_app(instance=None):
         params['download']=['1']
         base_url=request.url_root
         stream=io.BytesIO()
+        names={node_id:selection.filename(allowed[node_id]['unit']) for node_id in selected}
+        counts=Counter(name.casefold() for name in names.values())
         with zipfile.ZipFile(stream,'w',zipfile.ZIP_DEFLATED) as archive:
             for i,node_id in enumerate(selected,1):
                 params['oe']=[node_id]
@@ -1003,8 +1010,9 @@ def create_app(instance=None):
                     response.direct_passthrough=False
                     html=response.get_data()
                     response.close()
-                stem=re.sub(r'[^\w .-]','_',allowed[node_id]['unit'])[:70].strip(' .') or 'OE'
-                archive.writestr(f'{i:02d}_{stem}.html',html)
+                name=names[node_id]
+                # Distinct folders retain the individual filenames even on Windows.
+                archive.writestr(f'{i:02d}/{name}' if counts[name.casefold()]>1 else name,html)
         stream.seek(0)
         return send_file(stream,mimetype='application/zip',as_attachment=True,download_name=f'Berichtspaket_{pid}.zip')
 
