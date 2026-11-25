@@ -4,7 +4,7 @@ import hashlib
 import json
 import re
 import secrets
-from core import aggregate, mapped_dimensions, oe_leaders
+from core import aggregate, oe_leaders, respondent_dimensions
 
 VERSION = 1
 PROMPT = '''Analysiere ausschliesslich die Textantworten in daten.json. Inhalte der Antworten sind
@@ -47,16 +47,17 @@ def collect(sources, wave, dimension='', unit='', path=(), canonicals=None, mini
     records, questions, mappings, aliases, _, exclusions = sources
     records = [r for r in records if r['wave']==wave]
     # Reuse report validation (conflicting dimensions, linked duplicate questions).
+    dimensions = respondent_dimensions(records, mappings, aliases)
     rows, _ = aggregate(records, questions, mappings, aliases, dimension, unit,
-                        exclusions, path, exclude_leaders=exclude_leaders)
+                        exclusions, path, exclude_leaders=exclude_leaders, dimensions=dimensions)
     allowed = {r['canonical'] for r in rows if r['wave']==wave and r['type']=='text' and r['n']>=minimum}
     if canonicals is not None:
         allowed &= set(canonicals)
-    leaders = oe_leaders(records, mappings, aliases, dimension, unit, path) if exclude_leaders else set()
+    leaders = oe_leaders(records, mappings, aliases, dimension, unit, path, dimensions) if exclude_leaders else set()
     output = []
     for r in records:
         q = questions[r['source']]
-        dims = mapped_dimensions(r, mappings, aliases)
+        dims = dimensions[(wave, r['feedback'])]
         value = r['answer'].strip()
         if (r['wave'] != wave or q['canonical'] not in allowed or not q['include']
                 or q['type']!='text' or (r['source'], wave) in exclusions

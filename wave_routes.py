@@ -34,7 +34,8 @@ def register(app,db,project,report_data,result_sources):
         if not hasattr(g,'wave_text_fingerprints'):g.wave_text_fingerprints={}
         key=(pid,job['selection'])
         if key not in g.wave_text_fingerprints:
-            g.wave_text_fingerprints[key]=wa.contextual_records(result_sources(pid),**json.loads(job['selection']))
+            selection=json.loads(job['selection'])
+            g.wave_text_fingerprints[key]=wa.contextual_records(result_sources(pid,selection['wave']),**selection)
         records=g.wave_text_fingerprints[key]
         if ta.digest(records)==job['fingerprint']:return True
         with db() as c:
@@ -71,7 +72,7 @@ def register(app,db,project,report_data,result_sources):
     def home(pid):
         # OE/report filters intentionally do not constrain a wave preparation.
         ctx=wave_context(pid)
-        records=ta.collect(result_sources(pid),ctx['reference_wave'],exclude_leaders=False)
+        records=ta.collect(result_sources(pid,ctx['reference_wave']),ctx['reference_wave'],exclude_leaders=False)
         counts={}
         for r in records:
             q=counts.setdefault(r['canonical'],dict(canonical=r['canonical'],label=r['label'],count=0))
@@ -88,7 +89,7 @@ def register(app,db,project,report_data,result_sources):
         ctx=wave_context(pid)
         batch_size=request.form.get('batch_size','standard')
         wa.batch_limits(batch_size)
-        all_records=wa.contextual_records(result_sources(pid),wave=ctx['reference_wave'],exclude_leaders=False)
+        all_records=wa.contextual_records(result_sources(pid,ctx['reference_wave']),wave=ctx['reference_wave'],exclude_leaders=False)
         selected=set(request.form.getlist('question'))
         available={r['canonical'] for r in all_records}
         if not selected or not selected<=available:

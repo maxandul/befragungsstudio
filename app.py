@@ -10,8 +10,9 @@ from werkzeug.exceptions import HTTPException
 
 from flask import (Flask, abort, flash, redirect, render_template, request, send_file, jsonify,
                    session, url_for, g)
-from core import read_table, normalize, content_hash, aggregate, respondent_dimensions
+from core import read_table, normalize, content_hash, aggregate
 from organisation import tree
+from survey_sources import SurveySources, install_source_revisions
 
 ROOT = Path(__file__).resolve().parent
 DIMENSIONS = ['Amt', 'Bereich', 'Abteilung', 'RAV Gruppe', 'RAV', 'Team']
@@ -89,6 +90,7 @@ def create_app(instance=None):
                 c.execute(f'ALTER TABLE questions ADD COLUMN {column} {definition}')
         from report_themes import apply_afa_report_defaults
         apply_afa_report_defaults(c)
+        install_source_revisions(c)
 
     def project(pid):
         with db() as c:
@@ -97,38 +99,18 @@ def create_app(instance=None):
             abort(404)
         return dict(p)
 
-    def result_sources(pid):
-        if getattr(g,'result_project',None)==pid:
-            return g.result_sources
-        with db() as c:
-            qs = {r['source']: dict(r) for r in c.execute('SELECT * FROM questions WHERE project=?', (pid,))}
-            setting=c.execute('SELECT missing FROM question_settings WHERE project=?',(pid,)).fetchone()
-            common_missing=setting[0] if setting else DEFAULT_MISSING
-            for q in qs.values():
-                if not q['missing_override']:
-                    q['missing']=common_missing
-            parents={q['canonical']:q for q in qs.values() if q['type']!='text'}
-            for q in qs.values():
-                if q['type']=='text' and q['text_parent'] in parents:
-                    parent=parents[q['text_parent']]
-                    q['theme']=parent['theme']
-                    q['sort_order']=parent['sort_order']
-            mappings = [dict(r) for r in c.execute("SELECT * FROM mappings WHERE project=? ORDER BY (wave != '*'),id", (pid,))]
-            aliases = [dict(r) for r in c.execute("SELECT * FROM aliases WHERE project=? ORDER BY (wave != '*'),id", (pid,))]
-            grounds = [dict(r) for r in c.execute('SELECT * FROM grounds WHERE project=?', (pid,))]
-            exclusions={(r['source'],r['wave']) for r in c.execute('SELECT source,wave FROM question_exclusions WHERE project=?',(pid,))}
-            # Keep only the raw fields consumed by reports and text jobs. Import data stays intact.
-            fields={m['source'] for m in mappings} | {'Question','Kadertyp','Kadertyp (subject)','Survey ID'}
-            records=[]
-            for row in c.execute('SELECT wave,feedback,source,answer,raw FROM answers WHERE project=?',(pid,)):
-                record=dict(row)
-                raw=json.loads(record['raw'])
-                record['raw']={field:raw[field] for field in fields if field in raw}
-                records.append(record)
-        g.report_dimensions=None
-        g.result_project=pid
-        g.result_sources=(records,qs,mappings,aliases,grounds,exclusions)
-        return g.result_sources
+    source_cache=SurveySources(db,DEFAULT_MISSING)
+
+    def survey_snapshot(pid, wave=None):
+        snapshots=g.setdefault('survey_snapshots',{})
+        if (pid,None) in snapshots:
+            return snapshots[(pid,None)]
+        if (pid,wave) not in snapshots:
+            snapshots[(pid,wave)]=source_cache.get(pid,wave)
+        return snapshots[(pid,wave)]
+
+    def result_sources(pid, wave=None):
+        return survey_snapshot(pid,wave)[0]
 
     def adjusted_grounds(pid, records, grounds):
         role_waves={r['wave'] for r in records if 'Kadertyp (subject)' in r['raw'] or 'Kadertyp' in r['raw']}
@@ -628,7 +610,7 @@ def create_app(instance=None):
         nodes=tree(entries,observed.values())
         return nodes,tree(entries) if entries else nodes
 
-    def report_data(pid, group_text_origins=False):
+    def report_data(pid, group_text_origins=False, with_comparisons=True):
         p=project(pid)
         dimension=request.args.get('dimension','').strip()
         unit=request.args.get('unit','').strip()
@@ -655,10 +637,8 @@ def create_app(instance=None):
                 raise ValueError('Eine ausgewählte Welle ist nicht vorhanden.')
         selected=[w for w in available if w in selected]
         reference_wave=focus_wave or (selected[-1] if selected else '')
-        records,questions,mappings,aliases,grounds,exclusions=result_sources(pid)
-        if g.report_dimensions is None:
-            g.report_dimensions=respondent_dimensions(records,mappings,aliases)
-        dimensions=g.report_dimensions
+        sources,dimensions=survey_snapshot(pid)
+        records,questions,mappings,aliases,grounds,exclusions=sources
         grounds=adjusted_grounds(pid,records,grounds)
         nodes,reference_nodes=report_tree(dimensions,(dated.get(reference_wave) or '')[:10])
         # Grundmengen gehören zu einer Welle. Frühere Antwortpfade dürfen die
@@ -682,7 +662,7 @@ def create_app(instance=None):
         child_scope=node or (single_root if not dimension else None)
         child_parent=child_scope['id'] if child_scope else ''
         child_nodes=[]
-        if reference_wave and (node or not dimension):
+        if with_comparisons and reference_wave and (node or not dimension):
             child_nodes=[n for n in reference_nodes if n['parent']==child_parent]
         group_text_paths=group_text_origins
         selected_waves=set(selected)
@@ -710,7 +690,8 @@ def create_app(instance=None):
                 if row['complete_population']:
                     row['mean_ci95']=row['top2_ci95']=None
 
-        mark_complete_population(rows,participation,grounds,node,dimension,unit)
+        if with_comparisons:
+            mark_complete_population(rows,participation,grounds,node,dimension,unit)
         if focus_wave:
             rows=[r for r in rows if r['canonical'] in eligible]
         rows=[r for r in rows if r['wave'] in selected]
@@ -775,8 +756,8 @@ def create_app(instance=None):
         # then apply the complete path to distinguish identical names in different branches.
         child_buckets={(child['dimension'],child['unit']):[] for child in child_nodes}
         child_dimensions={dim for dim,_ in child_buckets}
-        for r in selected_records:
-            if r['wave']!=reference_wave or not child_buckets:
+        for r in (selected_records if child_buckets else ()):
+            if r['wave']!=reference_wave:
                 continue
             dims=dimensions[(reference_wave,r['feedback'])]
             for dim in child_dimensions:
@@ -809,7 +790,7 @@ def create_app(instance=None):
         if child_nodes:
             from report_groups import leadership_team
             team,team_rows,team_people,team_n=leadership_team(
-                result_sources(pid),child_nodes,reference_wave,child_scope['path'] if child_scope else (),dimensions)
+                sources,child_nodes,reference_wave,child_scope['path'] if child_scope else (),dimensions)
             team_total=leadership_total if leadership_basis_complete else None
             team_visible=team_n>=minimum
             if team_n or team_total:
@@ -829,7 +810,7 @@ def create_app(instance=None):
             from report_text_privacy import TextDisclosure
             from report_views import group_original_texts
             text_origin_nodes=[child for child,_ in child_results]
-            text_disclosure=TextDisclosure(result_sources(pid),reference_wave,minimum,text_origin_nodes,include_children,leadership,
+            text_disclosure=TextDisclosure(sources,reference_wave,minimum,text_origin_nodes,include_children,leadership,
                                            scope=child_scope['path'] if child_scope else (),dimension=dimension,unit=unit)
             if text_disclosure.adhoc_node:text_origin_nodes.append(text_disclosure.adhoc_node)
             child_depth=len(child_nodes[0]['path']) if child_nodes and include_children else 0
@@ -861,7 +842,7 @@ def create_app(instance=None):
         total_path=single_root['path'] if single_root else []
         if node and node['path']!=total_path and not any(path==total_path for _,_,path in candidates):
             candidates.append(('total',(single_root['unit'] if single_root else 'Alle Organisationseinheiten'),total_path))
-        for kind,label,path in candidates:
+        for kind,label,path in (candidates if with_comparisons else ()):
             comp,comp_participation=scoped_results(selected_records,path=path)
             comp_node=next((n for n in nodes if n['path']==path),None)
             mark_complete_population(comp,comp_participation,grounds,comp_node)
@@ -886,7 +867,6 @@ def create_app(instance=None):
         stale_evidence={theme:len(set(tokens)-set(evidence_options.get(theme,{}))) for theme,tokens in evidence.items()}
         note_themes=list(dict.fromkeys(['Erkenntnisse auf einen Blick']+
             [group[0]['theme'] or 'Weitere Fragen' for group in grouped.values()]+list(text_groups)+['Nächste Schritte']))
-        records,_,_,_,_,_=result_sources(pid)
         afa=any(r['raw'].get('Survey ID')=='2330' for r in records)
         return dict(p=p,grouped=grouped,rates=rates,minimum=minimum,hidden=hidden,
                     dimension=dimension,unit=unit,selected=selected,available=available,focus_wave=focus_wave,
@@ -901,7 +881,7 @@ def create_app(instance=None):
 
     @app.route('/p/<int:pid>/results')
     def view_results(pid):
-        return render_template('results.html',**report_data(pid),tab='results')
+        return render_template('results.html',**report_data(pid,with_comparisons=False),tab='results')
 
     @app.route('/p/<int:pid>/report')
     def report(pid):
@@ -1001,7 +981,7 @@ def create_app(instance=None):
 
     @app.post('/p/<int:pid>/report/notes')
     def report_notes(pid):
-        ctx=report_data(pid)
+        ctx=report_data(pid,with_comparisons=False)
         theme=request.form.get('theme','')
         tokens=set(request.form.getlist('evidence'))
         if not tokens.issubset(ctx['evidence_options'].get(theme,{})):
