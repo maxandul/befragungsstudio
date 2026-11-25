@@ -173,6 +173,25 @@ class OrganisationReportTests(unittest.TestCase):
         self.assertIn(b'<option value="0" selected>Weglassen</option>',settings.data)
         self.assertIn('Ergebnisse direktunterstellter OEs anzeigen',settings.text)
 
+    def test_package_reuses_shared_comparisons_and_matches_individual_downloads(self):
+        teams=[self.node('Team','Gleich',area)['id'] for area in ('A','B')]
+        root_path=self.node('Amt','AFA')['path']
+        for minimum in (2,3):
+            query=f'focus_wave=2026&min_n={minimum}&include_texts=1&include_summaries=1'
+            with patch('app.aggregate',wraps=aggregate) as aggregates:
+                package=self.client.post('/p/1/reports.zip?'+query,
+                                         data=dict(csrf=self.csrf,report_oe=teams))
+                self.assertEqual(package.status_code,200)
+                # Both teams share the Amtsvergleich, but belong to distinct parents.
+                root_calls=[call for call in aggregates.call_args_list if call.args[7]==root_path]
+                self.assertEqual(len(root_calls),1)
+            with zipfile.ZipFile(io.BytesIO(package.data)) as archive:
+                self.assertEqual(archive.namelist(),['01_Gleich.html','02_Gleich.html'])
+                for name,node_id in zip(archive.namelist(),teams):
+                    single=self.client.get(f'/p/1/report?{query}&download=1&oe={node_id}')
+                    self.assertEqual(single.status_code,200)
+                    self.assertEqual(archive.read(name),single.data)
+
     def test_ruecklauf_omits_units_with_zero_invited(self):
         with self.db() as c:
             for unit in ('Ohne Eingeladene','Ohne Grundmenge','Nur Leitung'):

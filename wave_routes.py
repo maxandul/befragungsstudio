@@ -251,10 +251,7 @@ def register(app,db,project,report_data,result_sources):
               AND NOT EXISTS(SELECT 1 FROM wave_text_parts p WHERE p.job=j.id AND p.state!='approved')
               ORDER BY j.rowid DESC''',(pid,ctx['reference_wave']))]
         if not jobs:return {}
-        sources=result_sources(pid)
-        eligible={tuple(r['key']) for r in ta.collect(sources,ctx['reference_wave'],ctx['dimension'],ctx['unit'],
-                  ctx['node']['path'] if ctx['node'] else [],minimum=ctx['minimum'])
-                  if not disclosure or disclosure.allows_source(tuple(r['key'][:2]),r['canonical'])}
+        eligible=ctx['summary_sources']
         output={};claimed=set()
         for job in jobs:
             if not is_current(pid,job):continue

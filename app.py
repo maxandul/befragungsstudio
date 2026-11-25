@@ -4,6 +4,7 @@ import json
 import secrets
 import hashlib
 import sqlite3
+from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import quote, urlencode
 from werkzeug.exceptions import HTTPException
@@ -20,6 +21,27 @@ DIMENSIONS = ['Amt', 'Bereich', 'Abteilung', 'RAV Gruppe', 'RAV', 'Team']
 TYPES = {'ignore': 'Nicht auswerten', 'scale': 'Skala', 'choice_single': 'Einfachauswahl',
          'choice_multiple': 'Mehrfachauswahl', 'yesno': 'Ja/Nein', 'text': 'Freitext'}
 DEFAULT_MISSING = 'Keine Antwort\nKeine Anmerkung\nKann ich noch nicht beurteilen\nN. v.'
+
+
+@dataclass
+class ReportSelection:
+    """Inputs for one wave selection. A ZIP shares them across its OE reports."""
+    project: dict
+    available: list
+    focus_wave: str
+    selected: list
+    reference_wave: str
+    eligible: set
+    minimum: int
+    sources: tuple
+    dimensions: dict
+    selected_records: list
+    grounds: list
+    nodes: list
+    reference_nodes: list
+    wave_nodes: dict
+    participation_policies: dict
+    comparison_rows: dict = field(default_factory=dict)
 
 
 def create_app(instance=None):
@@ -596,18 +618,15 @@ def create_app(instance=None):
         nodes=tree(entries,observed.values())
         return nodes,tree(entries) if entries else nodes
 
-    def report_data(pid, group_text_origins=False, with_comparisons=True):
+    def prepare_report_selection(pid):
         p=project(pid)
-        dimension=request.args.get('dimension','').strip()
-        unit=request.args.get('unit','').strip()
-        if bool(dimension)!=bool(unit):
-            raise ValueError('Merkmal und Einheit bitte gemeinsam auswählen oder beide leer lassen.')
         with db() as c:
             dated={r[0]:r[1] for r in c.execute('SELECT wave,MIN(NULLIF(date,\'\')) FROM answers WHERE project=? GROUP BY wave',(pid,))}
         available=sorted(dated,key=lambda w:(dated.get(w) or '9999',w))
         focus_wave=request.args.get('focus_wave','').strip()
         if focus_wave and focus_wave not in available:
             raise ValueError('Die ausgewählte Bezugswelle ist nicht vorhanden.')
+        eligible=set()
         if focus_wave:
             # Die Bezugswelle bestimmt den Fragenumfang unabhängig von Segment und Fallzahl.
             # Globale und wellenspezifische Ausschlüsse gelten auch für die Fragenauswahl.
@@ -624,23 +643,58 @@ def create_app(instance=None):
         selected=[w for w in available if w in selected]
         reference_wave=focus_wave or (selected[-1] if selected else '')
         sources,dimensions=survey_snapshot(pid)
-        records,questions,mappings,aliases,grounds,exclusions=sources
+        records,_,_,_,grounds,_=sources
         grounds=adjusted_grounds(pid,records,grounds)
         nodes,reference_nodes=report_tree(dimensions,(dated.get(reference_wave) or '')[:10])
         # Grundmengen gehören zu einer Welle. Frühere Antwortpfade dürfen die
         # Zuordnung im aktuellen Organisationsstand nicht mehrdeutig machen.
         wave_nodes={w:report_tree({k:d for k,d in dimensions.items() if k[0]==w},(dated.get(w) or '')[:10])[0] for w in selected}
 
-        def ground_path_matches(wave, target):
-            paths=[n['path'] for n in wave_nodes[wave]
-                   if n['dimension']==target['dimension'] and n['unit']==target['unit']]
-            return paths==[target['path']]
+        with db() as c:
+            participation_policies={(r['wave'],r['dimension'],r['unit']):dict(r)
+                                    for r in c.execute('SELECT * FROM participation_policies WHERE project=?',(pid,))}
+        selected_waves=set(selected)
+        selected_records=[r for r in records if r['wave'] in selected_waves]
+        return ReportSelection(
+            project=p, available=available, focus_wave=focus_wave, selected=selected,
+            reference_wave=reference_wave, eligible=eligible,
+            minimum=max(1,int(request.args.get('min_n',p['min_n']))),
+            sources=sources, dimensions=dimensions, selected_records=selected_records,
+            grounds=grounds, nodes=nodes, reference_nodes=reference_nodes,
+            wave_nodes=wave_nodes, participation_policies=participation_policies,
+        )
+
+    def report_scope(nodes):
+        dimension=request.args.get('dimension','').strip()
+        unit=request.args.get('unit','').strip()
+        if bool(dimension)!=bool(unit):
+            raise ValueError('Merkmal und Einheit bitte gemeinsam auswählen oder beide leer lassen.')
         node_id=request.args.get('oe','')
         node=next((n for n in nodes if n['id']==node_id),None)
         if node_id and node is None:
             raise ValueError('Die ausgewählte Organisationseinheit ist nicht vorhanden.')
         if node:
             dimension,unit=node['dimension'],node['unit']
+        return node,dimension,unit
+
+    def report_data(pid, group_text_origins=False, with_comparisons=True, selection=None):
+        if selection is None:
+            selection=prepare_report_selection(pid)
+        p=selection.project
+        available,selected=selection.available,selection.selected
+        focus_wave,reference_wave=selection.focus_wave,selection.reference_wave
+        sources,dimensions=selection.sources,selection.dimensions
+        records,questions,mappings,aliases,_,exclusions=sources
+        grounds=selection.grounds
+        nodes,reference_nodes=selection.nodes,selection.reference_nodes
+        selected_records=selection.selected_records
+        node,dimension,unit=report_scope(nodes)
+        node_id=node['id'] if node else ''
+
+        def ground_path_matches(wave, target):
+            paths=[n['path'] for n in selection.wave_nodes[wave]
+                   if n['dimension']==target['dimension'] and n['unit']==target['unit']]
+            return paths==[target['path']]
         include_children=request.args.get('include_children','1')=='1'
         include_texts=request.args.get('include_texts')=='1'
         roots=[n for n in reference_nodes if not n['parent']]
@@ -651,8 +705,6 @@ def create_app(instance=None):
         if with_comparisons and reference_wave and (node or not dimension):
             child_nodes=[n for n in reference_nodes if n['parent']==child_parent]
         group_text_paths=group_text_origins
-        selected_waves=set(selected)
-        selected_records=[r for r in records if r['wave'] in selected_waves]
 
         def scoped_results(data, dimension='', unit='', path=(), group_text_paths=False):
             return aggregate(data,questions,mappings,aliases,dimension,unit,exclusions,path,
@@ -668,7 +720,7 @@ def create_app(instance=None):
                 if row['wave'] not in selected or row['type']!='scale':continue
                 matches=[g for g in population if g['wave']==row['wave'] and g['dimension']==dim and g['unit']==name]
                 unique=ground_path_matches(row['wave'],target) if target else (
-                    not dim or len([n for n in wave_nodes[row['wave']] if n['dimension']==dim and n['unit']==name])==1)
+                    not dim or len([n for n in selection.wave_nodes[row['wave']] if n['dimension']==dim and n['unit']==name])==1)
                 ground=matches[0] if len(matches)==1 and unique else {}
                 total=ground.get('total')
                 row['complete_population']=bool(total and not ground.get('leader_basis_missing')
@@ -679,14 +731,11 @@ def create_app(instance=None):
         if with_comparisons:
             mark_complete_population(rows,participation,grounds,node,dimension,unit)
         if focus_wave:
-            rows=[r for r in rows if r['canonical'] in eligible]
+            rows=[r for r in rows if r['canonical'] in selection.eligible]
         rows=[r for r in rows if r['wave'] in selected]
 
-        minimum=max(1,int(request.args.get('min_n',p['min_n'])))
+        minimum=selection.minimum
         from participation import apply_participation_policy
-        with db() as c:
-            participation_policies={(r['wave'],r['dimension'],r['unit']):dict(r)
-                                    for r in c.execute('SELECT * FROM participation_policies WHERE project=?',(pid,))}
         rates=[]
         for wave in available:
             n=participation.get(wave,0)
@@ -700,7 +749,7 @@ def create_app(instance=None):
             rates.append(apply_participation_policy(dict(wave=wave,n=n,total=total,rate=100*n/total if total else None,
                               ground_ambiguous=ambiguous,
                               leader_basis_missing=bool(matches and matches[0].get('leader_basis_missing')),
-                              warning=total is not None and n>total),participation_policies.get((wave,dimension,unit))))
+                              warning=total is not None and n>total),selection.participation_policies.get((wave,dimension,unit))))
         text_groups={}
         for r in rows:
             if r['type']=='text' and r['wave']==reference_wave and r['n']>=minimum:
@@ -772,7 +821,7 @@ def create_app(instance=None):
                                     ground_ambiguous=not unique_unit,
                                     rate=100*n/total if visible and total else None,
                                     leader_basis_missing=child_ground.get('leader_basis_missing',False)),
-                                    participation_policies.get((reference_wave,child['dimension'],child['unit'])),visible=visible))
+                                    selection.participation_policies.get((reference_wave,child['dimension'],child['unit'])),visible=visible))
         if child_nodes:
             from report_groups import leadership_team
             team,team_rows,team_people,team_n=leadership_team(
@@ -792,6 +841,7 @@ def create_app(instance=None):
                                 text_questions={r['canonical'] for r in team_rows if r['type']=='text' and r['n']>=minimum})
                 child_results.append((team,team_rows))
         text_disclosure=None
+        summary_sources=set()
         if group_text_paths:
             from report_text_privacy import TextDisclosure
             from report_views import group_original_texts
@@ -806,10 +856,14 @@ def create_app(instance=None):
                     safe_by_child={}
                     item['adhoc_text_count']=0
                     item.pop('texts_by_path')
-                    for person,text in item.pop('texts_by_person').items():
+                    for source_key,text in item.pop('texts_by_source').items():
+                        person=source_key[:2]
+                        if not text_disclosure.allows_source(person,item['canonical']):
+                            continue
+                        if include_summaries and questions[source_key[2]]['type']=='text':
+                            summary_sources.add(source_key)
                         path=text_disclosure.paths[person]
-                        if (text_disclosure.allows_source(person,item['canonical'])
-                                and text_disclosure.allows_detail(path,item['canonical'])):
+                        if text_disclosure.allows_detail(path,item['canonical']):
                             origin=path if person in text_disclosure.adhoc_people else path[:child_depth]
                             safe_by_child.setdefault(origin,[]).append(text)
                             if person in text_disclosure.adhoc_people:
@@ -829,10 +883,13 @@ def create_app(instance=None):
         if node and node['path']!=total_path and not any(path==total_path for _,_,path in candidates):
             candidates.append(('total',(single_root['unit'] if single_root else 'Alle Organisationseinheiten'),total_path))
         for kind,label,path in (candidates if with_comparisons else ()):
-            comp,comp_participation=scoped_results(selected_records,path=path)
-            comp_node=next((n for n in nodes if n['path']==path),None)
-            mark_complete_population(comp,comp_participation,grounds,comp_node)
-            comparisons.append(dict(kind=kind,label=label,rows=[r for r in comp if r['wave'] in selected and r['n']>=minimum and r['type']!='text']))
+            key=tuple(path)
+            if key not in selection.comparison_rows:
+                comp,comp_participation=scoped_results(selected_records,path=path)
+                comp_node=next((n for n in nodes if n['path']==path),None)
+                mark_complete_population(comp,comp_participation,grounds,comp_node)
+                selection.comparison_rows[key]=[r for r in comp if r['n']>=minimum and r['type']!='text']
+            comparisons.append(dict(kind=kind,label=label,rows=selection.comparison_rows[key]))
         display_unit=unit or (single_root['unit'] if single_root else 'Alle Organisationseinheiten')
         scope=node_id or (dimension+'|'+unit if dimension else '')
         root_scope=bool(single_root and ((not node and not dimension) or (node and node['id']==single_root['id'])))
@@ -857,7 +914,7 @@ def create_app(instance=None):
         return dict(p=p,grouped=grouped,rates=rates,minimum=minimum,hidden=hidden,
                     dimension=dimension,unit=unit,selected=selected,available=available,focus_wave=focus_wave,
                     nodes=nodes,node=node,node_id=node_id,display_unit=display_unit,single_root=single_root,child_rates=child_rates,child_results=child_results,
-                    include_children=include_children,text_disclosure=text_disclosure,leadership=leadership,leadership_rate=leadership_rate,
+                    include_children=include_children,text_disclosure=text_disclosure,summary_sources=summary_sources,leadership=leadership,leadership_rate=leadership_rate,
                     batch_nodes=[n for n in nodes if not node or n['path'][:len(node['path'])]==node['path']],
                     comparisons=comparisons,reference_wave=reference_wave,notes=notes,scope=scope,
                     text_groups=text_groups,include_texts=include_texts,include_summaries=include_summaries,afa=afa,
@@ -870,13 +927,13 @@ def create_app(instance=None):
         return render_template('results.html',**report_data(pid,with_comparisons=False),tab='results')
 
     @app.route('/p/<int:pid>/report')
-    def report(pid):
+    def report(pid, selection=None):
         if request.args.get('preparing')=='1':
             args=request.args.to_dict(flat=False)
             args.pop('preparing')
             destination=url_for('report',pid=pid)+'?'+urlencode(args,doseq=True)
             return render_template('preparing.html',destination=destination)
-        ctx=report_data(pid,group_text_origins=True)
+        ctx=report_data(pid,group_text_origins=True,selection=selection)
         ctx['text_summaries']=approved_summaries(pid,ctx)
         from report_views import prepare_text_views
         ctx['text_views']=prepare_text_views(ctx['text_summaries'],ctx['profile'],ctx['text_disclosure'])
@@ -926,10 +983,11 @@ def create_app(instance=None):
     def report_package(pid):
         import re
         import zipfile
-        ctx=report_data(pid)
+        selection=prepare_report_selection(pid)
+        scope,_,_=report_scope(selection.nodes)
         selected=list(dict.fromkeys(request.form.getlist('report_oe')))
-        path=ctx['node']['path'] if ctx['node'] else []
-        allowed={n['id']:n for n in ctx['nodes'] if not path or n['path'][:len(path)]==path}
+        path=scope['path'] if scope else []
+        allowed={n['id']:n for n in selection.nodes if not path or n['path'][:len(path)]==path}
         if not selected or len(selected)>50 or any(node not in allowed for node in selected):
             raise ValueError('Bitte eine bis höchstens 50 OEs aus dem gewählten Organisationszweig auswählen.')
         params=request.args.to_dict(flat=False)
@@ -941,7 +999,7 @@ def create_app(instance=None):
             for i,node_id in enumerate(selected,1):
                 params['oe']=[node_id]
                 with app.test_request_context('/p/'+str(pid)+'/report?'+urlencode(params,doseq=True),base_url=base_url):
-                    response=report(pid)
+                    response=report(pid,selection)
                     response.direct_passthrough=False
                     html=response.get_data()
                     response.close()

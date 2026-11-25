@@ -219,7 +219,7 @@ def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit=''
         r, q = next(iter(answers.values()))
         values, counts, missing, invalid, texts = [], defaultdict(int), 0, 0, []
         texts_by_path = defaultdict(list)
-        texts_by_person = {}
+        texts_by_source = {}
         valid_people = 0
         abstentions = 0
         for r, source_q in answers.values():
@@ -258,7 +258,7 @@ def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit=''
                 if group_text_paths:
                     dims = dimensions[(wave, r['feedback'])]
                     texts_by_path[oe_path(dims)].append(value)
-                    texts_by_person[(wave,r['feedback'])]=value
+                    texts_by_source[(wave,r['feedback'],r['source'])]=value
             else:
                 counts[value] += 1
             valid_people += 1
@@ -272,7 +272,7 @@ def aggregate(records, questions, mappings=(), aliases=(), dimension='', unit=''
                          **scale_intervals(values,q['top_from'])))
         if q['type'] == 'text' and group_text_paths:
             rows[-1]['texts_by_path'] = texts_by_path
-            rows[-1]['texts_by_person'] = texts_by_person
+            rows[-1]['texts_by_source'] = texts_by_source
     return sorted(rows, key=lambda x: (x['theme'], x['sort_order'],x['label'], x['wave'])), {
         wave: len(ids) for wave, ids in participation.items()}
 
