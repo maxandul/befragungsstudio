@@ -190,3 +190,14 @@ steht der Toggle direkt neben der Bezeichnung. Strukturelle HTML-Zeilenumbrüche
 erzeugen keine zusätzlichen Leerzeilen; nur der Aussageinhalt erhält Zeilenumbrüche.
 Unterdrückte Anzahlen sind ausdrücklich mit «Anzahl Textantworten aus
 Anonymitätsgründen ausgeblendet» gekennzeichnet.
+
+
+### Freitextgruppen: Teilnahmebasis auch für Führungsteams
+
+Führungsteams verwenden dieselbe Mindestgrösse wie andere Freitextgruppen: die
+Teilnehmenden der Welle, nicht die Zahl der Textantwortenden einer einzelnen Frage.
+Die zusätzliche fragespezifische Sperre für Führungsteams entfällt in Rohtexten,
+Belegen und KI-Zusammenfassungen. Zahlenantworten behalten ihre Mindestfallzahlen.
+Kleine Führungsteams werden weiterhin mit vollständiger, wellenweit fester
+Mitgliedschaft unter «ad hoc» gebündelt; die gemeinsame übergeordnete Ebene und
+der Ausschluss aus der jeweils eigenen OE bleiben verbindlich.
