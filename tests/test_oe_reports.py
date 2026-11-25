@@ -4,12 +4,14 @@ import re
 import sqlite3
 import tempfile
 import unittest
+from unittest.mock import patch
 import zipfile
 import shutil
 import subprocess
 from pathlib import Path
 
 from app import create_app, DEFAULT_MISSING
+from core import aggregate
 from organisation import tree
 from report_themes import topic_overviews
 
@@ -60,6 +62,16 @@ class OrganisationReportTests(unittest.TestCase):
         self.assertEqual(payload['cards'][0]['rows'][-1]['mean'],1)
         self.assertIn(b'Zuordnung nicht eindeutig',response.data)
         self.assertEqual(self.client.get('/p/1/report?oe=unknown').status_code,400)
+
+    def test_editor_aggregates_only_selected_oe_and_preview_keeps_comparisons(self):
+        query='oe='+self.node('Bereich','A')['id']
+        with patch('app.aggregate', wraps=aggregate) as aggregates:
+            editor=self.client.get('/p/1/results?'+query)
+            self.assertEqual(editor.status_code,200)
+            self.assertEqual(aggregates.call_count,1)
+        _,preview=self.payload(query)
+        self.assertTrue(preview['cards'][0]['children'])
+        self.assertTrue(preview['cards'][0]['comparisons'])
 
     def test_weighted_parent_children_and_suppression(self):
         _,payload=self.payload()

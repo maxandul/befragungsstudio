@@ -25,7 +25,7 @@ def register(app, db, project, report_data, result_sources):
 
     def current(pid,job):
         selection=json.loads(job['selection'])
-        records=ta.collect(result_sources(pid),**selection)
+        records=ta.collect(result_sources(pid,selection['wave']),**selection)
         return ta.matches_fingerprint(records,job['fingerprint'],json.loads(job['records']))
 
     def update(pid,job,**values):
@@ -52,7 +52,7 @@ def register(app, db, project, report_data, result_sources):
             raise ValueError('Bitte mindestens eine verfügbare Textfrage auswählen.')
         selection=dict(wave=ctx['reference_wave'],dimension=ctx['dimension'],unit=ctx['unit'],
                        path=ctx['node']['path'] if ctx['node'] else [],canonicals=sorted(set(selected)),minimum=ctx['minimum'])
-        records=ta.collect(result_sources(pid),**selection)
+        records=ta.collect(result_sources(pid,selection['wave']),**selection)
         if not records:
             raise ValueError('Für diese Auswahl sind keine auswertbaren Textantworten vorhanden.')
         jid=secrets.token_hex(16)
