@@ -501,6 +501,7 @@ def create_app(instance=None):
                 action=f.get('action','save')
                 if action not in ('save','update','delete'):
                     raise ValueError('Unbekannte Grundmengenaktion.')
+                c.execute('BEGIN IMMEDIATE')  # Compare the submitted originals and write under one lock.
                 original=None
                 original_leaders=None
                 if action in ('update','delete'):
@@ -554,7 +555,16 @@ def create_app(instance=None):
                         c.execute('DELETE FROM ground_leaders WHERE project=? AND wave=? AND dimension=? AND unit=?',(pid,wave,dim,unit))
                     flash('Grundmenge gespeichert. Werte gelten jeweils inklusive Untereinheiten und werden nicht addiert.')
                 return redirect(url_for('grounds',pid=pid))
-            grounds=[dict(r) for r in c.execute('SELECT g.*,l.total leaders FROM grounds g LEFT JOIN ground_leaders l ON l.project=g.project AND l.wave=g.wave AND l.dimension=g.dimension AND l.unit=g.unit WHERE g.project=? ORDER BY g.wave,g.dimension,g.unit',(pid,))]
+            ground_query='''SELECT g.*,l.total AS leaders FROM grounds g
+                            LEFT JOIN ground_leaders l USING(project,wave,dimension,unit)
+                            WHERE g.project=?'''
+            if 'edit_wave' in request.args:
+                identity=(request.args['edit_wave'],request.args.get('dimension',''),request.args.get('unit',''))
+                ground=c.execute(ground_query+' AND g.wave=? AND g.dimension=? AND g.unit=?',(pid,*identity)).fetchone()
+                if ground is None:
+                    raise ValueError('Dieser Eintrag ist nicht mehr vorhanden. Bitte die Grundmengenübersicht neu öffnen.')
+                return render_template('ground_edit.html',p=p,g=ground,waves=waves,tab='grounds')
+            grounds=c.execute(ground_query+' ORDER BY g.wave,g.dimension,g.unit',(pid,)).fetchall()
             snapshots=[]
             for row in c.execute('SELECT * FROM population_snapshots WHERE project=? ORDER BY wave',(pid,)):
                 snapshot=dict(row)

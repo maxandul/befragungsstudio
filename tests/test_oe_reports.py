@@ -302,9 +302,13 @@ class OrganisationReportTests(unittest.TestCase):
         response,_=self.payload()
         self.assertIn(b'50.0 %',response.data)
         page=self.client.get('/p/1/grounds')
-        self.assertIn(b'Grundmenge l',page.data)
-        self.assertIn(b'value="update"',page.data)
-        self.assertIn(b'value="10"',page.data)
+        self.assertEqual(page.data.count(b'<form '),1)
+        self.assertNotIn(b'name="original_total"',page.data)
+        edit=self.client.get('/p/1/grounds',query_string={'edit_wave':'2026','dimension':'','unit':''})
+        self.assertEqual(edit.status_code,200)
+        self.assertIn(b'value="update"',edit.data)
+        self.assertIn(b'value="delete"',edit.data)
+        self.assertIn(b'name="original_total" value="10"',edit.data)
         # Ein alter Browser-Tab darf die Korrektur nicht versehentlich löschen.
         response=self.client.post('/p/1/grounds',data=dict(csrf=self.csrf,action='delete',**identity))
         self.assertEqual(response.status_code,400)
@@ -315,6 +319,24 @@ class OrganisationReportTests(unittest.TestCase):
             self.assertIsNone(c.execute("SELECT 1 FROM grounds WHERE wave='2026' AND dimension='' ").fetchone())
             self.assertEqual(c.execute('SELECT COUNT(*) FROM answers').fetchone()[0],20)
             self.assertEqual(c.execute("SELECT total FROM grounds WHERE wave='2024' AND dimension='' ").fetchone()[0],5)
+
+    def test_ground_editor_links_support_historical_waves_and_special_characters(self):
+        from html import unescape
+        from urllib.parse import parse_qs, urlsplit
+        wave,unit='Frühjahr 2020','B&V / "A" + B'
+        with self.db() as c:
+            c.execute('INSERT INTO grounds VALUES(1,?,?,?,7)',(wave,'Bereich',unit))
+            c.execute('INSERT INTO ground_leaders VALUES(1,?,?,?,0)',(wave,'Bereich',unit))
+        listing=self.client.get('/p/1/grounds').text
+        urls=[unescape(url) for url in re.findall(r'href="([^"]+edit_wave[^"]+)"',listing)]
+        link=next(url for url in urls if parse_qs(urlsplit(url).query).get('unit')==[unit])
+        editor=self.client.get(link)
+        self.assertEqual(editor.status_code,200)
+        self.assertIn('<option selected>'+wave+'</option>',editor.text)
+        self.assertIn('name="original_leaders" value="0"',editor.text)
+        with self.db() as c:
+            c.execute('DELETE FROM grounds WHERE wave=?',(wave,))
+        self.assertEqual(self.client.get(link).status_code,400)
 
     def test_ground_move_rejects_collisions_and_invalid_values_atomically(self):
         data=dict(csrf=self.csrf,action='update',original_wave='2026',original_dimension='Bereich',original_unit='A',

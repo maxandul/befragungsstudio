@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Grundmenge bearbeiten</h2>
+<p>{{g.wave}} · {{g.dimension or 'Gesamt'}} · {{g.unit or 'Gesamtbefragung'}}</p>
+<form method="post" action="{{url_for('grounds',pid=p.id)}}" class="panel">
+  <input type="hidden" name="csrf" value="{{session.csrf}}">
+  {% for field in ('wave','dimension','unit','total') %}
+  <input type="hidden" name="original_{{field}}" value="{{g[field]}}">
+  {% endfor %}
+  <input type="hidden" name="original_leaders" value="{{g.leaders if g.leaders is not none else ''}}">
+  <div class="formgrid">
+    <label>Welle<select name="wave" required>
+      {% if g.wave not in waves %}<option selected>{{g.wave}}</option>{% endif %}
+      {% for w in waves %}<option {{'selected' if g.wave==w}}>{{w}}</option>{% endfor %}
+    </select></label>
+    <label>Merkmal <small>leer für Gesamtbefragung</small><input name="dimension" value="{{g.dimension}}"></label>
+    <label>Einheit <small>exakter Berichtswert</small><input name="unit" value="{{g.unit}}"></label>
+    <label>Eingeladene Personen<input name="total" type="number" min="0" step="1" value="{{g.total}}" required></label>
+    <label>Davon Leitungspersonen dieser OE (Kadertyp 100)
+      <input name="leader_total" type="number" min="0" step="1" value="{{g.leaders if g.leaders is not none else ''}}" placeholder="Unbekannt">
+      <small>Nur die Leitung der ausgewählten OE, ohne unterstellte Leitungen.</small>
+    </label>
+  </div>
+  <button name="action" value="update">Änderungen speichern</button>
+  <a class="button secondary" href="{{url_for('grounds',pid=p.id)}}">Abbrechen</a>
+  <button name="action" value="delete" class="danger small" formnovalidate>Grundmenge löschen</button>
+</form>
+{% endblock %}
